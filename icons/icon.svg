@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Lemonade Stand">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe9a8"/>
+      <stop offset="1" stop-color="#f7c948"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff8dc"/>
+      <stop offset="1" stop-color="#ffd94a"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#sky)"/>
+  <!-- glass -->
+  <path d="M150 148h212l-26 250a34 34 0 0 1-34 30H210a34 34 0 0 1-34-30z" fill="url(#glass)" stroke="#8a6300" stroke-width="14" stroke-linejoin="round"/>
+  <!-- lemonade line -->
+  <path d="M163 214h186l-20 184a34 34 0 0 1-34 30H217a34 34 0 0 1-34-30z" fill="#ffcf33"/>
+  <!-- straw -->
+  <path d="M300 120 246 300" stroke="#e2574c" stroke-width="26" stroke-linecap="round"/>
+  <!-- lemon wedge -->
+  <path d="M168 150a76 76 0 0 1 108-46 76 76 0 0 1 36 46z" fill="#fff3b0" stroke="#8a6300" stroke-width="12" stroke-linejoin="round"/>
+  <circle cx="222" cy="150" r="6" fill="#8a6300"/>
+</svg>
