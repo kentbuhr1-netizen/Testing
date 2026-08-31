@@ -337,3 +337,181 @@ button {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* ================================================================
+   Campaign: map, cities, corners, operations
+   ================================================================ */
+
+.head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.head-row h1 { margin: 0; }
+
+.treasury {
+  text-align: right;
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.treasury small {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+h1 .of { font-size: 15px; font-weight: 600; color: var(--ink-soft); }
+
+.crumb {
+  align-self: flex-start;
+  min-height: 40px;
+  padding: 0 14px 0 8px;
+  margin-bottom: -4px;
+  border-radius: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.crumb:active { background: var(--line); }
+
+/* ---- lists of places ---- */
+
+.city-list, .corner-list { display: grid; gap: 8px; }
+
+.city, .corner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg-2);
+  box-shadow: var(--shadow);
+}
+.city:active, .corner.open:active { transform: translateY(1px); background: var(--lemon); }
+.city.locked, .corner.locked { opacity: .5; box-shadow: none; background: transparent; }
+.city.done { border-color: var(--leaf); }
+
+.city-flag { font-size: 30px; line-height: 1; }
+.city-main, .corner-main { flex: 1; min-width: 0; }
+.city-name, .corner-name {
+  font-weight: 700;
+  font-size: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.city-count, .corner-target {
+  text-align: right;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.city-count small, .corner-target small {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.corner-no {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  font-weight: 800;
+  font-size: 14px;
+}
+.corner.claimed { background: color-mix(in srgb, var(--leaf) 12%, var(--bg-2)); border-color: color-mix(in srgb, var(--leaf) 35%, var(--line)); }
+.corner.claimed .corner-no { background: var(--leaf); color: #fff; border-color: var(--leaf); }
+.tick { color: var(--leaf); }
+
+/* ---- difficulty pills ---- */
+
+.pill {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  border: 1px solid transparent;
+}
+.pill-easy { background: color-mix(in srgb, var(--leaf) 18%, transparent); color: var(--leaf); border-color: color-mix(in srgb, var(--leaf) 35%, transparent); }
+.pill-medium { background: color-mix(in srgb, var(--lemon-deep) 20%, transparent); color: var(--lemon-deep); border-color: color-mix(in srgb, var(--lemon-deep) 40%, transparent); }
+.pill-hard { background: color-mix(in srgb, #e08c3c 22%, transparent); color: #c9711f; border-color: color-mix(in srgb, #e08c3c 40%, transparent); }
+.pill-impossible { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+
+@media (prefers-color-scheme: dark) {
+  .pill-hard { color: #f0a75c; }
+  .pill-medium { color: var(--lemon); }
+}
+
+/* ---- meters ---- */
+
+.bar {
+  display: block;
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 99px;
+  background: var(--line);
+  overflow: hidden;
+}
+.bar i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--lemon-deep), var(--lemon));
+  transition: width .4s ease;
+}
+.bar-win i { background: linear-gradient(90deg, #3f8f4a, var(--leaf)); }
+.bar-warn i { background: linear-gradient(90deg, #c2452f, var(--danger)); }
+
+.hud-goal { flex: 0 1 130px; min-width: 96px; margin-left: auto; align-items: stretch; }
+.hud-goal .bar { margin-top: 4px; }
+
+/* ---- notices ---- */
+
+.notice, .locked-note, .warn, .warn-card {
+  border-radius: 14px;
+  font-size: 14px;
+}
+.notice {
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--danger) 12%, var(--bg-2));
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line));
+}
+.locked-note {
+  padding: 12px 14px;
+  text-align: center;
+  color: var(--ink-soft);
+  background: var(--bg-2);
+  border: 1px dashed var(--line);
+}
+.warn { color: var(--danger); }
+.warn-card { border-color: color-mix(in srgb, var(--danger) 35%, var(--line)); }
+.warn-dot { font-size: 13px; }
+.ops-report { border-color: color-mix(in srgb, var(--leaf) 35%, var(--line)); }
+
+.challenge h2 { color: var(--ink); font-size: 16px; letter-spacing: 0; text-transform: none; }
+
+.chip-on {
+  background: var(--leaf);
+  border-color: var(--leaf);
+  color: #fff;
+}
+
+.subtotal { border: 0; padding-top: 4px; margin-top: 0; font-size: 14px; font-weight: 600; }

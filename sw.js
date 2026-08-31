@@ -1,11 +1,18 @@
 /* Offline shell: the game is static, so cache it and serve from cache first. */
-const CACHE = 'lemonade-v1';
+const CACHE = 'lemonade-v2';
 const ASSETS = [
   './',
   './index.html',
   './css/styles.css',
   './js/app.js',
   './js/sim.js',
+  './js/campaign.js',
+  './js/ops.js',
+  './js/store.js',
+  './js/ui/kit.js',
+  './js/ui/map.js',
+  './js/ui/run.js',
+  './js/ui/opsui.js',
   './manifest.webmanifest',
   './icons/icon.svg',
   './icons/icon-192.png',
