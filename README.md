@@ -101,6 +101,15 @@ Claimed corners can be put to work:
 - **Time** — the network trades one day for every day you work a corner by hand,
   so the empire earns exactly as fast as you play.
 
+## The bank
+
+Idle treasury cash can be deposited (`🏦 Bank`, from the World screen) to earn
+interest — 0.5% a day, compounded for every day you spend working a corner,
+campaign or free play alike. It is the same "a day played by hand is a day
+everywhere" rule that drives the supply network: park cash you are not about
+to spend on a depot or a truck, and it is worth more by the time you pull it
+back out. Deposits and withdrawals are instant and free either way.
+
 ## Tutorial and achievements
 
 A five-slide welcome sequence plays automatically the first time the page
@@ -109,14 +118,14 @@ explanation of the loop — nothing gated behind it, nothing to miss by
 skipping.
 
 Achievements (`js/achievements.js`) are a record of what you've actually
-done — 42 of them, spanning first cup, first corner, clearing an
+done — 44 of them, spanning first cup, first corner, clearing an
 Impossible corner, winning every difficulty tier at least once, taking a
 city, building every farm and factory in three cities, running a fleet of
-ten trucks, selling your first small/large/BYO cup, going 50 or 100 or 365
-days without stopping, and going a whole run without a spoiled lemon — with
-no reward attached beyond a small toast and a line on the list. They're
-checked fresh from live game state after anything that could have earned
-one, so there's nothing to keep in sync by hand.
+ten trucks, selling your first small/large/BYO cup, your first bank deposit,
+going 50 or 100 or 365 days without stopping, and going a whole run without
+a spoiled lemon — with no reward attached beyond a small toast and a line on
+the list. They're checked fresh from live game state after anything that
+could have earned one, so there's nothing to keep in sync by hand.
 
 ## Project layout
 
@@ -126,21 +135,22 @@ css/styles.css          all styling, light + dark
 js/sim.js               day simulation, modifiers, and the reference player
 js/campaign.js          cities, corners, tiers, targets, progression
 js/ops.js               depots, wholesale, staffing, the daily network tick
+js/bank.js              deposits, withdrawals, and daily-compounding interest
 js/achievements.js      the achievement catalog and its unlock rules
 js/store.js             shared state, the save file, stats and unlocks
 js/app.js               router, HUD, input
-js/ui/                  screens: map.js, run.js, opsui.js, premium.js,
-                         tutorial.js, achievements.js, kit.js
-tests/                  87 tests across the rules, the campaign and operations
+js/ui/                  screens: map.js, run.js, opsui.js, bankui.js,
+                         premium.js, tutorial.js, achievements.js, kit.js
+tests/                  110 tests across the rules, the campaign, operations and the bank
 tools/make-icons.mjs    regenerates icons/*.png from icons/icon.svg
 ```
 
-`sim.js`, `campaign.js`, `ops.js` and `achievements.js` are pure and DOM-free,
-so the whole game can be played and balanced from node. The same seed always
-replays the same season.
+`sim.js`, `campaign.js`, `ops.js`, `bank.js` and `achievements.js` are pure
+and DOM-free, so the whole game can be played and balanced from node. The
+same seed always replays the same season.
 
 ```bash
-npm test           # 87 tests
+npm test           # 110 tests
 npm run icons      # rebuild PNG icons from the SVG (needs headless Chromium)
 ```
 

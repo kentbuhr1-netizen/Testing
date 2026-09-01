@@ -11,6 +11,7 @@ import * as S from './sim.js';
 import * as mapUi from './ui/map.js';
 import * as runUi from './ui/run.js';
 import * as opsUi from './ui/opsui.js';
+import * as bankUi from './ui/bankui.js';
 import * as premiumUi from './ui/premium.js';
 import * as tutorialUi from './ui/tutorial.js';
 import * as achievementsUi from './ui/achievements.js';
@@ -21,9 +22,9 @@ const screenEl = document.getElementById('screen');
 const actionsEl = document.getElementById('actions');
 const hudEl = document.getElementById('hud');
 
-const SCREENS = { ...mapUi.screens, ...opsUi.screens, ...premiumUi.screens, ...tutorialUi.screens, ...achievementsUi.screens };
+const SCREENS = { ...mapUi.screens, ...opsUi.screens, ...bankUi.screens, ...premiumUi.screens, ...tutorialUi.screens, ...achievementsUi.screens };
 const RUN_SCREENS = runUi.screens;
-const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions, ...premiumUi.actions, ...tutorialUi.actions, ...achievementsUi.actions };
+const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions, ...bankUi.actions, ...premiumUi.actions, ...tutorialUi.actions, ...achievementsUi.actions };
 
 /* ------------------------------------------------------------------ *
  * Render
@@ -73,7 +74,7 @@ function draw() {
 
 function drawHud() {
   const inRun = store.ui.view === 'run' && store.run;
-  const showHud = inRun || (store.campaign && ['world', 'city', 'corner', 'ops', 'opsCity'].includes(store.ui.view));
+  const showHud = inRun || (store.campaign && ['world', 'city', 'corner', 'ops', 'opsCity', 'bank'].includes(store.ui.view));
   hudEl.hidden = !showHud;
   if (!showHud) {
     hudEl.innerHTML = '';
@@ -137,6 +138,7 @@ const LIMITS = {
   order: { lemons: [0, 9999], sugar: [0, 9999], ice: [0, 9999], cups: [0, 9999] },
   restock: { lemons: [0, 99999], sugar: [0, 99999], cups: [0, 99999] },
   truckDraft: { amount: [25, 2000] },
+  bankAmount: { amount: [0, 999999] },
   enhancerOrder: Object.fromEntries(Object.keys(S.ENHANCERS).map((id) => [id, [0, 999]])),
 };
 
@@ -176,6 +178,10 @@ function applyStep(group, field, step) {
   }
   if (group === 'truckDraft') {
     store.ui.truckDraft[field] = clamp(store.ui.truckDraft[field] + step, min, max);
+    return true;
+  }
+  if (group === 'bankAmount') {
+    store.ui.bankAmount = Math.round(clamp(store.ui.bankAmount + step, min, max) * 100) / 100;
     return true;
   }
   if (group === 'price') {

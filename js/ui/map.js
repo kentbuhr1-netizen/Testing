@@ -112,6 +112,7 @@ function worldScreen() {
       ${opsUnlocked(campaign)
         ? '<button class="btn" data-act="open-ops">🏭 Operations</button>'
         : `<div class="locked-note">🏭 Operations unlock after ${C.CITIES_FOR_OPS} cities (${C.completedCities(campaign).length}/${C.CITIES_FOR_OPS})</div>`}
+      <button class="btn-ghost" data-act="open-bank">🏦 Bank${campaign.bank?.balance > 0 ? ` · ${whole(campaign.bank.balance)}` : ''}</button>
       <button class="btn-ghost" data-act="to-title">Menu</button>`,
   };
 }

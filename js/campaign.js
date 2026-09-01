@@ -12,6 +12,7 @@
  * balancing 625 numbers by hand.
  */
 import { parProfit, mulberry32 } from './sim.js';
+import { newBank } from './bank.js';
 
 export const CORNERS_PER_CITY = 25;
 /**
@@ -307,6 +308,7 @@ export function newCampaign() {
     claimed: {},   // cityId → array of claimed corner indexes
     targets: {},   // "cityId:index" → the bar, cached once shown
     ops: null,     // built by ops.js once five cities are done
+    bank: newBank(),
     stats: { runsPlayed: 0, runsWon: 0, cupsSold: 0 },
   };
 }

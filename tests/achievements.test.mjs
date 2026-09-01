@@ -96,6 +96,12 @@ test('money, buildings, trucks and quality achievements read their own fields', 
   assert.deepEqual(evaluateAchievements({ daysPlayed: 365 }, {}).sort(), ['dedicated', 'centurion', 'veteran'].sort());
 });
 
+test('banking achievements read the bank account, not just cash on hand', () => {
+  assert.deepEqual(evaluateAchievements({ everDeposited: true }, {}), ['firstDeposit']);
+  assert.deepEqual(evaluateAchievements({ interestEarnedEver: 500 }, {}), ['compoundInterest']);
+  assert.deepEqual(evaluateAchievements({ interestEarnedEver: 499.99 }, {}), []);
+});
+
 test('a rich context can unlock several achievements in one pass', () => {
   const ctx = {
     cupsSoldEver: 200,

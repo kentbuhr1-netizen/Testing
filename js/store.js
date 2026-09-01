@@ -31,6 +31,8 @@ export const store = {
     opsReport: null,    // what the network did while you were working
     editingTruck: null, // id of the truck whose route is being set, or null
     truckDraft: null,   // { from, to, cargo, amount } while editingTruck is set
+    bankAmount: 0,      // draft deposit/withdraw amount on the bank screen
+    interestEarned: 0,  // interest the bank paid out at the end of the last settled run
     showPremium: false,      // the never-expire paywall screen, shown over whatever's current
     showAchievements: false, // the achievements list, shown over whatever's current
     showTutorial: false,     // the first-time welcome sequence
@@ -150,6 +152,7 @@ export function markTutorialSeen() {
 const STATS_DEFAULTS = {
   cupsSoldEver: 0, daysPlayed: 0, peakCash: 0,
   smallSoldEver: 0, largeSoldEver: 0, byoSoldEver: 0, enhancersSoldEver: 0,
+  interestEarnedEver: 0,
   tiersWon: [],
 };
 
@@ -178,6 +181,16 @@ export function recordDay(result, cashNow) {
   stats.enhancersSoldEver += Object.values(result.enhancers || {}).reduce((n, s) => n + s.cups, 0);
   saveStats(stats);
 }
+
+/** Call whenever bank interest accrues, so lifetime interest can be checked later. */
+export function recordInterest(amount) {
+  if (!amount) return;
+  const stats = loadStats();
+  stats.interestEarnedEver = round2(stats.interestEarnedEver + amount);
+  saveStats(stats);
+}
+
+const round2 = (n) => Math.round(n * 100) / 100;
 
 /** Call once a corner is claimed, so "win every tier" can be checked later. */
 export function recordTierWon(tier) {
@@ -220,7 +233,8 @@ export function checkAchievements(extra = {}) {
   const citiesFullyBuilt = Object.values(buildings).filter((b) => Object.values(b).filter(Boolean).length >= 4).length;
   const anyBuildingBuilt = Object.values(buildings).some((b) => Object.values(b).filter(Boolean).length >= 1);
   const trucksCount = campaign?.ops?.trucks?.length || 0;
-  const currentCash = store.run ? store.run.money : (campaign?.treasury || 0);
+  const bankBalance = campaign?.bank?.balance || 0;
+  const currentCash = store.run ? store.run.money : (campaign?.treasury || 0) + bankBalance;
 
   const ctx = {
     cupsSoldEver: stats.cupsSoldEver,
@@ -236,11 +250,13 @@ export function checkAchievements(extra = {}) {
     anyBuildingBuilt,
     trucksBought: trucksCount >= 1,
     trucksCount,
-    treasury: campaign?.treasury || 0,
+    treasury: (campaign?.treasury || 0) + bankBalance,
     smallSoldEver: stats.smallSoldEver,
     largeSoldEver: stats.largeSoldEver,
     byoSoldEver: stats.byoSoldEver,
     enhancersSoldEver: stats.enhancersSoldEver,
+    interestEarnedEver: stats.interestEarnedEver,
+    everDeposited: campaign?.bank?.hasDeposited || false,
     tiersWon: stats.tiersWon,
     neverExpireLemons: isPremiumUnlocked('neverExpireLemons'),
     ...extra,

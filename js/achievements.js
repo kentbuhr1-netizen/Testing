@@ -64,6 +64,10 @@ export const ACHIEVEMENTS = {
   veteran:       { icon: '🎖️', title: 'Veteran',          desc: 'Play 365 days total, across every corner.' },
   qualityStreak: { icon: '🌟', title: 'Consistently Good', desc: 'Average 90%+ quality across an entire run.' },
   neverExpire:   { icon: '⏳', title: 'Frozen In Time',    desc: 'Unlock never-expiring lemons.' },
+
+  // Banking
+  firstDeposit:    { icon: '🏦', title: 'Rainy Day Fund',   desc: 'Make your first deposit at the bank.' },
+  compoundInterest:{ icon: '📈', title: 'Compound Interest', desc: 'Earn $500 in bank interest over your lifetime.' },
 };
 
 /**
@@ -128,6 +132,9 @@ export function evaluateAchievements(ctx, unlocked) {
   check('veteran', (ctx.daysPlayed || 0) >= 365);
   check('qualityStreak', (ctx.consistentQuality || 0) >= 0.9);
   check('neverExpire', !!ctx.neverExpireLemons);
+
+  check('firstDeposit', !!ctx.everDeposited);
+  check('compoundInterest', (ctx.interestEarnedEver || 0) >= 500);
 
   return newly;
 }
