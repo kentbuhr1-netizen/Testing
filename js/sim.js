@@ -400,7 +400,7 @@ export function newRun({
     },
     enhancersOffered: allEnhancersOff(),
     recipe: { lemons: 5, sugar: 5, ice: 2 },
-    price: 0.5,                                    // the medium price — unchanged from the original game
+    price: 0.5,                                    // the medium price — the classic default
     cupPrices: { small: 0.35, large: 0.7, byo: 0.5 },
     byoAccepted: false,
     acceptCards: false,
@@ -409,6 +409,14 @@ export function newRun({
     phase: 'forecast',
   };
   state.today = rollDay(state);
+  // The classic 50¢ default is fine on the cheaper corners, but one whose
+  // prices already run high (a city mod, a rough day) can make it a
+  // guaranteed loss before a first-time player ever touches the price
+  // stepper. Nudge it up just enough to clear cost with a thin margin, in
+  // the same nickel steps the stepper itself uses — never down, and never
+  // on a corner where 50¢ already covered cost.
+  const startingCost = costPerCup(state.recipe, state.today.prices);
+  state.price = Math.max(0.5, Math.ceil((startingCost + 0.03) * 20) / 20);
   return state;
 }
 

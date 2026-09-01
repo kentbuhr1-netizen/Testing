@@ -307,6 +307,14 @@ function playDay(result) {
   let frameId = null;
 
   const finish = () => {
+    // #screen is never replaced across renders (draw() only swaps its
+    // innerHTML), so a listener left on it outlives the day it was armed
+    // for. `{ once: true }` only detaches on the click path — reaching
+    // finish() via the timeout below would otherwise leak it, and a click
+    // on some future day's screen would fire this closure with day-stale
+    // data. Detach explicitly so finish() runs at most once no matter
+    // which path gets there first.
+    screenEl.removeEventListener('click', finish);
     if (frameId) cancelAnimationFrame(frameId);
     countEl.innerHTML = `${total}<small>cups sold</small>`;
     tillEl.textContent = money(result.revenue);

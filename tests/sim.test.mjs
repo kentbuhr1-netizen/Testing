@@ -9,6 +9,22 @@ test('same seed replays identically', () => {
   assert.deepEqual(S.simulateDay(a), S.simulateDay(b));
 });
 
+test('the starting price is never a guaranteed loss on the starting recipe', () => {
+  // Regression: a city with marked-up supply prices (e.g. NYC's cost mods)
+  // could leave the classic 50¢ default underwater before a first-time
+  // player ever touches the price stepper. newRun() nudges it up just
+  // enough to clear cost, in nickel steps, but never below 50¢.
+  let sawUnchanged = false;
+  for (let seed = 0; seed < 50; seed++) {
+    const st = S.newGame(seed);
+    const cost = S.costPerCup(st.recipe, st.today.prices);
+    assert.ok(st.price >= cost, `seed ${seed}: price ${st.price} should cover cost ${cost}`);
+    assert.ok(st.price >= 0.5, `seed ${seed}: price should never drop below the classic 50¢`);
+    if (st.price === 0.5) sawUnchanged = true;
+  }
+  assert.ok(sawUnchanged, 'sanity: 50¢ should still be untouched wherever it was already fine');
+});
+
 test('recipe quality peaks at the ideal recipe for the temperature', () => {
   const temp = 88;
   const ice = S.idealIcePerCup(temp);
