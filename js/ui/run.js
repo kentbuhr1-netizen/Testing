@@ -2,7 +2,7 @@
 import * as S from '../sim.js';
 import * as C from '../campaign.js';
 import { tickOps, newOps } from '../ops.js';
-import { store, render, recordBest, isPremiumUnlocked } from '../store.js';
+import { store, render, recordBest, isPremiumUnlocked, recordDay, checkAchievements, achievementToast } from '../store.js';
 import { money, whole, cents, fact, stepper, row, tierPill } from './kit.js';
 
 const zeroedEnhancers = () => Object.fromEntries(Object.keys(S.ENHANCERS).map((id) => [id, 0]));
@@ -444,10 +444,10 @@ function startRun(config) {
   store.ui.view = 'run';
 }
 
-/** Settle a finished run: bank a win, and let the network trade for those days. */
+/** Settle a finished run: bank a win, let the network trade, check achievements. */
 function settleRun() {
   const r = run();
-  if (!r.corner || r.settled) return;
+  if (!r.corner || r.settled) return [];
   r.settled = true;
   const score = S.finalScore(r);
   const campaign = store.campaign;
@@ -463,6 +463,8 @@ function settleRun() {
     const summary = tickOps(campaign, r.history.length);
     store.ui.opsReport = summary && summary.days > 0 ? summary : null;
   }
+  const cleanRunFinished = r.history.every((d) => !(d.spoiledLemons > 0));
+  return checkAchievements({ cleanRunFinished });
 }
 
 export const screens = {
@@ -514,6 +516,9 @@ export const actions = {
     const id = el.dataset.id;
     if ((r.inventory.enhancers?.[id] || 0) === 0) return; // nothing to offer
     r.enhancersOffered[id] = !r.enhancersOffered[id];
+    const offeredTogether = Object.values(r.enhancersOffered).filter(Boolean).length;
+    const toast = achievementToast(checkAchievements({ enhancersOfferedTogether: offeredTogether }));
+    if (toast) store.ui.notice = toast;
   },
   'open-premium': () => { store.ui.showPremium = true; },
   'open-stand': () => {
@@ -521,8 +526,17 @@ export const actions = {
     run().phase = 'open';
   },
   'next-day': () => {
-    S.commitDay(run(), store.ui.pending);
+    const pending = store.ui.pending;
+    S.commitDay(run(), pending);
     store.ui.pending = null;
-    if (run().phase === 'gameover') settleRun();
+    recordDay(pending, run().money);
+    const dayNewly = checkAchievements({
+      soldOutToday: pending.stock > 0 && pending.sold === pending.stock,
+      bestQualityToday: pending.quality,
+      cupsToday: pending.sold,
+    });
+    const runNewly = run().phase === 'gameover' ? settleRun() : [];
+    const toast = achievementToast([...dayNewly, ...runNewly]);
+    if (toast) store.ui.notice = toast;
   },
 };

@@ -40,6 +40,10 @@
 
 * { box-sizing: border-box; }
 
+/* An element's own `display` (e.g. .hud, .actions) would otherwise outrank
+   the browser's default [hidden] rule and stay visible. */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   height: 100%;
@@ -517,6 +521,8 @@ h1 .of { font-size: 15px; font-weight: 600; color: var(--ink-soft); }
 .warn-card { border-color: color-mix(in srgb, var(--danger) 35%, var(--line)); }
 .warn-dot { font-size: 13px; }
 .ops-report { border-color: color-mix(in srgb, var(--leaf) 35%, var(--line)); }
+.good { color: var(--leaf); }
+.bad { color: var(--danger); }
 
 .challenge h2 { color: var(--ink); font-size: 16px; letter-spacing: 0; text-transform: none; }
 
@@ -527,6 +533,82 @@ h1 .of { font-size: 15px; font-weight: 600; color: var(--ink-soft); }
 }
 
 .subtotal { border: 0; padding-top: 4px; margin-top: 0; font-size: 14px; font-weight: 600; }
+
+/* ---- inline text links (a stepping-stone into a bigger screen) ---- */
+
+.link-btn {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lemon-deep);
+  font-weight: 700;
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.link-btn:active { opacity: 0.7; }
+
+@media (prefers-color-scheme: dark) {
+  .link-btn { color: var(--lemon); }
+}
+
+/* ---- the one paywall in the game ---- */
+
+.paywall {
+  text-align: center;
+  border-color: color-mix(in srgb, var(--lemon-deep) 40%, var(--line));
+  background: color-mix(in srgb, var(--lemon) 10%, var(--bg-2));
+}
+.paywall-price {
+  font-size: 34px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+.paywall-price small {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.paywall p { text-align: left; }
+
+/* ---- locked list rows (achievements, and anywhere else that fits) ---- */
+
+.row.locked { opacity: .5; }
+.row.locked .row-name { color: var(--ink-soft); }
+
+/* ---- tutorial slides ---- */
+
+.tut-slide {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+  padding: 24px 12px;
+}
+.tut-icon { font-size: 72px; line-height: 1; margin-bottom: 8px; }
+.tut-slide h1 { font-size: 24px; margin: 0; }
+.tut-slide p { max-width: 34ch; color: var(--ink-soft); font-size: 16px; line-height: 1.5; }
+
+.tut-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+.tut-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--line);
+}
+.tut-dot.on { background: var(--lemon-deep); width: 22px; }
 
 /* Reserve room so the fixed preview bar never covers the game's own
    sticky action buttons or the tail end of an unpadded screen. */
@@ -2154,6 +2236,67 @@ function tickOps(campaign, days) {
   return { bulkDiscount, wholesaleCost, newOps, stockTotal, spaceLeft, cornerOutlook, cityOutlook, daysOfStock, networkOutlook, buyWarehouse, upgradeWarehouse, restock, restockCost, hireStaff, closeStand, buildBuilding, buyTruck, assignTruckRoute, unassignTruck, tickOps, WAREHOUSE_COST, WAREHOUSE_BASE_CAPACITY, CAPACITY_UPGRADE_COST, CAPACITY_UPGRADE_STEP, STAFF_HIRE_COST, STAFF_WAGE, WAREHOUSE_UPKEEP, WHOLESALE, BUILDINGS, TRUCK_COST, TRUCK_UPKEEP, TRUCK_CARGO, hasWarehouse, staffedIn, isStaffed, buildingsIn, hasBuilding };
 })();
 
+/* ---- js/achievements.js ---- */
+__modules["achievements"] = (function () {
+/**
+ * Achievements — a catalog of concrete, checkable accomplishments, plus the
+ * pure logic that decides which ones just became true.
+ *
+ * No storage here. store.js persists which ids are unlocked and gathers the
+ * numbers below from live game state; this file only knows the rules, so it
+ * can be tested the same way as everything else in this codebase.
+ */
+
+const ACHIEVEMENTS = {
+  firstCup:      { icon: '🍋', title: 'First Cup',        desc: 'Sell your very first cup of lemonade.' },
+  soldOut:       { icon: '🎉', title: 'Sold Out',         desc: 'Sell out of stock before the day is over.' },
+  perfectPour:   { icon: '✨', title: 'Perfect Pour',      desc: 'Pour a recipe at 98%+ quality.' },
+  centuryDay:    { icon: '💯', title: 'Century Day',      desc: 'Sell 100 cups in a single day.' },
+  firstCorner:   { icon: '🏅', title: 'Staked a Claim',   desc: 'Claim your first street corner.' },
+  homeTown:      { icon: '🏙️', title: 'Home Town Hero',   desc: 'Take an entire city — all of its corners.' },
+  globetrotter:  { icon: '🌍', title: 'Globetrotter',     desc: 'Claim a corner on two different continents.' },
+  fiveCities:    { icon: '🏭', title: 'Going Global',     desc: 'Take five cities and unlock Operations.' },
+  industrialist: { icon: '🚜', title: 'Industrialist',    desc: 'Build every farm and factory in one city.' },
+  trucker:       { icon: '🚚', title: 'On the Road',      desc: 'Buy your first delivery truck.' },
+  fullMenu:      { icon: '🧃', title: 'Full Menu',        desc: 'Offer all four enhancers at once.' },
+  wasteNot:      { icon: '🍋', title: 'Waste Not',        desc: 'Finish a corner without a single lemon spoiling.' },
+  tycoon:        { icon: '👑', title: 'Tycoon',           desc: 'Bank $1,000 in cash.' },
+  dedicated:     { icon: '📅', title: 'Dedicated',        desc: 'Play 50 days total, across every corner.' },
+};
+
+/**
+ * `ctx` is a grab-bag of the numbers achievements care about — every field
+ * is optional, callers pass whatever they actually have on hand. Conditions
+ * are checked against live state rather than one-time events, so calling
+ * this repeatedly is always safe: an id only ever unlocks once.
+ */
+function evaluateAchievements(ctx, unlocked) {
+  const newly = [];
+  const check = (id, condition) => {
+    if (condition && !unlocked[id]) newly.push(id);
+  };
+
+  check('firstCup', (ctx.cupsSoldEver || 0) >= 1);
+  check('soldOut', !!ctx.soldOutToday);
+  check('perfectPour', (ctx.bestQualityToday || 0) >= 0.98);
+  check('centuryDay', (ctx.cupsToday || 0) >= 100);
+  check('firstCorner', (ctx.cornersClaimed || 0) >= 1);
+  check('homeTown', (ctx.citiesClaimed || 0) >= 1);
+  check('globetrotter', !!ctx.hasUSCorner && !!ctx.hasEUCorner);
+  check('fiveCities', (ctx.citiesClaimed || 0) >= 5);
+  check('industrialist', !!ctx.allBuildingsInOneCity);
+  check('trucker', !!ctx.trucksBought);
+  check('fullMenu', (ctx.enhancersOfferedTogether || 0) >= 4);
+  check('wasteNot', !!ctx.cleanRunFinished);
+  check('tycoon', (ctx.peakMoney || 0) >= 1000);
+  check('dedicated', (ctx.daysPlayed || 0) >= 50);
+
+  return newly;
+}
+
+  return { evaluateAchievements, ACHIEVEMENTS };
+})();
+
 /* ---- js/store.js ---- */
 __modules["store"] = (function () {
 /**
@@ -2164,10 +2307,15 @@ __modules["store"] = (function () {
  * `ui` is throwaway view state — which screen, the basket being filled in.
  */
 const { ENHANCERS } = __modules["sim"];
+const { getCity, completedCities } = __modules["campaign"];
+const { ACHIEVEMENTS, evaluateAchievements } = __modules["achievements"];
 
 const SAVE_KEY = 'lemonade-stand-campaign-v2';
 const BEST_KEY = 'lemonade-stand-best-v1';
 const PREMIUM_KEY = 'lemonade-stand-premium-v1';
+const STATS_KEY = 'lemonade-stand-stats-v1';
+const ACHIEVEMENTS_KEY = 'lemonade-stand-achievements-v1';
+const TUTORIAL_KEY = 'lemonade-stand-tutorial-seen-v1';
 
 const zeroedEnhancers = () => Object.fromEntries(Object.keys(ENHANCERS).map((id) => [id, 0]));
 
@@ -2184,7 +2332,10 @@ const store = {
     opsReport: null,    // what the network did while you were working
     editingTruck: null, // id of the truck whose route is being set, or null
     truckDraft: null,   // { from, to, cargo, amount } while editingTruck is set
-    showPremium: false, // the never-expire paywall screen, shown over whatever's current
+    showPremium: false,      // the never-expire paywall screen, shown over whatever's current
+    showAchievements: false, // the achievements list, shown over whatever's current
+    showTutorial: false,     // the first-time welcome sequence
+    tutorialStep: 0,
     lastKey: null,
     notice: null,
   },
@@ -2270,7 +2421,117 @@ function unlockPremiumDemo(flag) {
   }
 }
 
-  return { save, loadSave, clearSave, bestScore, recordBest, isPremiumUnlocked, unlockPremiumDemo, store, onRender, render };
+/* ------------------------------------------------------------------ *
+ * Tutorial
+ * ------------------------------------------------------------------ */
+
+function hasTutorialBeenSeen() {
+  try {
+    return localStorage.getItem(TUTORIAL_KEY) === '1';
+  } catch {
+    return true; // if storage is unavailable, don't force it on every load
+  }
+}
+
+function markTutorialSeen() {
+  try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch { /* ignore */ }
+}
+
+/* ------------------------------------------------------------------ *
+ * Lifetime stats and achievements
+ *
+ * A handful of numbers persist across every campaign and every free-play
+ * season — total cups sold, total days played, the most cash ever held —
+ * since a fresh campaign or a cleared save shouldn't erase what you've
+ * actually accomplished. Everything else an achievement needs (corners,
+ * cities, buildings, trucks) is read fresh from the current campaign, so
+ * there's nothing to keep in sync by hand.
+ * ------------------------------------------------------------------ */
+
+function loadStats() {
+  try {
+    return { cupsSoldEver: 0, daysPlayed: 0, peakCash: 0, ...(JSON.parse(localStorage.getItem(STATS_KEY)) || {}) };
+  } catch {
+    return { cupsSoldEver: 0, daysPlayed: 0, peakCash: 0 };
+  }
+}
+
+function saveStats(stats) {
+  try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); } catch { /* ignore */ }
+}
+
+/** Call once per day committed, in any run — campaign or free play. */
+function recordDay(result, cashNow) {
+  const stats = loadStats();
+  stats.cupsSoldEver += result.sold;
+  stats.daysPlayed += 1;
+  stats.peakCash = Math.max(stats.peakCash, cashNow || 0);
+  saveStats(stats);
+}
+
+function loadUnlockedAchievements() {
+  try {
+    return JSON.parse(localStorage.getItem(ACHIEVEMENTS_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveUnlockedAchievements(map) {
+  try { localStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(map)); } catch { /* ignore */ }
+}
+
+/**
+ * Re-checks every achievement against the current state of the world.
+ * `extra` carries the handful of facts that only exist for a moment — how a
+ * day just went, whether a run just finished clean — everything else is
+ * read fresh from the campaign so calling this after any state change is
+ * always safe. Returns the ids that newly unlocked, for a toast.
+ */
+function checkAchievements(extra = {}) {
+  const stats = loadStats();
+  const campaign = store.campaign;
+  const claimed = campaign?.claimed || {};
+  const cornersClaimed = Object.values(claimed).reduce((n, list) => n + list.length, 0);
+  const claimedCityIds = Object.keys(claimed).filter((id) => (claimed[id] || []).length > 0);
+  const regions = claimedCityIds.map((id) => getCity(id).region);
+  const buildings = campaign?.ops?.buildings || {};
+  const allBuildingsInOneCity = Object.values(buildings).some((b) => Object.values(b).filter(Boolean).length >= 4);
+  const currentCash = store.run ? store.run.money : (campaign?.treasury || 0);
+
+  const ctx = {
+    cupsSoldEver: stats.cupsSoldEver,
+    daysPlayed: stats.daysPlayed,
+    peakMoney: Math.max(stats.peakCash, currentCash),
+    cornersClaimed,
+    citiesClaimed: campaign ? completedCities(campaign).length : 0,
+    hasUSCorner: regions.includes('US'),
+    hasEUCorner: regions.includes('EU'),
+    allBuildingsInOneCity,
+    trucksBought: (campaign?.ops?.trucks?.length || 0) >= 1,
+    ...extra,
+  };
+
+  const unlocked = loadUnlockedAchievements();
+  const newly = evaluateAchievements(ctx, unlocked);
+  if (newly.length) {
+    const now = Date.now();
+    for (const id of newly) unlocked[id] = { at: now };
+    saveUnlockedAchievements(unlocked);
+  }
+  return newly;
+}
+
+/** A one-line notice for whatever checkAchievements() just returned, or null. */
+function achievementToast(newlyUnlockedIds) {
+  if (!newlyUnlockedIds || newlyUnlockedIds.length === 0) return null;
+  if (newlyUnlockedIds.length === 1) {
+    return `🏅 Achievement unlocked: ${ACHIEVEMENTS[newlyUnlockedIds[0]].title}!`;
+  }
+  return `🏅 ${newlyUnlockedIds.length} achievements unlocked: ${newlyUnlockedIds.map((id) => ACHIEVEMENTS[id].title).join(', ')}!`;
+}
+
+  return { save, loadSave, clearSave, bestScore, recordBest, isPremiumUnlocked, unlockPremiumDemo, hasTutorialBeenSeen, markTutorialSeen, recordDay, loadUnlockedAchievements, checkAchievements, achievementToast, store, onRender, render };
 })();
 
 /* ---- js/ui/kit.js ---- */
@@ -2337,7 +2598,8 @@ const C = __modules["campaign"];
 const S = __modules["sim"];
 const { opsUnlocked } = __modules["campaign"];
 const { restockCost } = __modules["ops"];
-const { store, save, loadSave, clearSave, bestScore } = __modules["store"];
+const { store, save, loadSave, clearSave, bestScore, loadUnlockedAchievements } = __modules["store"];
+const { ACHIEVEMENTS } = __modules["achievements"];
 const { money, whole, fact, tierPill, bar, backBar } = __modules["ui/kit"];
 
 /* ------------------------------------------------------------------ *
@@ -2348,6 +2610,8 @@ function titleScreen() {
   const saved = loadSave();
   const progress = saved ? C.campaignProgress(saved.campaign) : null;
   const best = bestScore();
+  const achievementCount = Object.keys(loadUnlockedAchievements()).length;
+  const achievementTotal = Object.keys(ACHIEVEMENTS).length;
   return {
     body: `
       <div class="title-art">🍋</div>
@@ -2359,6 +2623,10 @@ function titleScreen() {
           <strong>${progress.cities}</strong> cit${progress.cities === 1 ? 'y' : 'ies'} taken ·
           <strong>${whole(saved.campaign.treasury)}</strong> banked</p>` : ''}
         ${best && !progress ? `<p class="muted">Best free season: <strong>${money(best)}</strong></p>` : ''}
+        <div class="chip-row" style="justify-content:center;margin-top:16px">
+          <button class="chip" data-act="start-tutorial">🎓 Tutorial</button>
+          <button class="chip" data-act="open-achievements">🏅 Achievements · ${achievementCount}/${achievementTotal}</button>
+        </div>
       </div>`,
     actions: `
       ${saved ? '<button class="btn" data-act="continue">Continue</button>' : ''}
@@ -2611,7 +2879,7 @@ __modules["ui/run"] = (function () {
 const S = __modules["sim"];
 const C = __modules["campaign"];
 const { tickOps, newOps } = __modules["ops"];
-const { store, render, recordBest, isPremiumUnlocked } = __modules["store"];
+const { store, render, recordBest, isPremiumUnlocked, recordDay, checkAchievements, achievementToast } = __modules["store"];
 const { money, whole, cents, fact, stepper, row, tierPill } = __modules["ui/kit"];
 
 const zeroedEnhancers = () => Object.fromEntries(Object.keys(S.ENHANCERS).map((id) => [id, 0]));
@@ -3053,10 +3321,10 @@ function startRun(config) {
   store.ui.view = 'run';
 }
 
-/** Settle a finished run: bank a win, and let the network trade for those days. */
+/** Settle a finished run: bank a win, let the network trade, check achievements. */
 function settleRun() {
   const r = run();
-  if (!r.corner || r.settled) return;
+  if (!r.corner || r.settled) return [];
   r.settled = true;
   const score = S.finalScore(r);
   const campaign = store.campaign;
@@ -3072,6 +3340,8 @@ function settleRun() {
     const summary = tickOps(campaign, r.history.length);
     store.ui.opsReport = summary && summary.days > 0 ? summary : null;
   }
+  const cleanRunFinished = r.history.every((d) => !(d.spoiledLemons > 0));
+  return checkAchievements({ cleanRunFinished });
 }
 
 const screens = {
@@ -3123,6 +3393,9 @@ const actions = {
     const id = el.dataset.id;
     if ((r.inventory.enhancers?.[id] || 0) === 0) return; // nothing to offer
     r.enhancersOffered[id] = !r.enhancersOffered[id];
+    const offeredTogether = Object.values(r.enhancersOffered).filter(Boolean).length;
+    const toast = achievementToast(checkAchievements({ enhancersOfferedTogether: offeredTogether }));
+    if (toast) store.ui.notice = toast;
   },
   'open-premium': () => { store.ui.showPremium = true; },
   'open-stand': () => {
@@ -3130,9 +3403,18 @@ const actions = {
     run().phase = 'open';
   },
   'next-day': () => {
-    S.commitDay(run(), store.ui.pending);
+    const pending = store.ui.pending;
+    S.commitDay(run(), pending);
     store.ui.pending = null;
-    if (run().phase === 'gameover') settleRun();
+    recordDay(pending, run().money);
+    const dayNewly = checkAchievements({
+      soldOutToday: pending.stock > 0 && pending.sold === pending.stock,
+      bestQualityToday: pending.quality,
+      cupsToday: pending.sold,
+    });
+    const runNewly = run().phase === 'gameover' ? settleRun() : [];
+    const toast = achievementToast([...dayNewly, ...runNewly]);
+    if (toast) store.ui.notice = toast;
   },
 };
 
@@ -3144,7 +3426,7 @@ __modules["ui/opsui"] = (function () {
 /** Operations: the depot network, wholesale buying and staffed corners. */
 const C = __modules["campaign"];
 const O = __modules["ops"];
-const { store } = __modules["store"];
+const { store, checkAchievements, achievementToast } = __modules["store"];
 const { money, whole, fact, bar, backBar, row, stepper, tierPill } = __modules["ui/kit"];
 
 const ops = () => store.campaign.ops;
@@ -3512,16 +3794,15 @@ const actions = {
   },
   'build-building': (el) => {
     const result = O.buildBuilding(store.campaign, el.dataset.city, el.dataset.building);
-    store.ui.notice = result.ok ? null : result.why;
+    if (!result.ok) { store.ui.notice = result.why; return; }
+    store.ui.notice = achievementToast(checkAchievements());
   },
   'buy-truck': () => {
     const result = O.buyTruck(store.campaign);
-    if (result.ok) {
-      store.ui.editingTruck = result.id;
-      store.ui.truckDraft = { from: null, to: null, cargo: 'lemons', amount: 100 };
-    } else {
-      store.ui.notice = result.why;
-    }
+    if (!result.ok) { store.ui.notice = result.why; return; }
+    store.ui.editingTruck = result.id;
+    store.ui.truckDraft = { from: null, to: null, cargo: 'lemons', amount: 100 };
+    store.ui.notice = achievementToast(checkAchievements());
   },
   'edit-truck': (el) => {
     const id = Number(el.dataset.truck);
@@ -3618,6 +3899,127 @@ const actions = {
   return { screens, actions };
 })();
 
+/* ---- js/ui/tutorial.js ---- */
+__modules["ui/tutorial"] = (function () {
+/**
+ * A short, skippable welcome sequence shown once to a first-time player.
+ * Reachable again anytime from the title screen.
+ */
+const { store, markTutorialSeen } = __modules["store"];
+
+const SLIDES = [
+  {
+    icon: '🍋',
+    title: 'Welcome to the corner',
+    body: 'You start with a few dollars and one street corner. Read the weather, mix a pitcher, name your price, and see who stops by.',
+  },
+  {
+    icon: '🌡️',
+    title: 'Heat brings customers',
+    body: 'A scorcher fills the street and loosens wallets. Rain empties it. Check the forecast every morning before you shop.',
+  },
+  {
+    icon: '🤫',
+    title: 'The recipe is a secret',
+    body: 'One balance of lemons, sugar and ice wins people over — the game never shows you which. Customers tell you when it is off: too sour, not sweet enough, warm on a hot day. Adjust and listen.',
+  },
+  {
+    icon: '💲',
+    title: 'Price is a trade-off',
+    body: 'Charge more and fewer people buy. Reputation grows when the lemonade was worth what you charged, and a strong reputation brings the crowds back tomorrow.',
+  },
+  {
+    icon: '🗺️',
+    title: 'One corner, then the world',
+    body: 'Every corner sets a profit target. Clear it and the next one opens. Take every corner in a city to claim it — and once you have taken five cities, you can start running the whole operation from the top.',
+  },
+];
+
+function tutorialScreen() {
+  const i = store.ui.tutorialStep || 0;
+  const slide = SLIDES[i];
+  const last = i === SLIDES.length - 1;
+  const dots = SLIDES.map((_, idx) => `<span class="tut-dot ${idx === i ? 'on' : ''}"></span>`).join('');
+
+  return {
+    body: `
+      <div class="tut-slide">
+        <div class="tut-icon">${slide.icon}</div>
+        <h1>${slide.title}</h1>
+        <p>${slide.body}</p>
+      </div>
+      <div class="tut-dots">${dots}</div>`,
+    actions: `
+      <button class="btn" data-act="tutorial-next">${last ? "Let's Go" : 'Next'}</button>
+      ${last ? '' : '<button class="btn-ghost" data-act="tutorial-skip">Skip</button>'}`,
+  };
+}
+
+const screens = { tutorial: tutorialScreen };
+
+const actions = {
+  'start-tutorial': () => {
+    store.ui.tutorialStep = 0;
+    store.ui.showTutorial = true;
+  },
+  'tutorial-next': () => {
+    if ((store.ui.tutorialStep || 0) >= SLIDES.length - 1) {
+      markTutorialSeen();
+      store.ui.showTutorial = false;
+    } else {
+      store.ui.tutorialStep = (store.ui.tutorialStep || 0) + 1;
+    }
+  },
+  'tutorial-skip': () => {
+    markTutorialSeen();
+    store.ui.showTutorial = false;
+  },
+};
+
+  return { screens, actions };
+})();
+
+/* ---- js/ui/achievements.js ---- */
+__modules["ui/achievements"] = (function () {
+/** The achievements list — a record of what you've actually done, nothing to buy. */
+const { store, loadUnlockedAchievements } = __modules["store"];
+const { ACHIEVEMENTS } = __modules["achievements"];
+
+function achievementsScreen() {
+  const unlocked = loadUnlockedAchievements();
+  const total = Object.keys(ACHIEVEMENTS).length;
+  const got = Object.keys(unlocked).length;
+
+  const rows = Object.entries(ACHIEVEMENTS).map(([id, a]) => {
+    const earned = unlocked[id];
+    return `<div class="row ${earned ? '' : 'locked'}">
+        <div class="row-main">
+          <div class="row-name">${earned ? a.icon : '🔒'} ${a.title}</div>
+          <div class="row-sub">${a.desc}</div>
+        </div>
+        ${earned ? '<span class="chip chip-on">✓</span>' : ''}
+      </div>`;
+  }).join('');
+
+  return {
+    body: `
+      <h1>Achievements</h1>
+      <p class="muted">${got} of ${total} unlocked.</p>
+      <div class="card">${rows}</div>`,
+    actions: `<button class="btn" data-act="close-achievements">Back</button>`,
+  };
+}
+
+const screens = { achievements: achievementsScreen };
+
+const actions = {
+  'open-achievements': () => { store.ui.showAchievements = true; },
+  'close-achievements': () => { store.ui.showAchievements = false; },
+};
+
+  return { screens, actions };
+})();
+
 /* ---- js/app.js ---- */
 __modules["app"] = (function () {
 /**
@@ -3627,13 +4029,15 @@ __modules["app"] = (function () {
  * returning { body, actions, mounted }) and `actions` (button name → handler).
  * This file owns the DOM, the HUD, input, and saving after every action.
  */
-const { store, onRender, render, save } = __modules["store"];
+const { store, onRender, render, save, hasTutorialBeenSeen } = __modules["store"];
 const C = __modules["campaign"];
 const S = __modules["sim"];
 const mapUi = __modules["ui/map"];
 const runUi = __modules["ui/run"];
 const opsUi = __modules["ui/opsui"];
 const premiumUi = __modules["ui/premium"];
+const tutorialUi = __modules["ui/tutorial"];
+const achievementsUi = __modules["ui/achievements"];
 const { money, whole, bar } = __modules["ui/kit"];
 const { restockCost, spaceLeft } = __modules["ops"];
 
@@ -3641,16 +4045,25 @@ const screenEl = document.getElementById('screen');
 const actionsEl = document.getElementById('actions');
 const hudEl = document.getElementById('hud');
 
-const SCREENS = { ...mapUi.screens, ...opsUi.screens, ...premiumUi.screens };
+const SCREENS = { ...mapUi.screens, ...opsUi.screens, ...premiumUi.screens, ...tutorialUi.screens, ...achievementsUi.screens };
 const RUN_SCREENS = runUi.screens;
-const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions, ...premiumUi.actions };
+const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions, ...premiumUi.actions, ...tutorialUi.actions, ...achievementsUi.actions };
 
 /* ------------------------------------------------------------------ *
  * Render
  * ------------------------------------------------------------------ */
 
+/** Full-screen overlays take priority over whatever's underneath, in this order. */
+function overlayView() {
+  if (store.ui.showTutorial) return 'tutorial';
+  if (store.ui.showPremium) return 'premium';
+  if (store.ui.showAchievements) return 'achievements';
+  return null;
+}
+
 function currentScreen() {
-  if (store.ui.showPremium) return SCREENS.premium;
+  const overlay = overlayView();
+  if (overlay) return SCREENS[overlay];
   if (store.ui.view === 'run' && store.run) {
     return RUN_SCREENS[store.run.phase] || RUN_SCREENS.forecast;
   }
@@ -3658,9 +4071,8 @@ function currentScreen() {
 }
 
 function draw() {
-  const view = store.ui.showPremium
-    ? 'premium'
-    : store.ui.view === 'run' && store.run ? `run:${store.run.phase}` : store.ui.view;
+  const overlay = overlayView();
+  const view = overlay || (store.ui.view === 'run' && store.run ? `run:${store.run.phase}` : store.ui.view);
   const screen = currentScreen()();
 
   screenEl.innerHTML = (store.ui.notice ? `<div class="notice">${store.ui.notice}</div>` : '') + screen.body;
@@ -3687,7 +4099,10 @@ function drawHud() {
   const inRun = store.ui.view === 'run' && store.run;
   const showHud = inRun || (store.campaign && ['world', 'city', 'corner', 'ops', 'opsCity'].includes(store.ui.view));
   hudEl.hidden = !showHud;
-  if (!showHud) return;
+  if (!showHud) {
+    hudEl.innerHTML = '';
+    return;
+  }
 
   if (inRun) {
     const r = store.run;
@@ -3847,6 +4262,7 @@ document.addEventListener('dblclick', (e) => e.preventDefault());
 
 // Always open on the title screen; Continue picks the saved game back up.
 store.ui.view = 'title';
+if (!hasTutorialBeenSeen()) store.ui.showTutorial = true;
 render();
 
   return {  };
@@ -3894,6 +4310,9 @@ render();
     store.ui.cornerIndex = null;
     store.ui.restock = { lemons: 0, sugar: 0, cups: 0 };
     store.ui.opsReport = null;
+    store.ui.showTutorial = false;
+    store.ui.showPremium = false;
+    store.ui.showAchievements = false;
     store.ui.view = 'opsCity';
     render();
   }

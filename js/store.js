@@ -6,10 +6,15 @@
  * `ui` is throwaway view state — which screen, the basket being filled in.
  */
 import { ENHANCERS } from './sim.js';
+import { getCity, completedCities } from './campaign.js';
+import { ACHIEVEMENTS, evaluateAchievements } from './achievements.js';
 
 const SAVE_KEY = 'lemonade-stand-campaign-v2';
 const BEST_KEY = 'lemonade-stand-best-v1';
 const PREMIUM_KEY = 'lemonade-stand-premium-v1';
+const STATS_KEY = 'lemonade-stand-stats-v1';
+const ACHIEVEMENTS_KEY = 'lemonade-stand-achievements-v1';
+const TUTORIAL_KEY = 'lemonade-stand-tutorial-seen-v1';
 
 const zeroedEnhancers = () => Object.fromEntries(Object.keys(ENHANCERS).map((id) => [id, 0]));
 
@@ -26,7 +31,10 @@ export const store = {
     opsReport: null,    // what the network did while you were working
     editingTruck: null, // id of the truck whose route is being set, or null
     truckDraft: null,   // { from, to, cargo, amount } while editingTruck is set
-    showPremium: false, // the never-expire paywall screen, shown over whatever's current
+    showPremium: false,      // the never-expire paywall screen, shown over whatever's current
+    showAchievements: false, // the achievements list, shown over whatever's current
+    showTutorial: false,     // the first-time welcome sequence
+    tutorialStep: 0,
     lastKey: null,
     notice: null,
   },
@@ -110,4 +118,114 @@ export function unlockPremiumDemo(flag) {
   } catch {
     /* private mode or a full quota — the unlock just won't stick around */
   }
+}
+
+/* ------------------------------------------------------------------ *
+ * Tutorial
+ * ------------------------------------------------------------------ */
+
+export function hasTutorialBeenSeen() {
+  try {
+    return localStorage.getItem(TUTORIAL_KEY) === '1';
+  } catch {
+    return true; // if storage is unavailable, don't force it on every load
+  }
+}
+
+export function markTutorialSeen() {
+  try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch { /* ignore */ }
+}
+
+/* ------------------------------------------------------------------ *
+ * Lifetime stats and achievements
+ *
+ * A handful of numbers persist across every campaign and every free-play
+ * season — total cups sold, total days played, the most cash ever held —
+ * since a fresh campaign or a cleared save shouldn't erase what you've
+ * actually accomplished. Everything else an achievement needs (corners,
+ * cities, buildings, trucks) is read fresh from the current campaign, so
+ * there's nothing to keep in sync by hand.
+ * ------------------------------------------------------------------ */
+
+function loadStats() {
+  try {
+    return { cupsSoldEver: 0, daysPlayed: 0, peakCash: 0, ...(JSON.parse(localStorage.getItem(STATS_KEY)) || {}) };
+  } catch {
+    return { cupsSoldEver: 0, daysPlayed: 0, peakCash: 0 };
+  }
+}
+
+function saveStats(stats) {
+  try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); } catch { /* ignore */ }
+}
+
+/** Call once per day committed, in any run — campaign or free play. */
+export function recordDay(result, cashNow) {
+  const stats = loadStats();
+  stats.cupsSoldEver += result.sold;
+  stats.daysPlayed += 1;
+  stats.peakCash = Math.max(stats.peakCash, cashNow || 0);
+  saveStats(stats);
+}
+
+export function loadUnlockedAchievements() {
+  try {
+    return JSON.parse(localStorage.getItem(ACHIEVEMENTS_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveUnlockedAchievements(map) {
+  try { localStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(map)); } catch { /* ignore */ }
+}
+
+/**
+ * Re-checks every achievement against the current state of the world.
+ * `extra` carries the handful of facts that only exist for a moment — how a
+ * day just went, whether a run just finished clean — everything else is
+ * read fresh from the campaign so calling this after any state change is
+ * always safe. Returns the ids that newly unlocked, for a toast.
+ */
+export function checkAchievements(extra = {}) {
+  const stats = loadStats();
+  const campaign = store.campaign;
+  const claimed = campaign?.claimed || {};
+  const cornersClaimed = Object.values(claimed).reduce((n, list) => n + list.length, 0);
+  const claimedCityIds = Object.keys(claimed).filter((id) => (claimed[id] || []).length > 0);
+  const regions = claimedCityIds.map((id) => getCity(id).region);
+  const buildings = campaign?.ops?.buildings || {};
+  const allBuildingsInOneCity = Object.values(buildings).some((b) => Object.values(b).filter(Boolean).length >= 4);
+  const currentCash = store.run ? store.run.money : (campaign?.treasury || 0);
+
+  const ctx = {
+    cupsSoldEver: stats.cupsSoldEver,
+    daysPlayed: stats.daysPlayed,
+    peakMoney: Math.max(stats.peakCash, currentCash),
+    cornersClaimed,
+    citiesClaimed: campaign ? completedCities(campaign).length : 0,
+    hasUSCorner: regions.includes('US'),
+    hasEUCorner: regions.includes('EU'),
+    allBuildingsInOneCity,
+    trucksBought: (campaign?.ops?.trucks?.length || 0) >= 1,
+    ...extra,
+  };
+
+  const unlocked = loadUnlockedAchievements();
+  const newly = evaluateAchievements(ctx, unlocked);
+  if (newly.length) {
+    const now = Date.now();
+    for (const id of newly) unlocked[id] = { at: now };
+    saveUnlockedAchievements(unlocked);
+  }
+  return newly;
+}
+
+/** A one-line notice for whatever checkAchievements() just returned, or null. */
+export function achievementToast(newlyUnlockedIds) {
+  if (!newlyUnlockedIds || newlyUnlockedIds.length === 0) return null;
+  if (newlyUnlockedIds.length === 1) {
+    return `🏅 Achievement unlocked: ${ACHIEVEMENTS[newlyUnlockedIds[0]].title}!`;
+  }
+  return `🏅 ${newlyUnlockedIds.length} achievements unlocked: ${newlyUnlockedIds.map((id) => ACHIEVEMENTS[id].title).join(', ')}!`;
 }

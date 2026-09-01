@@ -5,13 +5,15 @@
  * returning { body, actions, mounted }) and `actions` (button name → handler).
  * This file owns the DOM, the HUD, input, and saving after every action.
  */
-import { store, onRender, render, save } from './store.js';
+import { store, onRender, render, save, hasTutorialBeenSeen } from './store.js';
 import * as C from './campaign.js';
 import * as S from './sim.js';
 import * as mapUi from './ui/map.js';
 import * as runUi from './ui/run.js';
 import * as opsUi from './ui/opsui.js';
 import * as premiumUi from './ui/premium.js';
+import * as tutorialUi from './ui/tutorial.js';
+import * as achievementsUi from './ui/achievements.js';
 import { money, whole, bar } from './ui/kit.js';
 import { restockCost, spaceLeft } from './ops.js';
 
@@ -19,16 +21,25 @@ const screenEl = document.getElementById('screen');
 const actionsEl = document.getElementById('actions');
 const hudEl = document.getElementById('hud');
 
-const SCREENS = { ...mapUi.screens, ...opsUi.screens, ...premiumUi.screens };
+const SCREENS = { ...mapUi.screens, ...opsUi.screens, ...premiumUi.screens, ...tutorialUi.screens, ...achievementsUi.screens };
 const RUN_SCREENS = runUi.screens;
-const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions, ...premiumUi.actions };
+const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions, ...premiumUi.actions, ...tutorialUi.actions, ...achievementsUi.actions };
 
 /* ------------------------------------------------------------------ *
  * Render
  * ------------------------------------------------------------------ */
 
+/** Full-screen overlays take priority over whatever's underneath, in this order. */
+function overlayView() {
+  if (store.ui.showTutorial) return 'tutorial';
+  if (store.ui.showPremium) return 'premium';
+  if (store.ui.showAchievements) return 'achievements';
+  return null;
+}
+
 function currentScreen() {
-  if (store.ui.showPremium) return SCREENS.premium;
+  const overlay = overlayView();
+  if (overlay) return SCREENS[overlay];
   if (store.ui.view === 'run' && store.run) {
     return RUN_SCREENS[store.run.phase] || RUN_SCREENS.forecast;
   }
@@ -36,9 +47,8 @@ function currentScreen() {
 }
 
 function draw() {
-  const view = store.ui.showPremium
-    ? 'premium'
-    : store.ui.view === 'run' && store.run ? `run:${store.run.phase}` : store.ui.view;
+  const overlay = overlayView();
+  const view = overlay || (store.ui.view === 'run' && store.run ? `run:${store.run.phase}` : store.ui.view);
   const screen = currentScreen()();
 
   screenEl.innerHTML = (store.ui.notice ? `<div class="notice">${store.ui.notice}</div>` : '') + screen.body;
@@ -65,7 +75,10 @@ function drawHud() {
   const inRun = store.ui.view === 'run' && store.run;
   const showHud = inRun || (store.campaign && ['world', 'city', 'corner', 'ops', 'opsCity'].includes(store.ui.view));
   hudEl.hidden = !showHud;
-  if (!showHud) return;
+  if (!showHud) {
+    hudEl.innerHTML = '';
+    return;
+  }
 
   if (inRun) {
     const r = store.run;
@@ -230,4 +243,5 @@ if ('serviceWorker' in navigator) {
 
 // Always open on the title screen; Continue picks the saved game back up.
 store.ui.view = 'title';
+if (!hasTutorialBeenSeen()) store.ui.showTutorial = true;
 render();

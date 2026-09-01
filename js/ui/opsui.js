@@ -1,7 +1,7 @@
 /** Operations: the depot network, wholesale buying and staffed corners. */
 import * as C from '../campaign.js';
 import * as O from '../ops.js';
-import { store } from '../store.js';
+import { store, checkAchievements, achievementToast } from '../store.js';
 import { money, whole, fact, bar, backBar, row, stepper, tierPill } from './kit.js';
 
 const ops = () => store.campaign.ops;
@@ -369,16 +369,15 @@ export const actions = {
   },
   'build-building': (el) => {
     const result = O.buildBuilding(store.campaign, el.dataset.city, el.dataset.building);
-    store.ui.notice = result.ok ? null : result.why;
+    if (!result.ok) { store.ui.notice = result.why; return; }
+    store.ui.notice = achievementToast(checkAchievements());
   },
   'buy-truck': () => {
     const result = O.buyTruck(store.campaign);
-    if (result.ok) {
-      store.ui.editingTruck = result.id;
-      store.ui.truckDraft = { from: null, to: null, cargo: 'lemons', amount: 100 };
-    } else {
-      store.ui.notice = result.why;
-    }
+    if (!result.ok) { store.ui.notice = result.why; return; }
+    store.ui.editingTruck = result.id;
+    store.ui.truckDraft = { from: null, to: null, cargo: 'lemons', amount: 100 };
+    store.ui.notice = achievementToast(checkAchievements());
   },
   'edit-truck': (el) => {
     const id = Number(el.dataset.truck);

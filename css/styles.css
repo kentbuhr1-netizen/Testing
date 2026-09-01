@@ -30,6 +30,10 @@
 
 * { box-sizing: border-box; }
 
+/* An element's own `display` (e.g. .hud, .actions) would otherwise outrank
+   the browser's default [hidden] rule and stay visible. */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   height: 100%;
@@ -558,3 +562,38 @@ h1 .of { font-size: 15px; font-weight: 600; color: var(--ink-soft); }
   color: var(--ink-soft);
 }
 .paywall p { text-align: left; }
+
+/* ---- locked list rows (achievements, and anywhere else that fits) ---- */
+
+.row.locked { opacity: .5; }
+.row.locked .row-name { color: var(--ink-soft); }
+
+/* ---- tutorial slides ---- */
+
+.tut-slide {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+  padding: 24px 12px;
+}
+.tut-icon { font-size: 72px; line-height: 1; margin-bottom: 8px; }
+.tut-slide h1 { font-size: 24px; margin: 0; }
+.tut-slide p { max-width: 34ch; color: var(--ink-soft); font-size: 16px; line-height: 1.5; }
+
+.tut-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+.tut-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--line);
+}
+.tut-dot.on { background: var(--lemon-deep); width: 22px; }

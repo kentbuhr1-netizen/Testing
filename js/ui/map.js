@@ -3,7 +3,8 @@ import * as C from '../campaign.js';
 import * as S from '../sim.js';
 import { opsUnlocked } from '../campaign.js';
 import { restockCost } from '../ops.js';
-import { store, save, loadSave, clearSave, bestScore } from '../store.js';
+import { store, save, loadSave, clearSave, bestScore, loadUnlockedAchievements } from '../store.js';
+import { ACHIEVEMENTS } from '../achievements.js';
 import { money, whole, fact, tierPill, bar, backBar } from './kit.js';
 
 /* ------------------------------------------------------------------ *
@@ -14,6 +15,8 @@ function titleScreen() {
   const saved = loadSave();
   const progress = saved ? C.campaignProgress(saved.campaign) : null;
   const best = bestScore();
+  const achievementCount = Object.keys(loadUnlockedAchievements()).length;
+  const achievementTotal = Object.keys(ACHIEVEMENTS).length;
   return {
     body: `
       <div class="title-art">🍋</div>
@@ -25,6 +28,10 @@ function titleScreen() {
           <strong>${progress.cities}</strong> cit${progress.cities === 1 ? 'y' : 'ies'} taken ·
           <strong>${whole(saved.campaign.treasury)}</strong> banked</p>` : ''}
         ${best && !progress ? `<p class="muted">Best free season: <strong>${money(best)}</strong></p>` : ''}
+        <div class="chip-row" style="justify-content:center;margin-top:16px">
+          <button class="chip" data-act="start-tutorial">🎓 Tutorial</button>
+          <button class="chip" data-act="open-achievements">🏅 Achievements · ${achievementCount}/${achievementTotal}</button>
+        </div>
       </div>`,
     actions: `
       ${saved ? '<button class="btn" data-act="continue">Continue</button>' : ''}
