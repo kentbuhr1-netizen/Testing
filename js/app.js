@@ -133,11 +133,21 @@ const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 const LIMITS = {
   recipe: { lemons: [1, 12], sugar: [1, 12], ice: [0, 7] },
   price: { price: [0.05, 5] },
+  cupPrice: { small: [0.05, 5], large: [0.05, 5], byo: [0.05, 5] },
   order: { lemons: [0, 9999], sugar: [0, 9999], ice: [0, 9999], cups: [0, 9999] },
   restock: { lemons: [0, 99999], sugar: [0, 99999], cups: [0, 99999] },
   truckDraft: { amount: [25, 2000] },
   enhancerOrder: Object.fromEntries(Object.keys(S.ENHANCERS).map((id) => [id, [0, 999]])),
 };
+
+/** Every category a shopping basket can cost money in, added together. */
+function totalOrderCost(prices, order) {
+  return Math.round((
+    S.buyCost(prices, order) +
+    S.sizedCupOrderCost(prices, order) +
+    S.enhancerOrderCost(order.enhancers)
+  ) * 100) / 100;
+}
 
 /** Apply one tap of a stepper. Returns false when it could not move. */
 function applyStep(group, field, step) {
@@ -147,7 +157,7 @@ function applyStep(group, field, step) {
     const r = store.run;
     const next = clamp(store.ui.order[field] + step, min, max);
     const trial = { ...store.ui.order, [field]: next };
-    if (step > 0 && S.buyCost(r.today.prices, trial) > r.money) return false; // never overspend
+    if (step > 0 && totalOrderCost(r.today.prices, trial) > r.money) return false; // never overspend
     store.ui.order[field] = next;
     return true;
   }
@@ -159,11 +169,8 @@ function applyStep(group, field, step) {
   if (group === 'enhancerOrder') {
     const r = store.run;
     const next = clamp(store.ui.order.enhancers[field] + step, min, max);
-    const trial = { ...store.ui.order.enhancers, [field]: next };
-    if (step > 0) {
-      const total = S.buyCost(r.today.prices, store.ui.order) + S.enhancerOrderCost(trial);
-      if (total > r.money) return false; // never overspend
-    }
+    const trial = { ...store.ui.order, enhancers: { ...store.ui.order.enhancers, [field]: next } };
+    if (step > 0 && totalOrderCost(r.today.prices, trial) > r.money) return false; // never overspend
     store.ui.order.enhancers[field] = next;
     return true;
   }
@@ -173,6 +180,10 @@ function applyStep(group, field, step) {
   }
   if (group === 'price') {
     store.run.price = Math.round(clamp(store.run.price + step, min, max) * 100) / 100;
+    return true;
+  }
+  if (group === 'cupPrice') {
+    store.run.cupPrices[field] = Math.round(clamp(store.run.cupPrices[field] + step, min, max) * 100) / 100;
     return true;
   }
   store.run.recipe[field] = clamp(store.run.recipe[field] + step, min, max);

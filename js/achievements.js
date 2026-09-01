@@ -22,6 +22,48 @@ export const ACHIEVEMENTS = {
   wasteNot:      { icon: '🍋', title: 'Waste Not',        desc: 'Finish a corner without a single lemon spoiling.' },
   tycoon:        { icon: '👑', title: 'Tycoon',           desc: 'Bank $1,000 in cash.' },
   dedicated:     { icon: '📅', title: 'Dedicated',        desc: 'Play 50 days total, across every corner.' },
+
+  // Difficulty
+  hardWon:       { icon: '🟠', title: 'No Slack',         desc: 'Clear a corner on Hard difficulty.' },
+  impossibleWon: { icon: '🔴', title: 'Against The Odds', desc: 'Clear a corner on Impossible difficulty.' },
+  allTiers:      { icon: '🎯', title: 'Every Rung',       desc: 'Win at least one corner at every difficulty tier.' },
+
+  // Territory
+  tenCorners:    { icon: '📍', title: 'Ten Corners',      desc: 'Claim 10 street corners.' },
+  fiftyCorners:  { icon: '🗺️', title: 'Fifty Corners',     desc: 'Claim 50 street corners.' },
+  hundredCorners:{ icon: '🧭', title: 'A Hundred Strong', desc: 'Claim 100 street corners.' },
+  tenCities:     { icon: '🌆', title: 'Metropolis',       desc: 'Take ten entire cities.' },
+  worldChampion: { icon: '🏆', title: 'World Champion',   desc: 'Take every city on the map.' },
+
+  // Money
+  bigSpender:    { icon: '💵', title: 'Five Grand',       desc: 'Bank $5,000 in cash.' },
+  highRoller:    { icon: '💰', title: 'High Roller',      desc: 'Bank $25,000 in cash.' },
+  mogul:         { icon: '🏦', title: 'Mogul',            desc: 'Bank $100,000 in cash.' },
+  treasuryTen:   { icon: '🪙', title: 'War Chest',        desc: 'Grow the campaign treasury to $10,000.' },
+  bestRank:      { icon: '👑', title: 'Lemonade Tycoon',  desc: 'Earn the top rank in a free-play season.' },
+
+  // Supply chain
+  firstBuilding: { icon: '🏗️', title: 'Groundbreaking',   desc: 'Build your first farm or factory.' },
+  threeIndustrial:{ icon: '🏭', title: 'Vertical Integration', desc: 'Build every farm and factory in three different cities.' },
+  fleetOfFive:   { icon: '🚛', title: 'Small Fleet',      desc: 'Own 5 delivery trucks at once.' },
+  fleetOfTen:    { icon: '🚚', title: 'Logistics Network', desc: 'Own 10 delivery trucks at once.' },
+
+  // Cup sizes & BYO
+  goSmall:       { icon: '🥤', title: 'Small Talk',       desc: 'Sell your first small cup.' },
+  goBig:         { icon: '🧋', title: 'Go Big',           desc: 'Sell your first large cup.' },
+  ecoFriendly:   { icon: '🌱', title: 'Bring Your Own',   desc: 'Sell your first BYO cup.' },
+  ecoWarrior:    { icon: '♻️', title: 'Eco Warrior',       desc: 'Sell 100 BYO cups over your lifetime.' },
+  fullSpread:    { icon: '🍹', title: 'Full Spread',      desc: 'Sell a small, a medium, a large, and a BYO cup all in one day.' },
+
+  // Enhancers
+  firstUpsell:   { icon: '🧃', title: 'Say Yes To The Extra', desc: 'Sell your first enhancer.' },
+  flavorFanatic: { icon: '🍓', title: 'Flavor Fanatic',   desc: 'Sell 100 enhancers over your lifetime.' },
+
+  // Endurance & consistency
+  centurion:     { icon: '📆', title: 'Centurion',        desc: 'Play 100 days total, across every corner.' },
+  veteran:       { icon: '🎖️', title: 'Veteran',          desc: 'Play 365 days total, across every corner.' },
+  qualityStreak: { icon: '🌟', title: 'Consistently Good', desc: 'Average 90%+ quality across an entire run.' },
+  neverExpire:   { icon: '⏳', title: 'Frozen In Time',    desc: 'Unlock never-expiring lemons.' },
 };
 
 /**
@@ -50,6 +92,42 @@ export function evaluateAchievements(ctx, unlocked) {
   check('wasteNot', !!ctx.cleanRunFinished);
   check('tycoon', (ctx.peakMoney || 0) >= 1000);
   check('dedicated', (ctx.daysPlayed || 0) >= 50);
+
+  const tiersWon = ctx.tiersWon || [];
+  check('hardWon', tiersWon.includes('hard') || tiersWon.includes('impossible'));
+  check('impossibleWon', tiersWon.includes('impossible'));
+  check('allTiers', ['easy', 'medium', 'hard', 'impossible'].every((t) => tiersWon.includes(t)));
+
+  check('tenCorners', (ctx.cornersClaimed || 0) >= 10);
+  check('fiftyCorners', (ctx.cornersClaimed || 0) >= 50);
+  check('hundredCorners', (ctx.cornersClaimed || 0) >= 100);
+  check('tenCities', (ctx.citiesClaimed || 0) >= 10);
+  check('worldChampion', (ctx.citiesClaimed || 0) >= (ctx.totalCities || Infinity));
+
+  check('bigSpender', (ctx.peakMoney || 0) >= 5000);
+  check('highRoller', (ctx.peakMoney || 0) >= 25000);
+  check('mogul', (ctx.peakMoney || 0) >= 100000);
+  check('treasuryTen', (ctx.treasury || 0) >= 10000);
+  check('bestRank', !!ctx.topRankFreePlay);
+
+  check('firstBuilding', !!ctx.anyBuildingBuilt);
+  check('threeIndustrial', (ctx.citiesFullyBuilt || 0) >= 3);
+  check('fleetOfFive', (ctx.trucksCount || 0) >= 5);
+  check('fleetOfTen', (ctx.trucksCount || 0) >= 10);
+
+  check('goSmall', (ctx.smallSoldEver || 0) >= 1);
+  check('goBig', (ctx.largeSoldEver || 0) >= 1);
+  check('ecoFriendly', (ctx.byoSoldEver || 0) >= 1);
+  check('ecoWarrior', (ctx.byoSoldEver || 0) >= 100);
+  check('fullSpread', !!ctx.allSizesInADay);
+
+  check('firstUpsell', (ctx.enhancersSoldEver || 0) >= 1);
+  check('flavorFanatic', (ctx.enhancersSoldEver || 0) >= 100);
+
+  check('centurion', (ctx.daysPlayed || 0) >= 100);
+  check('veteran', (ctx.daysPlayed || 0) >= 365);
+  check('qualityStreak', (ctx.consistentQuality || 0) >= 0.9);
+  check('neverExpire', !!ctx.neverExpireLemons);
 
   return newly;
 }

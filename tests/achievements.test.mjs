@@ -57,6 +57,45 @@ test('wasteNot and tycoon and dedicated read their own thresholds', () => {
   assert.deepEqual(evaluateAchievements({ daysPlayed: 50 }, {}), ['dedicated']);
 });
 
+test('difficulty achievements read the tiers actually won, not just any win', () => {
+  assert.deepEqual(evaluateAchievements({ tiersWon: ['easy', 'medium'] }, {}), []);
+  const hardWin = evaluateAchievements({ tiersWon: ['easy', 'hard'] }, {});
+  assert.deepEqual(hardWin, ['hardWon']);
+  const allFour = evaluateAchievements({ tiersWon: ['easy', 'medium', 'hard', 'impossible'] }, {});
+  assert.ok(allFour.includes('hardWon'));
+  assert.ok(allFour.includes('impossibleWon'));
+  assert.ok(allFour.includes('allTiers'));
+});
+
+test('territory milestones scale past the original corner and city counts', () => {
+  assert.deepEqual(evaluateAchievements({ cornersClaimed: 10 }, {}).sort(), ['firstCorner', 'tenCorners'].sort());
+  assert.deepEqual(evaluateAchievements({ cornersClaimed: 100 }, {}).sort(),
+    ['firstCorner', 'tenCorners', 'fiftyCorners', 'hundredCorners'].sort());
+  assert.deepEqual(evaluateAchievements({ citiesClaimed: 25, totalCities: 25 }, {}).sort(),
+    ['homeTown', 'fiveCities', 'tenCities', 'worldChampion'].sort());
+});
+
+test('cup sizes, BYO and enhancers unlock from lifetime totals, not one day', () => {
+  assert.deepEqual(evaluateAchievements({ smallSoldEver: 1 }, {}), ['goSmall']);
+  assert.deepEqual(evaluateAchievements({ largeSoldEver: 1 }, {}), ['goBig']);
+  assert.deepEqual(evaluateAchievements({ byoSoldEver: 1 }, {}), ['ecoFriendly']);
+  assert.deepEqual(evaluateAchievements({ byoSoldEver: 100 }, {}).sort(), ['ecoFriendly', 'ecoWarrior'].sort());
+  assert.deepEqual(evaluateAchievements({ allSizesInADay: true }, {}), ['fullSpread']);
+  assert.deepEqual(evaluateAchievements({ enhancersSoldEver: 100 }, {}).sort(), ['firstUpsell', 'flavorFanatic'].sort());
+});
+
+test('money, buildings, trucks and quality achievements read their own fields', () => {
+  assert.deepEqual(evaluateAchievements({ peakMoney: 25000 }, {}).sort(), ['tycoon', 'bigSpender', 'highRoller'].sort());
+  assert.deepEqual(evaluateAchievements({ treasury: 10000 }, {}), ['treasuryTen']);
+  assert.deepEqual(evaluateAchievements({ topRankFreePlay: true }, {}), ['bestRank']);
+  assert.deepEqual(evaluateAchievements({ anyBuildingBuilt: true }, {}), ['firstBuilding']);
+  assert.deepEqual(evaluateAchievements({ citiesFullyBuilt: 3 }, {}), ['threeIndustrial']);
+  assert.deepEqual(evaluateAchievements({ trucksCount: 10 }, {}).sort(), ['fleetOfFive', 'fleetOfTen'].sort());
+  assert.deepEqual(evaluateAchievements({ consistentQuality: 0.95 }, {}), ['qualityStreak']);
+  assert.deepEqual(evaluateAchievements({ neverExpireLemons: true }, {}), ['neverExpire']);
+  assert.deepEqual(evaluateAchievements({ daysPlayed: 365 }, {}).sort(), ['dedicated', 'centurion', 'veteran'].sort());
+});
+
 test('a rich context can unlock several achievements in one pass', () => {
   const ctx = {
     cupsSoldEver: 200,

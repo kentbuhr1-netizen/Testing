@@ -2,7 +2,7 @@
 import * as S from '../sim.js';
 import * as C from '../campaign.js';
 import { tickOps, newOps } from '../ops.js';
-import { store, render, recordBest, isPremiumUnlocked, recordDay, checkAchievements, achievementToast } from '../store.js';
+import { store, render, recordBest, isPremiumUnlocked, recordDay, recordTierWon, checkAchievements, achievementToast } from '../store.js';
 import { money, whole, cents, fact, stepper, row, tierPill } from './kit.js';
 
 const zeroedEnhancers = () => Object.fromEntries(Object.keys(S.ENHANCERS).map((id) => [id, 0]));
@@ -36,7 +36,9 @@ function forecastScreen() {
           ${fact('Lemons', r.inventory.lemons)}
           ${fact('Sugar', r.inventory.sugar)}
           ${fact('Ice', `${r.inventory.ice} 🧊`)}
-          ${fact('Cups', r.inventory.cups)}
+          ${fact('Small cups', r.inventory.cupsSmall)}
+          ${fact('Medium cups', r.inventory.cups)}
+          ${fact('Large cups', r.inventory.cupsLarge)}
         </div>
         ${lemonFreshnessNote(r)}
         ${yesterday?.melted > 0
@@ -75,13 +77,16 @@ function buyScreen() {
   const o = store.ui.order;
   const baseCost = S.buyCost(p, o);
   const enhCost = S.enhancerOrderCost(o.enhancers);
-  const cost = Math.round((baseCost + enhCost) * 100) / 100;
+  const sizedCupCost = S.sizedCupOrderCost(p, o);
+  const cost = Math.round((baseCost + sizedCupCost + enhCost) * 100) / 100;
   const left = r.money - cost;
   const after = {
     lemons: r.inventory.lemons + o.lemons,
     sugar: r.inventory.sugar + o.sugar,
     ice: r.inventory.ice + o.ice,
     cups: r.inventory.cups + o.cups,
+    cupsSmall: r.inventory.cupsSmall + o.cupsSmall,
+    cupsLarge: r.inventory.cupsLarge + o.cupsLarge,
   };
   const pourable = S.maxCupsAvailable(after, r.recipe);
   const line = (key, name, unit, step) =>
@@ -91,6 +96,13 @@ function buyScreen() {
   const lemonSub = r.premium?.neverExpireLemons
     ? `${cents(p.lemon)} each · cooler: ${after.lemons} · never expires`
     : `${cents(p.lemon)} each · cooler: ${after.lemons} · good for ${S.LEMON_SHELF_LIFE_DAYS} days`;
+
+  const sizeCupLine = (sizeId, field, step) => {
+    const size = S.CUP_SIZES[sizeId];
+    const unitCost = p.cup * size.costMult;
+    return row(`${size.icon} ${size.label} · ${size.material}`, `${cents(unitCost)} each · cooler: ${after[field]}`,
+      stepper('order', field, o[field], step, 0, 9999));
+  };
 
   const enhancerRows = Object.values(S.ENHANCERS).map((enh) => {
     const held = r.inventory.enhancers?.[enh.id] || 0;
@@ -106,7 +118,9 @@ function buyScreen() {
         ${row('Lemons 🍋', lemonSub, stepper('order', 'lemons', o.lemons, 5, 0, 9999))}
         ${line('sugar', 'Sugar 🥄', 'sugar', 5)}
         ${line('ice', 'Ice cubes 🧊', 'ice', 25)}
-        ${line('cups', 'Paper cups 🥤', 'cup', 10)}
+        ${sizeCupLine('small', 'cupsSmall', 10)}
+        ${sizeCupLine('medium', 'cups', 10)}
+        ${sizeCupLine('large', 'cupsLarge', 10)}
         <div class="total">
           <span>Total</span>
           <span class="${cost > r.money ? 'over' : ''}">${money(cost)}</span>
@@ -149,6 +163,41 @@ function setupScreen() {
   const unitCost = S.costPerCup(r.recipe, r.today.prices);
   const margin = r.price - unitCost;
 
+  const cupStock = { small: r.inventory.cupsSmall, medium: r.inventory.cups, large: r.inventory.cupsLarge };
+  const sizeRows = Object.values(S.CUP_SIZES).map((size) => {
+    const stock = cupStock[size.id];
+    const price = size.id === 'medium' ? r.price : r.cupPrices[size.id];
+    const cost = S.costPerCupSized(r.recipe, r.today.prices, size.id);
+    const group = size.id === 'medium' ? 'price' : 'cupPrice';
+    const field = size.id === 'medium' ? 'price' : size.id;
+    return `<div class="row">
+        <div class="row-main">
+          <div class="row-name">${size.icon} ${size.label} <span class="muted" style="font-weight:600">· ${size.material}</span></div>
+          <div class="row-sub">${stock} in the cooler · costs ${cents(cost)} to pour</div>
+        </div>
+        ${stepper(group, field, price, 0.05, 0.05, 5, money(price))}
+      </div>`;
+  }).join('');
+
+  const byoPrice = r.cupPrices.byo;
+  const byoCost = S.costPerCupSized(r.recipe, r.today.prices, 'byo');
+  const byoRow = r.byoAccepted
+    ? `<div class="row">
+        <div class="row-main">
+          <div class="row-name">🌱 BYO Cup</div>
+          <div class="row-sub">no cup to buy · costs ${cents(byoCost)} to pour</div>
+        </div>
+        ${stepper('cupPrice', 'byo', byoPrice, 0.05, 0.05, 5, money(byoPrice))}
+      </div>
+      <button class="chip chip-on" data-act="toggle-byo" style="margin-top:8px">Accepting BYO ✓</button>`
+    : `<div class="row">
+        <div class="row-main">
+          <div class="row-name">🌱 Bring Your Own Cup</div>
+          <div class="row-sub">customers use their own container — no cup cost to you</div>
+        </div>
+        <button class="chip" data-act="toggle-byo">Accept It</button>
+      </div>`;
+
   const enhancerToggles = Object.values(S.ENHANCERS).map((enh) => {
     const stock = r.inventory.enhancers?.[enh.id] || 0;
     const offered = !!r.enhancersOffered?.[enh.id];
@@ -175,12 +224,15 @@ function setupScreen() {
       </div>
       <div class="card">
         <h2>Price per cup</h2>
-        ${row('What you charge', `costs you ${cents(unitCost)} to pour`,
-              stepper('price', 'price', r.price, 0.05, 0.05, 5, money(r.price)))}
+        ${sizeRows}
         <div class="facts" style="margin-top:12px">
-          ${fact('Profit per cup', money(margin), margin > 0 ? 'good' : 'bad')}
+          ${fact('Profit per medium', money(margin), margin > 0 ? 'good' : 'bad')}
           ${fact('Cups ready', pourable, pourable === 0 ? 'bad' : '')}
         </div>
+      </div>
+      <div class="card">
+        <h2>Bring your own cup</h2>
+        ${byoRow}
       </div>
       <div class="card">
         <h2>Enhancers on offer</h2>
@@ -269,6 +321,13 @@ function reportScreen() {
     const enh = S.ENHANCERS[id];
     return `<li>${enh.icon} ${s.cups} customer${s.cups === 1 ? '' : 's'} added ${enh.label.toLowerCase()} for ${money(s.revenue)}.</li>`;
   }).join('');
+  const sizeIcons = { small: '🥤', medium: '🧋', large: '🧋', byo: '🌱' };
+  const sizeLabels = { small: 'Small', medium: 'Medium', large: 'Large', byo: 'BYO' };
+  const soldSizeCount = Object.values(result.sizes || {}).filter((s) => s.sold > 0).length;
+  const sizeLines = soldSizeCount > 1
+    ? Object.entries(result.sizes || {}).filter(([, s]) => s.sold > 0).map(([id, s]) =>
+        `<li>${sizeIcons[id]} ${sizeLabels[id]}: ${s.sold} cup${s.sold === 1 ? '' : 's'} for ${money(s.revenue)}.</li>`).join('')
+    : '';
 
   return {
     body: `
@@ -283,6 +342,7 @@ function reportScreen() {
         ${result.enhancerRevenue > 0 ? `<p class="muted" style="margin-top:8px">Enhancers added ${money(result.enhancerRevenue)} on top of the base price.</p>` : ''}
         <ul class="notes">
           ${result.notes.map((n) => `<li>${n}</li>`).join('')}
+          ${sizeLines}
           ${enhancerLines}
           ${result.rent > 0 ? `<li>🏠 Pitch fee of ${money(result.rent)} came out of the till.</li>` : ''}
           <li>${w.icon} ${w.label}, ${result.temp}°F · about ${result.potential} people walked past.</li>
@@ -383,12 +443,12 @@ function runOverScreen() {
  * Actions
  * ------------------------------------------------------------------ */
 
-const emptyOrder = () => ({ lemons: 0, sugar: 0, ice: 0, cups: 0, enhancers: zeroedEnhancers() });
+const emptyOrder = () => ({ lemons: 0, sugar: 0, ice: 0, cups: 0, cupsSmall: 0, cupsLarge: 0, enhancers: zeroedEnhancers() });
 
 /**
- * What you would need to add to the cooler to pour `cups` cups today.
- * Enhancers are a deliberate, separate purchase — a stock-up preset for the
- * base drink should never silently add or drop them.
+ * What you would need to add to the cooler to pour `cups` medium cups today.
+ * Small cups, large cups and enhancers are deliberate, separate purchases —
+ * a stock-up preset for the classic size should never silently touch them.
  */
 function orderFor(cups) {
   const r = run();
@@ -399,6 +459,8 @@ function orderFor(cups) {
     sugar: need(r.inventory.sugar, pitchers * r.recipe.sugar),
     ice: need(r.inventory.ice, cups * r.recipe.ice),
     cups: need(r.inventory.cups, cups),
+    cupsSmall: store.ui.order.cupsSmall,
+    cupsLarge: store.ui.order.cupsLarge,
     enhancers: store.ui.order.enhancers,
   };
 }
@@ -447,24 +509,36 @@ function startRun(config) {
 /** Settle a finished run: bank a win, let the network trade, check achievements. */
 function settleRun() {
   const r = run();
-  if (!r.corner || r.settled) return [];
+  if (r.settled) return [];
   r.settled = true;
   const score = S.finalScore(r);
-  const campaign = store.campaign;
-  campaign.stats.runsPlayed += 1;
-  campaign.stats.cupsSold += score.cupsSold;
 
-  if (score.won) {
-    campaign.stats.runsWon += 1;
-    store.ui.claimResult = C.claimCorner(campaign, r.corner.cityId, r.corner.index, score.net);
-    if (store.ui.claimResult.opsJustUnlocked && !campaign.ops) campaign.ops = newOps();
+  if (r.corner) {
+    const campaign = store.campaign;
+    campaign.stats.runsPlayed += 1;
+    campaign.stats.cupsSold += score.cupsSold;
+
+    if (score.won) {
+      campaign.stats.runsWon += 1;
+      recordTierWon(r.corner.tier);
+      store.ui.claimResult = C.claimCorner(campaign, r.corner.cityId, r.corner.index, score.net);
+      if (store.ui.claimResult.opsJustUnlocked && !campaign.ops) campaign.ops = newOps();
+    }
+    if (campaign.ops) {
+      const summary = tickOps(campaign, r.history.length);
+      store.ui.opsReport = summary && summary.days > 0 ? summary : null;
+    }
   }
-  if (campaign.ops) {
-    const summary = tickOps(campaign, r.history.length);
-    store.ui.opsReport = summary && summary.days > 0 ? summary : null;
-  }
+
   const cleanRunFinished = r.history.every((d) => !(d.spoiledLemons > 0));
-  return checkAchievements({ cleanRunFinished });
+  const avgQuality = r.history.length ? r.history.reduce((n, d) => n + d.quality, 0) / r.history.length : 0;
+  const allSizesInADay = r.history.some((d) => Object.values(d.sizes || {}).filter((s) => s.sold > 0).length >= 4);
+  return checkAchievements({
+    cleanRunFinished,
+    consistentQuality: avgQuality,
+    allSizesInADay,
+    topRankFreePlay: !r.corner && !score.bankrupt && score.rank?.title === 'Lemonade Tycoon',
+  });
 }
 
 export const screens = {
@@ -503,7 +577,11 @@ export const actions = {
   'confirm-buy': () => {
     const r = run();
     const order = store.ui.order;
-    const cost = Math.round((S.buyCost(r.today.prices, order) + S.enhancerOrderCost(order.enhancers)) * 100) / 100;
+    const cost = Math.round((
+      S.buyCost(r.today.prices, order) +
+      S.sizedCupOrderCost(r.today.prices, order) +
+      S.enhancerOrderCost(order.enhancers)
+    ) * 100) / 100;
     if (cost > r.money) return;
     r.money = Math.round((r.money - cost) * 100) / 100;
     S.receiveOrder(r, order);
@@ -521,6 +599,7 @@ export const actions = {
     if (toast) store.ui.notice = toast;
   },
   'open-premium': () => { store.ui.showPremium = true; },
+  'toggle-byo': () => { run().byoAccepted = !run().byoAccepted; },
   'open-stand': () => {
     store.ui.pending = S.simulateDay(run());
     run().phase = 'open';

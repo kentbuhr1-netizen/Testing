@@ -153,6 +153,69 @@ function enhancerUptake(enh, heat) {
   return clamp(chance, 0, 0.9);
 }
 
+/* ------------------------------------------------------------------ *
+ * Cup sizes
+ *
+ * "Medium" is the size the original game always had — it still lives on
+ * `state.price` and `inventory.cups`, untouched, so a player who never
+ * touches small, large or BYO gets bit-for-bit the same day the game has
+ * always simulated. The other sizes share the same pitcher: a large cup
+ * just claims more of it, in the same currency (`servingMult`) that a
+ * pitcher is metered in.
+ * ------------------------------------------------------------------ */
+
+export const CUP_SIZES = {
+  small:  { id: 'small',  label: 'Small',  icon: '🥤', material: 'Paper',     share: 0.4,  servingMult: 0.7, costMult: 0.55 },
+  medium: { id: 'medium', label: 'Medium', icon: '🧋', material: 'Styrofoam', share: 0.35, servingMult: 1.0, costMult: 1.0 },
+  large:  { id: 'large',  label: 'Large',  icon: '🧋', material: 'Styrofoam', share: 0.25, servingMult: 1.4, costMult: 1.6 },
+};
+
+// Customers who'd bring their own cup if you'd let them — a bonus on top of
+// the regular crowd, not carved out of it, since they weren't going to take
+// a disposable cup either way.
+export const BYO_SHARE = 0.15;
+
+/** Bigger cups feel like better value, but not in strict proportion to size. */
+function sizeWillingnessMult(servingMult) {
+  return Math.pow(servingMult, 0.6);
+}
+
+/** How many medium-equivalent servings the lemons and sugar alone allow — no ice, no cup count. */
+export function maxServingsFromLiquid(inventory, recipe) {
+  const byLemons = Math.floor(inventory.lemons / Math.max(1, recipe.lemons));
+  const bySugar = Math.floor(inventory.sugar / Math.max(1, recipe.sugar));
+  return Math.min(byLemons, bySugar) * CUPS_PER_PITCHER;
+}
+
+/** What one cup of `sizeId` costs to make, at today's prices. */
+export function costPerCupSized(recipe, prices, sizeId) {
+  const size = CUP_SIZES[sizeId];
+  const mult = size ? size.servingMult : 1;
+  const perServing = (recipe.lemons * prices.lemon + recipe.sugar * prices.sugar) / CUPS_PER_PITCHER;
+  const ice = Math.round(recipe.ice * mult) * prices.ice;
+  const cup = sizeId === 'byo' ? 0 : prices.cup * (size ? size.costMult : 1);
+  return round2(perServing * mult + ice + cup);
+}
+
+/**
+ * Sell one size for the day against what's left of the shared pitcher and
+ * ice pool. Pure — the caller deducts what actually sold before selling the
+ * next size. For medium alone, given the full pool and nothing held back,
+ * this reproduces the original single-size loop's numbers precisely.
+ */
+function sellSize({ potential, price, willingness, cupStock, servingMult, iceEach, remainingServings, remainingIce, rng }) {
+  let interested = 0;
+  for (let i = 0; i < potential; i++) {
+    const personal = willingness * (0.6 + rng() * 0.8);
+    if (price <= personal) interested++;
+  }
+  const byLiquid = servingMult > 0 ? Math.floor(remainingServings / servingMult) : Infinity;
+  const byIce = iceEach > 0 ? Math.floor(remainingIce / iceEach) : Infinity;
+  const stock = Math.max(0, Math.min(cupStock, byLiquid, byIce));
+  const sold = Math.min(interested, stock);
+  return { potential, interested, sold, stock, lostToStockout: Math.max(0, interested - sold) };
+}
+
 export const WEATHER = {
   scorcher:  { id: 'scorcher',  label: 'Scorcher',      icon: '🔥', traffic: 1.35, tempRange: [92, 104], hot: true },
   sunny:     { id: 'sunny',     label: 'Sunny',         icon: '☀️', traffic: 1.15, tempRange: [76, 92], hot: true },
@@ -315,10 +378,15 @@ export function newRun({
     premium: { neverExpireLemons: false, ...(premium || {}) },
     money: stake,
     reputation: 0.5,
-    inventory: { lemons: 0, sugar: 0, ice: 0, cups: 0, lemonBatches: [], enhancers: emptyEnhancerInventory() },
+    inventory: {
+      lemons: 0, sugar: 0, ice: 0, cups: 0, cupsSmall: 0, cupsLarge: 0,
+      lemonBatches: [], enhancers: emptyEnhancerInventory(),
+    },
     enhancersOffered: allEnhancersOff(),
     recipe: { lemons: 5, sugar: 5, ice: 2 },
-    price: 0.5,
+    price: 0.5,                                    // the medium price — unchanged from the original game
+    cupPrices: { small: 0.35, large: 0.7, byo: 0.5 },
+    byoAccepted: false,
     history: [],
     today: null,
     phase: 'forecast',
@@ -357,6 +425,14 @@ export function buyCost(prices, order) {
   );
 }
 
+/** Small and large cups ride the same daily cup price, scaled by material and size. */
+export function sizedCupOrderCost(prices, order) {
+  return round2(
+    (order.cupsSmall || 0) * prices.cup * CUP_SIZES.small.costMult +
+    (order.cupsLarge || 0) * prices.cup * CUP_SIZES.large.costMult
+  );
+}
+
 /** Enhancer stock has a fixed wholesale price — no daily jitter, no bulk break. */
 export function enhancerOrderCost(order) {
   return round2(
@@ -383,21 +459,87 @@ export function simulateDay(state) {
     Math.round(22 * thirst * today.trafficMod * repFactor * (0.88 + rng() * 0.24))
   );
 
-  const stock = maxCupsAvailable(state.inventory, state.recipe);
-
   // What a passer-by would pay: better lemonade and hotter days raise it.
   const baseWillingness = (0.1 + 1.35 * quality + 0.7 * heat) * mods.willingness;
 
-  let interested = 0;
-  for (let i = 0; i < potential; i++) {
-    // Spread of budgets across the crowd — some splurge, some are stingy.
-    const personal = baseWillingness * (0.6 + rng() * 0.8);
-    if (state.price <= personal) interested++;
+  // Medium is always on offer. Small and large only enter the mix once
+  // there's actual stock of them, and BYO only once you've said you'll take
+  // it — so a player who never touches any of that gets 100% of `potential`
+  // routed to medium, exactly like the original single-size game did.
+  const smallOn = (state.inventory.cupsSmall || 0) > 0;
+  const largeOn = (state.inventory.cupsLarge || 0) > 0;
+  const byoOn = !!state.byoAccepted;
+  const activeShare = CUP_SIZES.medium.share + (smallOn ? CUP_SIZES.small.share : 0) + (largeOn ? CUP_SIZES.large.share : 0);
+
+  const potentialFor = (size) => (size === 'medium' && !smallOn && !largeOn)
+    ? potential
+    : Math.round(potential * (CUP_SIZES[size].share / activeShare));
+
+  let remainingServings = maxServingsFromLiquid(state.inventory, state.recipe);
+  let remainingIce = state.inventory.ice;
+  const sizeResults = {};
+
+  // Fixed serving order: medium first (the default anyone can buy), then
+  // small, then large, then BYO — whoever is last only gets what's left of
+  // a tight pitcher. Only matters when stock is actually scarce.
+  const order = ['medium', ...(smallOn ? ['small'] : []), ...(largeOn ? ['large'] : [])];
+  for (const id of order) {
+    const size = CUP_SIZES[id];
+    const cupStock = id === 'medium' ? state.inventory.cups : id === 'small' ? state.inventory.cupsSmall : state.inventory.cupsLarge;
+    const price = id === 'medium' ? state.price : state.cupPrices[id];
+    const iceEach = Math.round(state.recipe.ice * size.servingMult);
+    const r = sellSize({
+      potential: potentialFor(id),
+      price,
+      willingness: baseWillingness * sizeWillingnessMult(size.servingMult),
+      cupStock,
+      servingMult: size.servingMult,
+      iceEach,
+      remainingServings,
+      remainingIce,
+      rng,
+    });
+    remainingServings -= r.sold * size.servingMult;
+    remainingIce -= r.sold * iceEach;
+    sizeResults[id] = { ...r, price, iceEach, revenue: round2(r.sold * price) };
+  }
+  if (byoOn) {
+    const iceEach = Math.round(state.recipe.ice); // sized like medium
+    const r = sellSize({
+      potential: Math.round(potential * BYO_SHARE),
+      price: state.cupPrices.byo,
+      willingness: baseWillingness,
+      cupStock: Infinity, // the customer's own cup, not yours to run out of
+      servingMult: 1,
+      iceEach,
+      remainingServings,
+      remainingIce,
+      rng,
+    });
+    remainingServings -= r.sold;
+    remainingIce -= r.sold * iceEach;
+    sizeResults.byo = { ...r, price: state.cupPrices.byo, iceEach, revenue: round2(r.sold * state.cupPrices.byo) };
   }
 
-  const sold = Math.min(interested, stock);
-  const lostToStockout = Math.max(0, interested - stock);
-  const pitchersMade = Math.ceil(sold / CUPS_PER_PITCHER);
+  const sold = Object.values(sizeResults).reduce((n, r) => n + r.sold, 0);
+  const potentialTotal = Object.values(sizeResults).reduce((n, r) => n + r.potential, 0);
+  const interested = Object.values(sizeResults).reduce((n, r) => n + r.interested, 0);
+  const stock = Object.values(sizeResults).reduce((n, r) => n + r.stock, 0);
+  const lostToStockout = Object.values(sizeResults).reduce((n, r) => n + r.lostToStockout, 0);
+  const baseRevenue = Object.values(sizeResults).reduce((n, r) => n + r.revenue, 0);
+  // What you actually charged, on average, across every size sold — used
+  // below in place of a single `state.price` now that there can be several.
+  const avgPrice = sold > 0 ? baseRevenue / sold : state.price;
+
+  const totalServings = sold === 0
+    ? 0
+    : Object.entries(sizeResults).reduce((n, [id, r]) => n + r.sold * (id === 'byo' ? 1 : CUP_SIZES[id].servingMult), 0);
+  const pitchersMade = Math.ceil(totalServings / CUPS_PER_PITCHER);
+  const iceUsed = Object.values(sizeResults).reduce((n, r) => n + r.sold * r.iceEach, 0);
+  const cupCost = ['small', 'medium', 'large'].reduce((n, id) => {
+    const r = sizeResults[id];
+    return r ? n + r.sold * today.prices.cup * CUP_SIZES[id].costMult : n;
+  }, 0);
 
   // Enhancers are an independent upsell: every cup sold is offered whichever
   // ones are switched on and still in stock, and each customer decides for
@@ -411,39 +553,41 @@ export function simulateDay(state) {
     if (stockLeft <= 0) continue;
     const enh = ENHANCERS[id];
     const uptake = enhancerUptake(enh, heat);
-    let used = 0;
+    let usedCount = 0;
     for (let i = 0; i < sold && stockLeft > 0; i++) {
       if (rng() < uptake) {
-        used++;
+        usedCount++;
         stockLeft--;
       }
     }
-    if (used > 0) {
-      enhancerSales[id] = { cups: used, revenue: round2(used * enh.addPrice), cost: round2(used * enh.unitCost) };
-      enhancerRevenue += used * enh.addPrice;
-      enhancerCost += used * enh.unitCost;
+    if (usedCount > 0) {
+      enhancerSales[id] = { cups: usedCount, revenue: round2(usedCount * enh.addPrice), cost: round2(usedCount * enh.unitCost) };
+      enhancerRevenue += usedCount * enh.addPrice;
+      enhancerCost += usedCount * enh.unitCost;
     }
   }
 
   const used = {
     lemons: pitchersMade * state.recipe.lemons,
     sugar: pitchersMade * state.recipe.sugar,
-    ice: sold * state.recipe.ice,
-    cups: sold,
+    ice: iceUsed,
+    cups: sizeResults.medium.sold,
+    cupsSmall: sizeResults.small?.sold || 0,
+    cupsLarge: sizeResults.large?.sold || 0,
     enhancers: Object.fromEntries(Object.entries(enhancerSales).map(([id, s]) => [id, s.cups])),
   };
-  const revenue = round2(sold * state.price + enhancerRevenue);
+  const revenue = round2(baseRevenue + enhancerRevenue);
   const cogs = round2(
     pitchersMade * (state.recipe.lemons * today.prices.lemon + state.recipe.sugar * today.prices.sugar) +
-    used.ice * today.prices.ice +
-    used.cups * today.prices.cup +
+    iceUsed * today.prices.ice +
+    cupCost +
     enhancerCost
   );
 
   // Reputation follows the drink first, then how you priced it. Word only
   // spreads through cups actually sold, and the last stretch to a perfect
   // reputation is the hardest to earn.
-  const valueForMoney = clamp(baseWillingness - state.price, -1, 1);
+  const valueForMoney = clamp(baseWillingness - avgPrice, -1, 1);
   let repDelta;
   if (sold === 0) {
     repDelta = stock === 0 ? -0.01 : -0.02; // shut, or nobody bit at that price
@@ -468,7 +612,8 @@ export function simulateDay(state) {
     lostToStockout,
     stock,
     quality,
-    price: state.price,
+    price: avgPrice,
+    sizes: sizeResults,
     revenue,
     rent: round2(mods.rent),
     cogs,
@@ -489,6 +634,8 @@ export function commitDay(state, result) {
   consumeLemons(state, result.used.lemons);
   state.inventory.sugar -= result.used.sugar;
   state.inventory.cups -= result.used.cups;
+  state.inventory.cupsSmall -= result.used.cupsSmall || 0;
+  state.inventory.cupsLarge -= result.used.cupsLarge || 0;
   for (const [id, qty] of Object.entries(result.used.enhancers || {})) {
     state.inventory.enhancers[id] = Math.max(0, (state.inventory.enhancers[id] || 0) - qty);
   }
@@ -514,10 +661,26 @@ export function commitDay(state, result) {
  * Nothing left to pour and not enough cash for the cheapest possible pitcher
  * (one lemon, one spoon of sugar, one paper cup) at today's prices.
  */
+/** Whether there's a way to pour at least one cup of `sizeId` right now. */
+function canPourSize(inventory, recipe, sizeId) {
+  if (sizeId === 'medium') return maxCupsAvailable(inventory, recipe) > 0;
+  const size = CUP_SIZES[sizeId];
+  const cupStock = sizeId === 'small' ? inventory.cupsSmall : inventory.cupsLarge;
+  if (!(cupStock > 0)) return false;
+  const iceEach = Math.round(recipe.ice * size.servingMult);
+  const byLiquid = size.servingMult > 0 ? Math.floor(maxServingsFromLiquid(inventory, recipe) / size.servingMult) : Infinity;
+  const byIce = iceEach > 0 ? Math.floor(inventory.ice / iceEach) : Infinity;
+  return Math.min(byLiquid, byIce) > 0;
+}
+
 export function isBankrupt(state) {
-  if (maxCupsAvailable(state.inventory, state.recipe) > 0) return false;
+  if (canPourSize(state.inventory, state.recipe, 'medium')) return false;
+  if (canPourSize(state.inventory, state.recipe, 'small')) return false;
+  if (canPourSize(state.inventory, state.recipe, 'large')) return false;
+  if (state.byoAccepted && maxServingsFromLiquid(state.inventory, state.recipe) > 0 &&
+      (state.recipe.ice === 0 || state.inventory.ice >= state.recipe.ice)) return false;
   const p = state.today.prices;
-  const cheapestCup = p.lemon + p.sugar + p.cup;
+  const cheapestCup = p.lemon + p.sugar + p.cup * CUP_SIZES.small.costMult;
   return state.money < cheapestCup;
 }
 

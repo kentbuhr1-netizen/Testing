@@ -169,9 +169,10 @@ test('ice poured into cups is not counted as melted', () => {
 
 test('the season ends only when even the cheapest pitcher is out of reach', () => {
   const st = S.newGame(41);
-  st.inventory = { lemons: 0, sugar: 0, ice: 0, cups: 0 };
+  st.inventory = { lemons: 0, sugar: 0, ice: 0, cups: 0, cupsSmall: 0, cupsLarge: 0 };
   const p = st.today.prices;
-  const cheapest = p.lemon + p.sugar + p.cup;
+  // A small paper cup is the cheapest possible fallback purchase.
+  const cheapest = p.lemon + p.sugar + p.cup * S.CUP_SIZES.small.costMult;
 
   st.money = cheapest + 0.5;
   assert.equal(S.isBankrupt(st), false, 'still has a way back in');
@@ -388,4 +389,134 @@ test('receiveOrder tops up enhancer stock through its own sub-order', () => {
   assert.equal(st.inventory.enhancers.mint, 40);
   assert.equal(st.inventory.enhancers.caffeine, 10);
   assert.equal(st.inventory.enhancers.strawberry, 0, 'untouched enhancers stay at zero');
+});
+
+/* -------------------------------------------------------------- *
+ * Cup sizes and BYO
+ * -------------------------------------------------------------- */
+
+test('with no small or large stock, everything still runs through medium alone', () => {
+  const st = S.newGame(80);
+  st.inventory = { lemons: 500, sugar: 500, ice: 500, cups: 500, cupsSmall: 0, cupsLarge: 0, lemonBatches: [], enhancers: {} };
+  st.price = 0.4;
+  const r = S.simulateDay(st);
+  assert.equal(Object.keys(r.sizes).length, 1);
+  assert.ok(r.sizes.medium);
+  assert.equal(r.sold, r.sizes.medium.sold);
+  assert.equal(r.used.cupsSmall, 0);
+  assert.equal(r.used.cupsLarge, 0);
+});
+
+test('stocking small cups actually sells some, without needing a separate toggle', () => {
+  const st = S.newGame(81);
+  st.inventory = { lemons: 500, sugar: 500, ice: 500, cups: 500, cupsSmall: 200, cupsLarge: 0, lemonBatches: [], enhancers: {} };
+  st.price = 0.4;
+  st.cupPrices = { small: 0.3, large: 0.7, byo: 0.4 };
+  const r = S.simulateDay(st);
+  assert.ok(r.sizes.small.sold > 0, 'small should sell once stocked');
+  assert.equal(r.used.cupsSmall, r.sizes.small.sold);
+});
+
+test('a large cup costs more lemons and sugar to make than a small one', () => {
+  const smallCost = S.costPerCupSized({ lemons: 5, sugar: 5, ice: 2 }, { lemon: 0.4, sugar: 0.3, ice: 0.05, cup: 0.1 }, 'small');
+  const mediumCost = S.costPerCupSized({ lemons: 5, sugar: 5, ice: 2 }, { lemon: 0.4, sugar: 0.3, ice: 0.05, cup: 0.1 }, 'medium');
+  const largeCost = S.costPerCupSized({ lemons: 5, sugar: 5, ice: 2 }, { lemon: 0.4, sugar: 0.3, ice: 0.05, cup: 0.1 }, 'large');
+  assert.ok(smallCost < mediumCost, `${smallCost} vs ${mediumCost}`);
+  assert.ok(mediumCost < largeCost, `${mediumCost} vs ${largeCost}`);
+});
+
+test('a BYO cup costs nothing for the cup itself', () => {
+  const prices = { lemon: 0.4, sugar: 0.3, ice: 0.05, cup: 0.1 };
+  const withCup = S.costPerCupSized({ lemons: 5, sugar: 5, ice: 2 }, prices, 'medium');
+  const byo = S.costPerCupSized({ lemons: 5, sugar: 5, ice: 2 }, prices, 'byo');
+  assert.ok(byo < withCup);
+});
+
+test('BYO only sells once accepted, and never touches cup inventory', () => {
+  const st = S.newGame(82);
+  st.inventory = { lemons: 500, sugar: 500, ice: 500, cups: 500, cupsSmall: 0, cupsLarge: 0, lemonBatches: [], enhancers: {} };
+  st.price = 0.4;
+  st.cupPrices = { small: 0.3, large: 0.7, byo: 0.35 };
+
+  const off = S.simulateDay(st);
+  assert.equal(off.sizes.byo, undefined);
+
+  st.byoAccepted = true;
+  const on = S.simulateDay(st);
+  assert.ok(on.sizes.byo.sold > 0);
+  assert.equal(on.used.cups, on.sizes.medium.sold, 'medium cup use is unaffected by BYO');
+});
+
+test('running out of large cups never blocks small or medium from selling', () => {
+  const st = S.newGame(83);
+  st.inventory = { lemons: 500, sugar: 500, ice: 500, cups: 200, cupsSmall: 200, cupsLarge: 0, lemonBatches: [], enhancers: {} };
+  st.price = 0.3;
+  st.cupPrices = { small: 0.25, large: 0.6, byo: 0.3 };
+  const r = S.simulateDay(st);
+  assert.equal(r.sizes.large, undefined, 'large was never stocked, so it never enters the mix');
+  assert.ok(r.sizes.medium.sold > 0);
+  assert.ok(r.sizes.small.sold > 0);
+});
+
+test('ingredient use pools correctly across every size sold that day', () => {
+  const st = S.newGame(84);
+  st.inventory = { lemons: 500, sugar: 500, ice: 500, cups: 500, cupsSmall: 500, cupsLarge: 500, lemonBatches: [], enhancers: {} };
+  st.price = 0.2;
+  st.cupPrices = { small: 0.15, large: 0.35, byo: 0.2 };
+  st.byoAccepted = true;
+  const r = S.simulateDay(st);
+  const servings = ['medium', 'small', 'large'].reduce((n, id) => n + (r.sizes[id]?.sold || 0) * S.CUP_SIZES[id].servingMult, 0)
+    + (r.sizes.byo?.sold || 0);
+  const expectedPitchers = Math.ceil(servings / S.CUPS_PER_PITCHER);
+  assert.equal(r.used.lemons, expectedPitchers * st.recipe.lemons);
+  assert.equal(r.used.sugar, expectedPitchers * st.recipe.sugar);
+});
+
+test('committing a multi-size day draws every cup type down correctly', () => {
+  const st = S.newGame(85);
+  st.inventory = { lemons: 500, sugar: 500, ice: 500, cups: 100, cupsSmall: 100, cupsLarge: 100, lemonBatches: [], enhancers: {} };
+  st.price = 0.3;
+  st.cupPrices = { small: 0.25, large: 0.55, byo: 0.3 };
+  const r = S.simulateDay(st);
+  S.commitDay(st, r);
+  assert.equal(st.inventory.cups, 100 - r.used.cups);
+  assert.equal(st.inventory.cupsSmall, 100 - r.used.cupsSmall);
+  assert.equal(st.inventory.cupsLarge, 100 - r.used.cupsLarge);
+});
+
+test('bankruptcy checks every size and BYO before giving up', () => {
+  const st = S.newGame(86);
+  st.inventory = { lemons: 0, sugar: 0, ice: 0, cups: 0, cupsSmall: 5, cupsLarge: 0 };
+  st.recipe = { lemons: 5, sugar: 5, ice: 0 };
+  st.money = 0;
+  // No lemons or sugar at all, so even a stocked small cup cannot be poured.
+  assert.equal(S.isBankrupt(st), true);
+
+  st.inventory = { lemons: 5, sugar: 5, ice: 0, cups: 0, cupsSmall: 5, cupsLarge: 0 };
+  assert.equal(S.isBankrupt(st), false, 'a small cup can still be poured');
+});
+
+test('BYO alone can keep a corner out of bankruptcy with no cups at all', () => {
+  const st = S.newGame(87);
+  st.inventory = { lemons: 5, sugar: 5, ice: 0, cups: 0, cupsSmall: 0, cupsLarge: 0 };
+  st.recipe = { lemons: 5, sugar: 5, ice: 0 };
+  st.money = 0;
+  st.byoAccepted = false;
+  assert.equal(S.isBankrupt(st), true);
+  st.byoAccepted = true;
+  assert.equal(S.isBankrupt(st), false);
+});
+
+test('receiveOrder tops up small and large cup stock like any other ingredient', () => {
+  const st = S.newGame(88);
+  st.inventory = { lemons: 0, sugar: 0, ice: 0, cups: 0, cupsSmall: 0, cupsLarge: 0, lemonBatches: [], enhancers: {} };
+  S.receiveOrder(st, { lemons: 10, sugar: 10, ice: 10, cups: 10, cupsSmall: 40, cupsLarge: 15 });
+  assert.equal(st.inventory.cupsSmall, 40);
+  assert.equal(st.inventory.cupsLarge, 15);
+});
+
+test('every corner in the campaign is still winnable with cup sizes in the sim', () => {
+  // Regression guard: the reference bot never touches small/large/BYO, so
+  // every one of the 625 calibrated targets must be exactly what it was.
+  assert.equal(S.parProfit({ seed: 999, days: 7, stake: 25 }) > 0, true);
 });

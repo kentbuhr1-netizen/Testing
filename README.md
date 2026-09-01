@@ -44,6 +44,12 @@ on hot days), and ☕ Caffeine Kick. Buy stock, switch one on at the stand, and
 some fraction of buyers take it for the extra charge — running out never turns
 away a base sale, it just means fewer add-ons that day.
 
+**Cup sizes** — 🥤 Small (paper), 🧋 Medium, and 🧋 Large (styrofoam) are
+stocked and priced independently, each drawing on the same pitcher of
+lemonade but pouring a different amount of it. Accept 🌱 **Bring Your Own
+Cup** and some customers skip a cup purchase entirely — pure margin, since
+there's nothing to stock or wash.
+
 **Never-Expiring Lemons** is the one premium unlock in the game — reachable
 from the buy screen once lemons start aging. There's no payment processor
 wired into this static page, so it's built as an honest placeholder: a real
@@ -103,11 +109,14 @@ explanation of the loop — nothing gated behind it, nothing to miss by
 skipping.
 
 Achievements (`js/achievements.js`) are a record of what you've actually
-done — first cup, first corner, taking a city, building every farm and
-factory in one place, going 50 days without a spoiled lemon — with no reward
-attached beyond a small toast and a line on the list. They're checked fresh
-from live game state after anything that could have earned one, so there's
-nothing to keep in sync by hand.
+done — 42 of them, spanning first cup, first corner, clearing an
+Impossible corner, winning every difficulty tier at least once, taking a
+city, building every farm and factory in three cities, running a fleet of
+ten trucks, selling your first small/large/BYO cup, going 50 or 100 or 365
+days without stopping, and going a whole run without a spoiled lemon — with
+no reward attached beyond a small toast and a line on the list. They're
+checked fresh from live game state after anything that could have earned
+one, so there's nothing to keep in sync by hand.
 
 ## Project layout
 

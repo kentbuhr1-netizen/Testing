@@ -1,5 +1,5 @@
 /* Offline shell: the game is static, so cache it and serve from cache first. */
-const CACHE = 'lemonade-v4';
+const CACHE = 'lemonade-v5';
 const ASSETS = [
   './',
   './index.html',

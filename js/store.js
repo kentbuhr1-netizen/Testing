@@ -6,7 +6,7 @@
  * `ui` is throwaway view state — which screen, the basket being filled in.
  */
 import { ENHANCERS } from './sim.js';
-import { getCity, completedCities } from './campaign.js';
+import { getCity, completedCities, CITIES } from './campaign.js';
 import { ACHIEVEMENTS, evaluateAchievements } from './achievements.js';
 
 const SAVE_KEY = 'lemonade-stand-campaign-v2';
@@ -25,7 +25,7 @@ export const store = {
     view: 'title',      // title | world | city | corner | run | ops | opsCity | help
     cityId: null,
     cornerIndex: null,
-    order: { lemons: 0, sugar: 0, ice: 0, cups: 0, enhancers: zeroedEnhancers() },
+    order: { lemons: 0, sugar: 0, ice: 0, cups: 0, cupsSmall: 0, cupsLarge: 0, enhancers: zeroedEnhancers() },
     restock: { lemons: 0, sugar: 0, cups: 0 },
     pending: null,      // simulated day awaiting its report
     opsReport: null,    // what the network did while you were working
@@ -147,11 +147,17 @@ export function markTutorialSeen() {
  * there's nothing to keep in sync by hand.
  * ------------------------------------------------------------------ */
 
+const STATS_DEFAULTS = {
+  cupsSoldEver: 0, daysPlayed: 0, peakCash: 0,
+  smallSoldEver: 0, largeSoldEver: 0, byoSoldEver: 0, enhancersSoldEver: 0,
+  tiersWon: [],
+};
+
 function loadStats() {
   try {
-    return { cupsSoldEver: 0, daysPlayed: 0, peakCash: 0, ...(JSON.parse(localStorage.getItem(STATS_KEY)) || {}) };
+    return { ...STATS_DEFAULTS, ...(JSON.parse(localStorage.getItem(STATS_KEY)) || {}) };
   } catch {
-    return { cupsSoldEver: 0, daysPlayed: 0, peakCash: 0 };
+    return { ...STATS_DEFAULTS };
   }
 }
 
@@ -165,7 +171,22 @@ export function recordDay(result, cashNow) {
   stats.cupsSoldEver += result.sold;
   stats.daysPlayed += 1;
   stats.peakCash = Math.max(stats.peakCash, cashNow || 0);
+  const sizes = result.sizes || {};
+  stats.smallSoldEver += sizes.small?.sold || 0;
+  stats.largeSoldEver += sizes.large?.sold || 0;
+  stats.byoSoldEver += sizes.byo?.sold || 0;
+  stats.enhancersSoldEver += Object.values(result.enhancers || {}).reduce((n, s) => n + s.cups, 0);
   saveStats(stats);
+}
+
+/** Call once a corner is claimed, so "win every tier" can be checked later. */
+export function recordTierWon(tier) {
+  if (!tier) return;
+  const stats = loadStats();
+  if (!stats.tiersWon.includes(tier)) {
+    stats.tiersWon.push(tier);
+    saveStats(stats);
+  }
 }
 
 export function loadUnlockedAchievements() {
@@ -196,6 +217,9 @@ export function checkAchievements(extra = {}) {
   const regions = claimedCityIds.map((id) => getCity(id).region);
   const buildings = campaign?.ops?.buildings || {};
   const allBuildingsInOneCity = Object.values(buildings).some((b) => Object.values(b).filter(Boolean).length >= 4);
+  const citiesFullyBuilt = Object.values(buildings).filter((b) => Object.values(b).filter(Boolean).length >= 4).length;
+  const anyBuildingBuilt = Object.values(buildings).some((b) => Object.values(b).filter(Boolean).length >= 1);
+  const trucksCount = campaign?.ops?.trucks?.length || 0;
   const currentCash = store.run ? store.run.money : (campaign?.treasury || 0);
 
   const ctx = {
@@ -204,10 +228,21 @@ export function checkAchievements(extra = {}) {
     peakMoney: Math.max(stats.peakCash, currentCash),
     cornersClaimed,
     citiesClaimed: campaign ? completedCities(campaign).length : 0,
+    totalCities: CITIES.length,
     hasUSCorner: regions.includes('US'),
     hasEUCorner: regions.includes('EU'),
     allBuildingsInOneCity,
-    trucksBought: (campaign?.ops?.trucks?.length || 0) >= 1,
+    citiesFullyBuilt,
+    anyBuildingBuilt,
+    trucksBought: trucksCount >= 1,
+    trucksCount,
+    treasury: campaign?.treasury || 0,
+    smallSoldEver: stats.smallSoldEver,
+    largeSoldEver: stats.largeSoldEver,
+    byoSoldEver: stats.byoSoldEver,
+    enhancersSoldEver: stats.enhancersSoldEver,
+    tiersWon: stats.tiersWon,
+    neverExpireLemons: isPremiumUnlocked('neverExpireLemons'),
     ...extra,
   };
 
