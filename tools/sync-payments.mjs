@@ -27,6 +27,7 @@ const SOURCES = [
 const GAMES = [
   { name: 'lemonade', dir: '.' },
   { name: 'outbreak', dir: 'games/outbreak' },
+  { name: 'the-round', dir: 'games/the-round' },
 ];
 
 const banner = (from) =>

@@ -7,7 +7,7 @@
   "scripts": {
     "start": "python3 -m http.server 8080",
     "test": "node --test tests/*.test.mjs",
-    "test:all": "node tools/sync-payments.mjs --check && node --test tests/*.test.mjs && node --test games/outbreak/tests/*.test.mjs && node --test shared/payments/tests/*.test.mjs",
+    "test:all": "node tools/sync-payments.mjs --check && node --test tests/*.test.mjs && node --test games/outbreak/tests/*.test.mjs && node --test games/the-round/tests/*.test.mjs && node --test shared/payments/tests/*.test.mjs",
     "sync": "node tools/sync-payments.mjs",
     "icons": "node tools/make-icons.mjs"
   },

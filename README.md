@@ -114,6 +114,7 @@ operations layer that unlocks partway through).
 |---|---|
 | `.` | 🍋 **Lemonade Stand** — this game |
 | `games/outbreak` | 🦠 **Outbreak** — epidemic containment |
+| `games/the-round` | 🌱 **The Round** — a grass-cutting business |
 | `shared/payments` | the shop: Stripe checkout, signed licences, one server for every game |
 
 ```bash
