@@ -515,6 +515,42 @@ test('receiveOrder tops up small and large cup stock like any other ingredient',
   assert.equal(st.inventory.cupsLarge, 15);
 });
 
+test('card payments are off by default and touch nothing when unused', () => {
+  const st = S.newGame(90);
+  st.inventory = { lemons: 500, sugar: 500, ice: 500, cups: 500, cupsSmall: 0, cupsLarge: 0, lemonBatches: [], enhancers: {} };
+  const r = S.simulateDay(st);
+  assert.equal(r.cardCups, 0);
+  assert.equal(r.cardFeeRevenue, 0);
+  assert.equal(r.cardProcessingCost, 0);
+  assert.equal(r.cardNet, 0);
+});
+
+test('accepting cards splits the same sales by payment method, without changing how many sell', () => {
+  const withoutCards = S.newGame(91);
+  withoutCards.inventory = { lemons: 500, sugar: 500, ice: 500, cups: 500, cupsSmall: 0, cupsLarge: 0, lemonBatches: [], enhancers: {} };
+  const base = S.simulateDay(withoutCards);
+
+  const withCards = S.newGame(91);
+  withCards.inventory = { lemons: 500, sugar: 500, ice: 500, cups: 500, cupsSmall: 0, cupsLarge: 0, lemonBatches: [], enhancers: {} };
+  withCards.acceptCards = true;
+  const cardDay = S.simulateDay(withCards);
+
+  assert.equal(cardDay.sold, base.sold, 'accepting cards never changes how many cups sell');
+  assert.equal(cardDay.cardCups, Math.round(base.sold * S.CARD_SHARE));
+  assert.equal(cardDay.cardFeeRevenue, Math.round(cardDay.cardCups * cardDay.price * S.CARD_CONVENIENCE_RATE * 100) / 100);
+  assert.equal(cardDay.cardProcessingCost, Math.round(cardDay.cardCups * cardDay.price * S.CARD_PROCESSING_RATE * 100) / 100);
+  assert.equal(cardDay.revenue, Math.round((base.revenue + cardDay.cardFeeRevenue) * 100) / 100);
+  assert.equal(cardDay.cogs, Math.round((base.cogs + cardDay.cardProcessingCost) * 100) / 100);
+});
+
+test('the convenience fee always covers the processing cost, never a loss on card sales', () => {
+  const st = S.newGame(92);
+  st.inventory = { lemons: 500, sugar: 500, ice: 500, cups: 500, cupsSmall: 0, cupsLarge: 0, lemonBatches: [], enhancers: {} };
+  st.acceptCards = true;
+  const r = S.simulateDay(st);
+  assert.ok(r.cardNet >= 0, 'the fee rate is set at or above the processing rate');
+});
+
 test('every corner in the campaign is still winnable with cup sizes in the sim', () => {
   // Regression guard: the reference bot never touches small/large/BYO, so
   // every one of the 625 calibrated targets must be exactly what it was.

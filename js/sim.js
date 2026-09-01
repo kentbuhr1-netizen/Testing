@@ -154,6 +154,22 @@ function enhancerUptake(enh, heat) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Card payments — an optional convenience fee that pays for itself
+ *
+ * Accepting cards never changes who buys or how many cups sell; it only
+ * decides how the same sales get paid for. A fixed share of buyers would
+ * rather tap than dig for exact change, each paying a small convenience
+ * fee on top of the price. That fee is set a hair above what the
+ * processor actually takes, so offering the option is close to free —
+ * "close to" rather than "exactly", the same honesty as the rest of the
+ * game's economics.
+ * ------------------------------------------------------------------ */
+
+export const CARD_SHARE = 0.45;             // of cups sold, roughly how many get paid by card
+export const CARD_CONVENIENCE_RATE = 0.03;  // charged to the customer, on top of the price
+export const CARD_PROCESSING_RATE = 0.029;  // paid to the processor, out of the till
+
+/* ------------------------------------------------------------------ *
  * Cup sizes
  *
  * "Medium" is the size the original game always had — it still lives on
@@ -387,6 +403,7 @@ export function newRun({
     price: 0.5,                                    // the medium price — unchanged from the original game
     cupPrices: { small: 0.35, large: 0.7, byo: 0.5 },
     byoAccepted: false,
+    acceptCards: false,
     history: [],
     today: null,
     phase: 'forecast',
@@ -567,6 +584,13 @@ export function simulateDay(state) {
     }
   }
 
+  // Card payments split the same sales by how they were paid for — see the
+  // note above CARD_SHARE. Off by default, and zero-cost when off: nothing
+  // here runs unless a player has actually switched it on.
+  const cardCups = state.acceptCards ? Math.round(sold * CARD_SHARE) : 0;
+  const cardFeeRevenue = round2(cardCups * avgPrice * CARD_CONVENIENCE_RATE);
+  const cardProcessingCost = round2(cardCups * avgPrice * CARD_PROCESSING_RATE);
+
   const used = {
     lemons: pitchersMade * state.recipe.lemons,
     sugar: pitchersMade * state.recipe.sugar,
@@ -576,12 +600,13 @@ export function simulateDay(state) {
     cupsLarge: sizeResults.large?.sold || 0,
     enhancers: Object.fromEntries(Object.entries(enhancerSales).map(([id, s]) => [id, s.cups])),
   };
-  const revenue = round2(baseRevenue + enhancerRevenue);
+  const revenue = round2(baseRevenue + enhancerRevenue + cardFeeRevenue);
   const cogs = round2(
     pitchersMade * (state.recipe.lemons * today.prices.lemon + state.recipe.sugar * today.prices.sugar) +
     iceUsed * today.prices.ice +
     cupCost +
-    enhancerCost
+    enhancerCost +
+    cardProcessingCost
   );
 
   // Reputation follows the drink first, then how you priced it. Word only
@@ -621,6 +646,10 @@ export function simulateDay(state) {
     used,
     enhancers: enhancerSales,
     enhancerRevenue: round2(enhancerRevenue),
+    cardCups,
+    cardFeeRevenue,
+    cardProcessingCost,
+    cardNet: round2(cardFeeRevenue - cardProcessingCost),
     repDelta,
   };
   result.notes = customerNotes(state.recipe, today.temp, result, mods);

@@ -102,6 +102,11 @@ test('banking achievements read the bank account, not just cash on hand', () => 
   assert.deepEqual(evaluateAchievements({ interestEarnedEver: 499.99 }, {}), []);
 });
 
+test('card payment achievements read lifetime card cups, not one day', () => {
+  assert.deepEqual(evaluateAchievements({ cardCupsEver: 99 }, {}), []);
+  assert.deepEqual(evaluateAchievements({ cardCupsEver: 100 }, {}), ['cardCarrier']);
+});
+
 test('a rich context can unlock several achievements in one pass', () => {
   const ctx = {
     cupsSoldEver: 200,

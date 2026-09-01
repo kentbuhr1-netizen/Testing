@@ -68,6 +68,9 @@ export const ACHIEVEMENTS = {
   // Banking
   firstDeposit:    { icon: '🏦', title: 'Rainy Day Fund',   desc: 'Make your first deposit at the bank.' },
   compoundInterest:{ icon: '📈', title: 'Compound Interest', desc: 'Earn $500 in bank interest over your lifetime.' },
+
+  // Card payments
+  cardCarrier:     { icon: '💳', title: 'Card Carrier',     desc: 'Sell 100 cups paid for by card, over your lifetime.' },
 };
 
 /**
@@ -135,6 +138,8 @@ export function evaluateAchievements(ctx, unlocked) {
 
   check('firstDeposit', !!ctx.everDeposited);
   check('compoundInterest', (ctx.interestEarnedEver || 0) >= 500);
+
+  check('cardCarrier', (ctx.cardCupsEver || 0) >= 100);
 
   return newly;
 }

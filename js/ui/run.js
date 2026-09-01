@@ -199,6 +199,23 @@ function setupScreen() {
         <button class="chip" data-act="toggle-byo">Accept It</button>
       </div>`;
 
+  const cardRow = r.acceptCards
+    ? `<div class="row">
+        <div class="row-main">
+          <div class="row-name">💳 Accepting Cards ✓</div>
+          <div class="row-sub">customers pay a ${Math.round(S.CARD_CONVENIENCE_RATE * 100)}% convenience fee ·
+            it costs you ${(S.CARD_PROCESSING_RATE * 100).toFixed(1)}% to process</div>
+        </div>
+        <button class="chip chip-on" data-act="toggle-cards">Stop Accepting</button>
+      </div>`
+    : `<div class="row">
+        <div class="row-main">
+          <div class="row-name">💳 Accept Card Payments</div>
+          <div class="row-sub">some customers without cash on hand will pay by card instead</div>
+        </div>
+        <button class="chip" data-act="toggle-cards">Accept It</button>
+      </div>`;
+
   const enhancerToggles = Object.values(S.ENHANCERS).map((enh) => {
     const stock = r.inventory.enhancers?.[enh.id] || 0;
     const offered = !!r.enhancersOffered?.[enh.id];
@@ -234,6 +251,10 @@ function setupScreen() {
       <div class="card">
         <h2>Bring your own cup</h2>
         ${byoRow}
+      </div>
+      <div class="card">
+        <h2>Payment</h2>
+        ${cardRow}
       </div>
       <div class="card">
         <h2>Enhancers on offer</h2>
@@ -341,6 +362,8 @@ function reportScreen() {
           ${fact("Day's profit", money(result.profit), result.profit >= 0 ? 'good' : 'bad')}
         </div>
         ${result.enhancerRevenue > 0 ? `<p class="muted" style="margin-top:8px">Enhancers added ${money(result.enhancerRevenue)} on top of the base price.</p>` : ''}
+        ${result.cardCups > 0 ? `<p class="muted" style="margin-top:8px">💳 ${result.cardCups} customer${result.cardCups === 1 ? '' : 's'} paid by card —
+           ${money(result.cardFeeRevenue)} in convenience fees against ${money(result.cardProcessingCost)} to process.</p>` : ''}
         <ul class="notes">
           ${result.notes.map((n) => `<li>${n}</li>`).join('')}
           ${sizeLines}
@@ -612,6 +635,7 @@ export const actions = {
   },
   'open-premium': () => { store.ui.showPremium = true; },
   'toggle-byo': () => { run().byoAccepted = !run().byoAccepted; },
+  'toggle-cards': () => { run().acceptCards = !run().acceptCards; },
   'open-stand': () => {
     store.ui.pending = S.simulateDay(run());
     run().phase = 'open';

@@ -152,6 +152,7 @@ export function markTutorialSeen() {
 const STATS_DEFAULTS = {
   cupsSoldEver: 0, daysPlayed: 0, peakCash: 0,
   smallSoldEver: 0, largeSoldEver: 0, byoSoldEver: 0, enhancersSoldEver: 0,
+  cardCupsEver: 0,
   interestEarnedEver: 0,
   tiersWon: [],
 };
@@ -179,6 +180,7 @@ export function recordDay(result, cashNow) {
   stats.largeSoldEver += sizes.large?.sold || 0;
   stats.byoSoldEver += sizes.byo?.sold || 0;
   stats.enhancersSoldEver += Object.values(result.enhancers || {}).reduce((n, s) => n + s.cups, 0);
+  stats.cardCupsEver += result.cardCups || 0;
   saveStats(stats);
 }
 
@@ -255,6 +257,7 @@ export function checkAchievements(extra = {}) {
     largeSoldEver: stats.largeSoldEver,
     byoSoldEver: stats.byoSoldEver,
     enhancersSoldEver: stats.enhancersSoldEver,
+    cardCupsEver: stats.cardCupsEver,
     interestEarnedEver: stats.interestEarnedEver,
     everDeposited: campaign?.bank?.hasDeposited || false,
     tiersWon: stats.tiersWon,

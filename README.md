@@ -50,6 +50,12 @@ lemonade but pouring a different amount of it. Accept 🌱 **Bring Your Own
 Cup** and some customers skip a cup purchase entirely — pure margin, since
 there's nothing to stock or wash.
 
+**Card payments** are an optional toggle at the stand: switch it on and a
+share of buyers who'd rather tap than dig for exact change pay a small
+convenience fee on top of the price — set just above what it costs to
+process, so offering the option costs you almost nothing either way. It
+never changes how many cups sell, only how the same sales get paid for.
+
 **Never-Expiring Lemons** is the one premium unlock in the game — reachable
 from the buy screen once lemons start aging. There's no payment processor
 wired into this static page, so it's built as an honest placeholder: a real
@@ -118,14 +124,15 @@ explanation of the loop — nothing gated behind it, nothing to miss by
 skipping.
 
 Achievements (`js/achievements.js`) are a record of what you've actually
-done — 44 of them, spanning first cup, first corner, clearing an
+done — 45 of them, spanning first cup, first corner, clearing an
 Impossible corner, winning every difficulty tier at least once, taking a
 city, building every farm and factory in three cities, running a fleet of
-ten trucks, selling your first small/large/BYO cup, your first bank deposit,
-going 50 or 100 or 365 days without stopping, and going a whole run without
-a spoiled lemon — with no reward attached beyond a small toast and a line on
-the list. They're checked fresh from live game state after anything that
-could have earned one, so there's nothing to keep in sync by hand.
+ten trucks, selling your first small/large/BYO/card-paid cup, your first
+bank deposit, going 50 or 100 or 365 days without stopping, and going a
+whole run without a spoiled lemon — with no reward attached beyond a small
+toast and a line on the list. They're checked fresh from live game state
+after anything that could have earned one, so there's nothing to keep in
+sync by hand.
 
 ## Project layout
 
@@ -141,7 +148,7 @@ js/store.js             shared state, the save file, stats and unlocks
 js/app.js               router, HUD, input
 js/ui/                  screens: map.js, run.js, opsui.js, bankui.js,
                          premium.js, tutorial.js, achievements.js, kit.js
-tests/                  110 tests across the rules, the campaign, operations and the bank
+tests/                  114 tests across the rules, the campaign, operations and the bank
 tools/make-icons.mjs    regenerates icons/*.png from icons/icon.svg
 ```
 
@@ -150,7 +157,7 @@ and DOM-free, so the whole game can be played and balanced from node. The
 same seed always replays the same season.
 
 ```bash
-npm test           # 110 tests
+npm test           # 114 tests
 npm run icons      # rebuild PNG icons from the SVG (needs headless Chromium)
 ```
 
