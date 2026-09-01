@@ -11,6 +11,7 @@ import * as S from './sim.js';
 import * as mapUi from './ui/map.js';
 import * as runUi from './ui/run.js';
 import * as opsUi from './ui/opsui.js';
+import * as premiumUi from './ui/premium.js';
 import { money, whole, bar } from './ui/kit.js';
 import { restockCost, spaceLeft } from './ops.js';
 
@@ -18,15 +19,16 @@ const screenEl = document.getElementById('screen');
 const actionsEl = document.getElementById('actions');
 const hudEl = document.getElementById('hud');
 
-const SCREENS = { ...mapUi.screens, ...opsUi.screens };
+const SCREENS = { ...mapUi.screens, ...opsUi.screens, ...premiumUi.screens };
 const RUN_SCREENS = runUi.screens;
-const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions };
+const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions, ...premiumUi.actions };
 
 /* ------------------------------------------------------------------ *
  * Render
  * ------------------------------------------------------------------ */
 
 function currentScreen() {
+  if (store.ui.showPremium) return SCREENS.premium;
   if (store.ui.view === 'run' && store.run) {
     return RUN_SCREENS[store.run.phase] || RUN_SCREENS.forecast;
   }
@@ -34,7 +36,9 @@ function currentScreen() {
 }
 
 function draw() {
-  const view = store.ui.view === 'run' && store.run ? `run:${store.run.phase}` : store.ui.view;
+  const view = store.ui.showPremium
+    ? 'premium'
+    : store.ui.view === 'run' && store.run ? `run:${store.run.phase}` : store.ui.view;
   const screen = currentScreen()();
 
   screenEl.innerHTML = (store.ui.notice ? `<div class="notice">${store.ui.notice}</div>` : '') + screen.body;
@@ -119,6 +123,7 @@ const LIMITS = {
   order: { lemons: [0, 9999], sugar: [0, 9999], ice: [0, 9999], cups: [0, 9999] },
   restock: { lemons: [0, 99999], sugar: [0, 99999], cups: [0, 99999] },
   truckDraft: { amount: [25, 2000] },
+  enhancerOrder: Object.fromEntries(Object.keys(S.ENHANCERS).map((id) => [id, [0, 999]])),
 };
 
 /** Apply one tap of a stepper. Returns false when it could not move. */
@@ -137,6 +142,17 @@ function applyStep(group, field, step) {
     const next = clamp(store.ui.restock[field] + step, min, max);
     const trial = { ...store.ui.restock, [field]: next };
     return acceptRestock(trial, field, next);
+  }
+  if (group === 'enhancerOrder') {
+    const r = store.run;
+    const next = clamp(store.ui.order.enhancers[field] + step, min, max);
+    const trial = { ...store.ui.order.enhancers, [field]: next };
+    if (step > 0) {
+      const total = S.buyCost(r.today.prices, store.ui.order) + S.enhancerOrderCost(trial);
+      if (total > r.money) return false; // never overspend
+    }
+    store.ui.order.enhancers[field] = next;
+    return true;
   }
   if (group === 'truckDraft') {
     store.ui.truckDraft[field] = clamp(store.ui.truckDraft[field] + step, min, max);

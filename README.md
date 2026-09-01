@@ -27,13 +27,28 @@ Every corner is played a day at a time:
 
 1. **Forecast** — the weather and any local news set how many people walk past.
 2. **Supplies** — lemons, sugar, ice and cups at prices that drift daily.
-   Unpoured ice **melts overnight**; everything else keeps.
-3. **The stand** — set the recipe (per 10-cup pitcher) and the price per cup.
-4. **Open up** — each passer-by decides whether your lemonade is worth the ask.
+   Unpoured ice **melts overnight**; lemons **spoil after 7 days** in the
+   cooler (tracked as dated batches, oldest used first); everything else keeps.
+3. **The stand** — set the recipe (per 10-cup pitcher), the price per cup, and
+   which stocked enhancers you're offering today.
+4. **Open up** — each passer-by decides whether your lemonade is worth the ask,
+   then separately decides whether to add an enhancer for a little more.
 
 Heat sells, taste is a hidden target you learn from customer grumbles, and every
 cent of price costs you customers. Reputation compounds, and the last stretch to
 a perfect one is the hardest to earn.
+
+**Enhancers** are an optional upsell, stocked and priced separately from the
+core drink: 🍓 Strawberry Splash, 🥭 Mango Twist, 🌿 Mint Cooler (sells better
+on hot days), and ☕ Caffeine Kick. Buy stock, switch one on at the stand, and
+some fraction of buyers take it for the extra charge — running out never turns
+away a base sale, it just means fewer add-ons that day.
+
+**Never-Expiring Lemons** is the one premium unlock in the game — reachable
+from the buy screen once lemons start aging. There's no payment processor
+wired into this static page, so it's built as an honest placeholder: a real
+price, a real mechanic, and copy that says outright no card is charged. See
+`js/store.js` and `js/ui/premium.js` for the hook a real IAP would plug into.
 
 ## The campaign
 
@@ -90,8 +105,8 @@ js/campaign.js          cities, corners, tiers, targets, progression
 js/ops.js               depots, wholesale, staffing, the daily network tick
 js/store.js             shared state and the save file
 js/app.js               router, HUD, input
-js/ui/                  screens: map.js, run.js, opsui.js, kit.js
-tests/                  61 tests across the rules, the campaign and operations
+js/ui/                  screens: map.js, run.js, opsui.js, premium.js, kit.js
+tests/                  78 tests across the rules, the campaign and operations
 tools/make-icons.mjs    regenerates icons/*.png from icons/icon.svg
 ```
 
@@ -99,7 +114,7 @@ tools/make-icons.mjs    regenerates icons/*.png from icons/icon.svg
 be played and balanced from node. The same seed always replays the same season.
 
 ```bash
-npm test           # 61 tests
+npm test           # 78 tests
 npm run icons      # rebuild PNG icons from the SVG (needs headless Chromium)
 ```
 

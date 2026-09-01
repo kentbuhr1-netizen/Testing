@@ -505,6 +505,8 @@ h1 .of { font-size: 15px; font-weight: 600; color: var(--ink-soft); }
 .warn-card { border-color: color-mix(in srgb, var(--danger) 35%, var(--line)); }
 .warn-dot { font-size: 13px; }
 .ops-report { border-color: color-mix(in srgb, var(--leaf) 35%, var(--line)); }
+.good { color: var(--leaf); }
+.bad { color: var(--danger); }
 
 .challenge h2 { color: var(--ink); font-size: 16px; letter-spacing: 0; text-transform: none; }
 
@@ -515,3 +517,44 @@ h1 .of { font-size: 15px; font-weight: 600; color: var(--ink-soft); }
 }
 
 .subtotal { border: 0; padding-top: 4px; margin-top: 0; font-size: 14px; font-weight: 600; }
+
+/* ---- inline text links (a stepping-stone into a bigger screen) ---- */
+
+.link-btn {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lemon-deep);
+  font-weight: 700;
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.link-btn:active { opacity: 0.7; }
+
+@media (prefers-color-scheme: dark) {
+  .link-btn { color: var(--lemon); }
+}
+
+/* ---- the one paywall in the game ---- */
+
+.paywall {
+  text-align: center;
+  border-color: color-mix(in srgb, var(--lemon-deep) 40%, var(--line));
+  background: color-mix(in srgb, var(--lemon) 10%, var(--bg-2));
+}
+.paywall-price {
+  font-size: 34px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+.paywall-price small {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.paywall p { text-align: left; }

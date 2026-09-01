@@ -631,6 +631,105 @@ function withMods(mods) {
   return { ...NO_MODS, ...(mods || {}) };
 }
 
+/* ------------------------------------------------------------------ *
+ * Lemons spoil
+ *
+ * Lemons are tracked as dated batches, not just a running total, so a
+ * cooler full of them can go bad. Everything else (sugar, cups, ice-per-day)
+ * keeps indefinitely — only the fruit itself is perishable.
+ * ------------------------------------------------------------------ */
+
+const LEMON_SHELF_LIFE_DAYS = 7;
+
+/** Add lemons to the cooler, dated so they can spoil on schedule. */
+function receiveLemons(state, qty) {
+  if (qty <= 0) return;
+  state.inventory.lemons += qty;
+  const batches = state.inventory.lemonBatches || (state.inventory.lemonBatches = []);
+  batches.push({ day: state.day, qty });
+}
+
+/**
+ * A full shopping order: lemons go through receiveLemons so they can spoil
+ * on schedule, an `enhancers` sub-order tops up enhancer stock, and the rest
+ * (sugar, ice, cups) adds straight in.
+ */
+function receiveOrder(state, order) {
+  for (const key of Object.keys(order)) {
+    if (key === 'lemons') {
+      receiveLemons(state, order.lemons || 0);
+    } else if (key === 'enhancers') {
+      for (const [id, qty] of Object.entries(order.enhancers || {})) {
+        state.inventory.enhancers[id] = (state.inventory.enhancers[id] || 0) + (qty || 0);
+      }
+    } else {
+      state.inventory[key] = (state.inventory[key] || 0) + (order[key] || 0);
+    }
+  }
+}
+
+/** Use the oldest lemons first, so the freshest batch is the one left to spoil last. */
+function consumeLemons(state, qty) {
+  let remaining = qty;
+  const batches = state.inventory.lemonBatches || [];
+  while (remaining > 0 && batches.length) {
+    const take = Math.min(remaining, batches[0].qty);
+    batches[0].qty -= take;
+    remaining -= take;
+    if (batches[0].qty <= 0) batches.shift();
+  }
+  state.inventory.lemons = Math.max(0, state.inventory.lemons - qty);
+}
+
+/**
+ * Discard any batch older than the shelf life, as of the current day. A
+ * never-expire unlock skips this entirely — the one thing real money buys.
+ */
+function spoilLemons(state) {
+  if (state.premium?.neverExpireLemons) return 0;
+  const batches = state.inventory.lemonBatches || [];
+  let spoiled = 0;
+  const fresh = [];
+  for (const b of batches) {
+    if (state.day - b.day >= LEMON_SHELF_LIFE_DAYS) spoiled += b.qty;
+    else fresh.push(b);
+  }
+  state.inventory.lemonBatches = fresh;
+  if (spoiled > 0) state.inventory.lemons = Math.max(0, state.inventory.lemons - spoiled);
+  return spoiled;
+}
+
+/** How many days the oldest lemon in the cooler has left before it spoils. */
+function daysUntilLemonsSpoil(state) {
+  const batches = state.inventory.lemonBatches || [];
+  if (!batches.length) return null;
+  const age = state.day - batches[0].day;
+  return Math.max(0, LEMON_SHELF_LIFE_DAYS - age);
+}
+
+/* ------------------------------------------------------------------ *
+ * Enhancers — optional add-ins customers can pay extra for
+ * ------------------------------------------------------------------ */
+
+const ENHANCERS = {
+  strawberry: { id: 'strawberry', label: 'Strawberry Splash', icon: '🍓', addPrice: 0.35, unitCost: 0.16, appeal: 1.0 },
+  mango:      { id: 'mango',      label: 'Mango Twist',       icon: '🥭', addPrice: 0.4,  unitCost: 0.2,  appeal: 0.9 },
+  mint:       { id: 'mint',       label: 'Mint Cooler',       icon: '🌿', addPrice: 0.3,  unitCost: 0.12, appeal: 1.0, coolant: true },
+  caffeine:   { id: 'caffeine',   label: 'Caffeine Kick',     icon: '☕', addPrice: 0.55, unitCost: 0.24, appeal: 0.75 },
+};
+
+const emptyEnhancerInventory = () =>
+  Object.fromEntries(Object.keys(ENHANCERS).map((id) => [id, 0]));
+const allEnhancersOff = () =>
+  Object.fromEntries(Object.keys(ENHANCERS).map((id) => [id, false]));
+
+/** How likely a customer who is already buying is to add this enhancer too. */
+function enhancerUptake(enh, heat) {
+  let chance = 0.55 * enh.appeal - 0.4 * enh.addPrice;
+  if (enh.coolant) chance *= 1 + heat * 0.35; // a cool add-on sells better when it's hot
+  return clamp(chance, 0, 0.9);
+}
+
 const WEATHER = {
   scorcher:  { id: 'scorcher',  label: 'Scorcher',      icon: '🔥', traffic: 1.35, tempRange: [92, 104], hot: true },
   sunny:     { id: 'sunny',     label: 'Sunny',         icon: '☀️', traffic: 1.15, tempRange: [76, 92], hot: true },
@@ -780,6 +879,7 @@ function newRun({
   target = null,
   mods = null,
   corner = null,
+  premium = null,
 } = {}) {
   const state = {
     seed,
@@ -789,9 +889,11 @@ function newRun({
     target,
     corner,               // { cityId, index, name } when played from the campaign
     mods: withMods(mods),
+    premium: { neverExpireLemons: false, ...(premium || {}) },
     money: stake,
     reputation: 0.5,
-    inventory: { lemons: 0, sugar: 0, ice: 0, cups: 0 },
+    inventory: { lemons: 0, sugar: 0, ice: 0, cups: 0, lemonBatches: [], enhancers: emptyEnhancerInventory() },
+    enhancersOffered: allEnhancersOff(),
     recipe: { lemons: 5, sugar: 5, ice: 2 },
     price: 0.5,
     history: [],
@@ -832,6 +934,13 @@ function buyCost(prices, order) {
   );
 }
 
+/** Enhancer stock has a fixed wholesale price — no daily jitter, no bulk break. */
+function enhancerOrderCost(order) {
+  return round2(
+    Object.entries(order || {}).reduce((sum, [id, qty]) => sum + (ENHANCERS[id]?.unitCost || 0) * (qty || 0), 0)
+  );
+}
+
 /**
  * Run the day. Walks every potential customer past the stand and asks
  * whether they'd pay your price for what you're pouring.
@@ -867,17 +976,45 @@ function simulateDay(state) {
   const lostToStockout = Math.max(0, interested - stock);
   const pitchersMade = Math.ceil(sold / CUPS_PER_PITCHER);
 
+  // Enhancers are an independent upsell: every cup sold is offered whichever
+  // ones are switched on and still in stock, and each customer decides for
+  // themself — it never affects whether the base cup gets bought at all.
+  const enhancerSales = {};
+  let enhancerRevenue = 0;
+  let enhancerCost = 0;
+  for (const id of Object.keys(ENHANCERS)) {
+    if (!state.enhancersOffered?.[id]) continue;
+    let stockLeft = state.inventory.enhancers?.[id] || 0;
+    if (stockLeft <= 0) continue;
+    const enh = ENHANCERS[id];
+    const uptake = enhancerUptake(enh, heat);
+    let used = 0;
+    for (let i = 0; i < sold && stockLeft > 0; i++) {
+      if (rng() < uptake) {
+        used++;
+        stockLeft--;
+      }
+    }
+    if (used > 0) {
+      enhancerSales[id] = { cups: used, revenue: round2(used * enh.addPrice), cost: round2(used * enh.unitCost) };
+      enhancerRevenue += used * enh.addPrice;
+      enhancerCost += used * enh.unitCost;
+    }
+  }
+
   const used = {
     lemons: pitchersMade * state.recipe.lemons,
     sugar: pitchersMade * state.recipe.sugar,
     ice: sold * state.recipe.ice,
     cups: sold,
+    enhancers: Object.fromEntries(Object.entries(enhancerSales).map(([id, s]) => [id, s.cups])),
   };
-  const revenue = round2(sold * state.price);
+  const revenue = round2(sold * state.price + enhancerRevenue);
   const cogs = round2(
     pitchersMade * (state.recipe.lemons * today.prices.lemon + state.recipe.sugar * today.prices.sugar) +
     used.ice * today.prices.ice +
-    used.cups * today.prices.cup
+    used.cups * today.prices.cup +
+    enhancerCost
   );
 
   // Reputation follows the drink first, then how you priced it. Word only
@@ -914,6 +1051,8 @@ function simulateDay(state) {
     cogs,
     profit: round2(revenue - cogs - mods.rent),
     used,
+    enhancers: enhancerSales,
+    enhancerRevenue: round2(enhancerRevenue),
     repDelta,
   };
   result.notes = customerNotes(state.recipe, today.temp, result, mods);
@@ -924,14 +1063,18 @@ function simulateDay(state) {
 function commitDay(state, result) {
   const days = state.days ?? TOTAL_DAYS;
   state.money = round2(state.money + result.revenue - (result.rent || 0));
-  state.inventory.lemons -= result.used.lemons;
+  consumeLemons(state, result.used.lemons);
   state.inventory.sugar -= result.used.sugar;
   state.inventory.cups -= result.used.cups;
+  for (const [id, qty] of Object.entries(result.used.enhancers || {})) {
+    state.inventory.enhancers[id] = Math.max(0, (state.inventory.enhancers[id] || 0) - qty);
+  }
   result.melted = Math.max(0, state.inventory.ice - result.used.ice);
   state.inventory.ice = 0; // whatever is left melts overnight
   state.reputation = clamp(state.reputation + result.repDelta, 0.05, 1);
   state.history.push(result);
   state.day += 1;
+  result.spoiledLemons = spoilLemons(state); // checked as of the day that's about to start
   if (state.day > days) {
     state.phase = 'gameover';
   } else if (isBankrupt(state)) {
@@ -961,9 +1104,11 @@ function finalScore(state) {
       acc.revenue += d.revenue;
       acc.profit += d.profit;
       acc.sold += d.sold;
+      acc.enhancerCups += Object.values(d.used?.enhancers || {}).reduce((a, b) => a + b, 0);
+      acc.enhancerRevenue += d.enhancerRevenue || 0;
       return acc;
     },
-    { revenue: 0, profit: 0, sold: 0 }
+    { revenue: 0, profit: 0, sold: 0, enhancerCups: 0, enhancerRevenue: 0 }
   );
   const best = state.history.reduce((a, b) => (b.profit > (a?.profit ?? -Infinity) ? b : a), null);
   const net = round2(state.money - state.stake);
@@ -973,6 +1118,8 @@ function finalScore(state) {
     revenue: round2(totals.revenue),
     profit: round2(totals.profit),
     cupsSold: totals.sold,
+    enhancerCups: totals.enhancerCups,
+    enhancerRevenue: round2(totals.enhancerRevenue),
     bestDay: best,
     reputation: state.reputation,
     target: state.target,
@@ -1074,13 +1221,13 @@ function parProfit(config) {
     state.price = plan.price;
     const order = affordableOrder(state, plan.recipe, plan.cups);
     state.money = round2(state.money - buyCost(state.today.prices, order));
-    for (const key of Object.keys(order)) state.inventory[key] += order[key];
+    receiveOrder(state, order);
     commitDay(state, simulateDay(state));
   }
   return round2(state.money - state.stake);
 }
 
-  return { mulberry32, withMods, idealIcePerCup, recipeQuality, costPerCup, maxCupsAvailable, customerNotes, newRun, newGame, rollDay, buyCost, simulateDay, commitDay, isBankrupt, finalScore, willingnessToday, bestPrice, demandShare, expectedTraffic, referencePlan, affordableOrder, parProfit, CUPS_PER_PITCHER, TOTAL_DAYS, STARTING_MONEY, NO_MODS, WEATHER, EVENTS };
+  return { mulberry32, withMods, receiveLemons, receiveOrder, daysUntilLemonsSpoil, idealIcePerCup, recipeQuality, costPerCup, maxCupsAvailable, customerNotes, newRun, newGame, rollDay, buyCost, enhancerOrderCost, simulateDay, commitDay, isBankrupt, finalScore, willingnessToday, bestPrice, demandShare, expectedTraffic, referencePlan, affordableOrder, parProfit, CUPS_PER_PITCHER, TOTAL_DAYS, STARTING_MONEY, NO_MODS, LEMON_SHELF_LIFE_DAYS, ENHANCERS, WEATHER, EVENTS };
 })();
 
 /* ---- js/campaign.js ---- */
@@ -2016,8 +2163,13 @@ __modules["store"] = (function () {
  * `run` is the stretch of days currently being played on one corner.
  * `ui` is throwaway view state — which screen, the basket being filled in.
  */
+const { ENHANCERS } = __modules["sim"];
+
 const SAVE_KEY = 'lemonade-stand-campaign-v2';
 const BEST_KEY = 'lemonade-stand-best-v1';
+const PREMIUM_KEY = 'lemonade-stand-premium-v1';
+
+const zeroedEnhancers = () => Object.fromEntries(Object.keys(ENHANCERS).map((id) => [id, 0]));
 
 const store = {
   campaign: null,
@@ -2026,12 +2178,13 @@ const store = {
     view: 'title',      // title | world | city | corner | run | ops | opsCity | help
     cityId: null,
     cornerIndex: null,
-    order: { lemons: 0, sugar: 0, ice: 0, cups: 0 },
+    order: { lemons: 0, sugar: 0, ice: 0, cups: 0, enhancers: zeroedEnhancers() },
     restock: { lemons: 0, sugar: 0, cups: 0 },
     pending: null,      // simulated day awaiting its report
     opsReport: null,    // what the network did while you were working
     editingTruck: null, // id of the truck whose route is being set, or null
     truckDraft: null,   // { from, to, cargo, amount } while editingTruck is set
+    showPremium: false, // the never-expire paywall screen, shown over whatever's current
     lastKey: null,
     notice: null,
   },
@@ -2083,7 +2236,41 @@ function recordBest(amount) {
   } catch { /* ignore */ }
 }
 
-  return { save, loadSave, clearSave, bestScore, recordBest, store, onRender, render };
+/* ------------------------------------------------------------------ *
+ * Premium unlocks
+ *
+ * There is no payment processor wired into this game — it's a static page
+ * with no server. This is the hook a real one would plug into: the paywall
+ * screen is real and the mechanic it unlocks is real, but the "purchase"
+ * button here just flips a local flag rather than charging anyone. Shipping
+ * this for real would mean wiring it to App Store / Play Store IAP, or
+ * Stripe for a web build, behind this exact same call.
+ * ------------------------------------------------------------------ */
+
+function loadPremium() {
+  try {
+    return JSON.parse(localStorage.getItem(PREMIUM_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function isPremiumUnlocked(flag) {
+  return Boolean(loadPremium()[flag]);
+}
+
+/** Flips the flag locally. Not a real purchase — see the note above. */
+function unlockPremiumDemo(flag) {
+  try {
+    const current = loadPremium();
+    current[flag] = true;
+    localStorage.setItem(PREMIUM_KEY, JSON.stringify(current));
+  } catch {
+    /* private mode or a full quota — the unlock just won't stick around */
+  }
+}
+
+  return { save, loadSave, clearSave, bestScore, recordBest, isPremiumUnlocked, unlockPremiumDemo, store, onRender, render };
 })();
 
 /* ---- js/ui/kit.js ---- */
@@ -2424,8 +2611,10 @@ __modules["ui/run"] = (function () {
 const S = __modules["sim"];
 const C = __modules["campaign"];
 const { tickOps, newOps } = __modules["ops"];
-const { store, render, recordBest } = __modules["store"];
+const { store, render, recordBest, isPremiumUnlocked } = __modules["store"];
 const { money, whole, cents, fact, stepper, row, tierPill } = __modules["ui/kit"];
+
+const zeroedEnhancers = () => Object.fromEntries(Object.keys(S.ENHANCERS).map((id) => [id, 0]));
 
 const run = () => store.run;
 
@@ -2458,8 +2647,12 @@ function forecastScreen() {
           ${fact('Ice', `${r.inventory.ice} 🧊`)}
           ${fact('Cups', r.inventory.cups)}
         </div>
+        ${lemonFreshnessNote(r)}
         ${yesterday?.melted > 0
-          ? `<p class="muted" style="margin-top:10px">${yesterday.melted} ice cube${yesterday.melted === 1 ? '' : 's'} melted overnight.</p>`
+          ? `<p class="muted" style="margin-top:6px">${yesterday.melted} ice cube${yesterday.melted === 1 ? '' : 's'} melted overnight.</p>`
+          : ''}
+        ${yesterday?.spoiledLemons > 0
+          ? `<p class="warn" style="margin-top:6px">${yesterday.spoiledLemons} lemon${yesterday.spoiledLemons === 1 ? '' : 's'} went bad overnight — a week in the cooler is all they get.</p>`
           : ''}
       </div>
       ${yesterday ? `<p class="muted center">Yesterday you sold ${yesterday.sold} cup${yesterday.sold === 1 ? '' : 's'} for ${money(yesterday.revenue)}.</p>` : ''}`,
@@ -2469,11 +2662,29 @@ function forecastScreen() {
   };
 }
 
+/** A quiet reminder near the lemons that the clock is running, unless it isn't. */
+function lemonFreshnessNote(r) {
+  if (r.premium?.neverExpireLemons) {
+    return r.inventory.lemons > 0
+      ? '<p class="muted good" style="margin-top:6px">✓ Never-expiring lemons — nothing in this cooler goes bad.</p>'
+      : '';
+  }
+  const daysLeft = S.daysUntilLemonsSpoil(r);
+  if (daysLeft == null) return '';
+  if (daysLeft <= 3) {
+    return `<p class="warn" style="margin-top:6px">Your oldest lemons spoil in ${daysLeft} day${daysLeft === 1 ? '' : 's'}.
+      <button class="link-btn" data-act="open-premium">Never let that happen →</button></p>`;
+  }
+  return `<p class="muted" style="margin-top:6px">Oldest lemons are good for ${daysLeft} more day${daysLeft === 1 ? '' : 's'}.</p>`;
+}
+
 function buyScreen() {
   const r = run();
   const p = r.today.prices;
   const o = store.ui.order;
-  const cost = S.buyCost(p, o);
+  const baseCost = S.buyCost(p, o);
+  const enhCost = S.enhancerOrderCost(o.enhancers);
+  const cost = Math.round((baseCost + enhCost) * 100) / 100;
   const left = r.money - cost;
   const after = {
     lemons: r.inventory.lemons + o.lemons,
@@ -2486,12 +2697,22 @@ function buyScreen() {
     row(name, `${cents(p[unit])} each · cooler: ${after[key]}`,
         stepper('order', key, o[key], step, 0, 9999));
 
+  const lemonSub = r.premium?.neverExpireLemons
+    ? `${cents(p.lemon)} each · cooler: ${after.lemons} · never expires`
+    : `${cents(p.lemon)} each · cooler: ${after.lemons} · good for ${S.LEMON_SHELF_LIFE_DAYS} days`;
+
+  const enhancerRows = Object.values(S.ENHANCERS).map((enh) => {
+    const held = r.inventory.enhancers?.[enh.id] || 0;
+    return row(`${enh.icon} ${enh.label}`, `${cents(enh.unitCost)} each to stock · adds ${money(enh.addPrice)} to the cup · cooler: ${held + (o.enhancers[enh.id] || 0)}`,
+      stepper('enhancerOrder', enh.id, o.enhancers[enh.id] || 0, 10, 0, 999));
+  }).join('');
+
   return {
     body: `
       <h1>Supplies</h1>
       <p class="muted">Prices move a little every day. Buy for the weather you are expecting.</p>
       <div class="card">
-        ${line('lemons', 'Lemons 🍋', 'lemon', 5)}
+        ${row('Lemons 🍋', lemonSub, stepper('order', 'lemons', o.lemons, 5, 0, 9999))}
         ${line('sugar', 'Sugar 🥄', 'sugar', 5)}
         ${line('ice', 'Ice cubes 🧊', 'ice', 25)}
         ${line('cups', 'Paper cups 🥤', 'cup', 10)}
@@ -2503,6 +2724,10 @@ function buyScreen() {
           <span class="muted">Cash left</span>
           <span class="muted ${left < 0 ? 'over' : ''}">${money(left)}</span>
         </div>
+        ${!r.premium?.neverExpireLemons
+          ? `<p class="muted" style="margin-top:10px">Lemons spoil after ${S.LEMON_SHELF_LIFE_DAYS} days in the cooler.
+             <button class="link-btn" data-act="open-premium">Never let that happen →</button></p>`
+          : ''}
       </div>
       <div class="card">
         <h2>Quick stock-up</h2>
@@ -2513,6 +2738,11 @@ function buyScreen() {
           <button class="chip" data-act="clear-order">Clear</button>
         </div>
         <p class="muted" style="margin-top:10px">Fills the order to pour that many cups with your current recipe, as far as your cash goes.</p>
+      </div>
+      <div class="card">
+        <h2>Enhancers <span class="muted" style="font-weight:600;text-transform:none;letter-spacing:0">· optional</span></h2>
+        <p class="muted">Stock these and offer them at the stand for extra per cup. Nobody has to take one — it is pure upside when they do.</p>
+        ${enhancerRows}
       </div>
       <p class="muted center">That is enough for <strong>${pourable}</strong> cup${pourable === 1 ? '' : 's'} today.</p>`,
     actions: `
@@ -2527,6 +2757,21 @@ function setupScreen() {
   const pourable = S.maxCupsAvailable(r.inventory, r.recipe);
   const unitCost = S.costPerCup(r.recipe, r.today.prices);
   const margin = r.price - unitCost;
+
+  const enhancerToggles = Object.values(S.ENHANCERS).map((enh) => {
+    const stock = r.inventory.enhancers?.[enh.id] || 0;
+    const offered = !!r.enhancersOffered?.[enh.id];
+    return `<div class="row">
+        <div class="row-main">
+          <div class="row-name">${enh.icon} ${enh.label}</div>
+          <div class="row-sub">${stock > 0 ? `${stock} in stock · +${money(enh.addPrice)} a cup` : 'none in stock'}</div>
+        </div>
+        <button class="chip ${offered ? 'chip-on' : ''}" data-act="toggle-enhancer" data-id="${enh.id}"
+                ${stock === 0 ? 'disabled' : ''}>
+          ${offered ? 'Offering ✓' : 'Offer It'}
+        </button>
+      </div>`;
+  }).join('');
 
   return {
     body: `
@@ -2545,6 +2790,11 @@ function setupScreen() {
           ${fact('Profit per cup', money(margin), margin > 0 ? 'good' : 'bad')}
           ${fact('Cups ready', pourable, pourable === 0 ? 'bad' : '')}
         </div>
+      </div>
+      <div class="card">
+        <h2>Enhancers on offer</h2>
+        ${enhancerToggles}
+        <p class="muted" style="margin-top:10px">Only stocked enhancers can be offered. Customers who want one pay extra — it never affects whether the cup itself sells.</p>
       </div>
       ${pourable === 0 ? '<p class="muted center">Nothing to pour. Buy supplies, use less per pitcher — or sit this one out.</p>' : ''}`,
     actions: `
@@ -2624,6 +2874,11 @@ function reportScreen() {
   const result = store.ui.pending;
   const w = S.WEATHER[result.weather];
   const last = r.day >= r.days;
+  const enhancerLines = Object.entries(result.enhancers || {}).map(([id, s]) => {
+    const enh = S.ENHANCERS[id];
+    return `<li>${enh.icon} ${s.cups} customer${s.cups === 1 ? '' : 's'} added ${enh.label.toLowerCase()} for ${money(s.revenue)}.</li>`;
+  }).join('');
+
   return {
     body: `
       <h1>Day ${result.day} · closed</h1>
@@ -2634,8 +2889,10 @@ function reportScreen() {
           ${fact('Supplies used', money(result.cogs))}
           ${fact("Day's profit", money(result.profit), result.profit >= 0 ? 'good' : 'bad')}
         </div>
+        ${result.enhancerRevenue > 0 ? `<p class="muted" style="margin-top:8px">Enhancers added ${money(result.enhancerRevenue)} on top of the base price.</p>` : ''}
         <ul class="notes">
           ${result.notes.map((n) => `<li>${n}</li>`).join('')}
+          ${enhancerLines}
           ${result.rent > 0 ? `<li>🏠 Pitch fee of ${money(result.rent)} came out of the till.</li>` : ''}
           <li>${w.icon} ${w.label}, ${result.temp}°F · about ${result.potential} people walked past.</li>
           <li>Reputation ${result.repDelta >= 0 ? 'rose ↑' : 'slipped ↓'} — word gets around.</li>
@@ -2684,6 +2941,7 @@ function runOverScreen() {
             ${fact('Cups sold', score.cupsSold)}
             ${fact('Best day', score.bestDay ? money(score.bestDay.profit) : '—')}
           </div>
+          ${score.enhancerCups > 0 ? `<p class="muted" style="margin-top:8px">${score.enhancerCups} enhancers sold for ${money(score.enhancerRevenue)} on top of the base price.</p>` : ''}
           ${chart}
           <p class="muted" style="margin-top:6px">Daily profit, day 1 → ${r.history.length}</p>
         </div>`,
@@ -2734,9 +2992,13 @@ function runOverScreen() {
  * Actions
  * ------------------------------------------------------------------ */
 
-const emptyOrder = () => ({ lemons: 0, sugar: 0, ice: 0, cups: 0 });
+const emptyOrder = () => ({ lemons: 0, sugar: 0, ice: 0, cups: 0, enhancers: zeroedEnhancers() });
 
-/** What you would need to add to the cooler to pour `cups` cups today. */
+/**
+ * What you would need to add to the cooler to pour `cups` cups today.
+ * Enhancers are a deliberate, separate purchase — a stock-up preset for the
+ * base drink should never silently add or drop them.
+ */
 function orderFor(cups) {
   const r = run();
   const pitchers = Math.ceil(cups / S.CUPS_PER_PITCHER);
@@ -2746,6 +3008,7 @@ function orderFor(cups) {
     sugar: need(r.inventory.sugar, pitchers * r.recipe.sugar),
     ice: need(r.inventory.ice, cups * r.recipe.ice),
     cups: need(r.inventory.cups, cups),
+    enhancers: store.ui.order.enhancers,
   };
 }
 
@@ -2780,7 +3043,10 @@ function cornerRun(cityId, index) {
 }
 
 function startRun(config) {
-  store.run = S.newRun(config);
+  store.run = S.newRun({
+    ...config,
+    premium: { neverExpireLemons: isPremiumUnlocked('neverExpireLemons') },
+  });
   store.ui.order = emptyOrder();
   store.ui.pending = null;
   store.ui.claimResult = null;
@@ -2843,14 +3109,22 @@ const actions = {
   'clear-order': () => { store.ui.order = emptyOrder(); },
   'confirm-buy': () => {
     const r = run();
-    const cost = S.buyCost(r.today.prices, store.ui.order);
+    const order = store.ui.order;
+    const cost = Math.round((S.buyCost(r.today.prices, order) + S.enhancerOrderCost(order.enhancers)) * 100) / 100;
     if (cost > r.money) return;
     r.money = Math.round((r.money - cost) * 100) / 100;
-    for (const key of Object.keys(store.ui.order)) r.inventory[key] += store.ui.order[key];
+    S.receiveOrder(r, order);
     store.ui.order = emptyOrder();
     r.phase = 'setup';
   },
   'back-to-buy': () => { run().phase = 'buy'; },
+  'toggle-enhancer': (el) => {
+    const r = run();
+    const id = el.dataset.id;
+    if ((r.inventory.enhancers?.[id] || 0) === 0) return; // nothing to offer
+    r.enhancersOffered[id] = !r.enhancersOffered[id];
+  },
+  'open-premium': () => { store.ui.showPremium = true; },
   'open-stand': () => {
     store.ui.pending = S.simulateDay(run());
     run().phase = 'open';
@@ -3280,6 +3554,70 @@ const actions = {
   return { screens, actions };
 })();
 
+/* ---- js/ui/premium.js ---- */
+__modules["ui/premium"] = (function () {
+/**
+ * The one premium unlock in the game: lemons that never spoil.
+ *
+ * There is no payment processor wired into this build — it is a static page
+ * with no server to talk to. This screen is the real hook a shipped app
+ * would connect to App Store / Play Store IAP or Stripe: the price, the
+ * copy and the mechanic it flips are all real, but the button here is
+ * explicitly labelled as a demo unlock rather than pretending to charge
+ * anyone. See js/store.js for the local flag it sets.
+ */
+const { store, isPremiumUnlocked, unlockPremiumDemo } = __modules["store"];
+const { LEMON_SHELF_LIFE_DAYS } = __modules["sim"];
+
+const PRICE = '$1.99';
+const FLAG = 'neverExpireLemons';
+
+function premiumScreen() {
+  const unlocked = isPremiumUnlocked(FLAG);
+  return {
+    body: `
+      <div class="rank">
+        <div class="rank-icon">🔒</div>
+        <div class="rank-title">Never-Expiring Lemons</div>
+      </div>
+      <div class="card">
+        <p>Every lemon you buy is good for ${LEMON_SHELF_LIFE_DAYS} days in the cooler, then it spoils —
+          whatever's left over is gone, and buying too far ahead of a slow stretch stops paying off.</p>
+        <p>This unlock removes the clock. Buy in bulk whenever prices are good, hold as much stock as
+          you like, and none of it ever goes bad.</p>
+      </div>
+      ${unlocked
+        ? `<div class="card">
+             <p class="good"><strong>✓ Unlocked.</strong> Your lemons never expire, in every run from here on.</p>
+           </div>`
+        : `<div class="card paywall">
+             <div class="paywall-price">${PRICE}<small>one-time</small></div>
+             <p class="muted">This is a prototype with no payment processor connected — no card is charged and
+               no store is involved. Tapping the button below flips the unlock locally so you can see what it
+               does. A shipped version would put a real App Store / Play Store / Stripe purchase behind this
+               exact same button.</p>
+           </div>`}`,
+    actions: unlocked
+      ? `<button class="btn" data-act="close-premium">Back</button>`
+      : `<button class="btn" data-act="unlock-premium-demo">Unlock — ${PRICE} (Demo, No Charge)</button>
+         <button class="btn-ghost" data-act="close-premium">Not Now</button>`,
+  };
+}
+
+const screens = { premium: premiumScreen };
+
+const actions = {
+  'unlock-premium-demo': () => {
+    unlockPremiumDemo(FLAG);
+    if (store.run) store.run.premium = { ...(store.run.premium || {}), neverExpireLemons: true };
+    store.ui.notice = '🔒 Never-Expiring Lemons unlocked (demo) — your lemons stop spoiling from now on.';
+  },
+  'close-premium': () => { store.ui.showPremium = false; },
+};
+
+  return { screens, actions };
+})();
+
 /* ---- js/app.js ---- */
 __modules["app"] = (function () {
 /**
@@ -3295,6 +3633,7 @@ const S = __modules["sim"];
 const mapUi = __modules["ui/map"];
 const runUi = __modules["ui/run"];
 const opsUi = __modules["ui/opsui"];
+const premiumUi = __modules["ui/premium"];
 const { money, whole, bar } = __modules["ui/kit"];
 const { restockCost, spaceLeft } = __modules["ops"];
 
@@ -3302,15 +3641,16 @@ const screenEl = document.getElementById('screen');
 const actionsEl = document.getElementById('actions');
 const hudEl = document.getElementById('hud');
 
-const SCREENS = { ...mapUi.screens, ...opsUi.screens };
+const SCREENS = { ...mapUi.screens, ...opsUi.screens, ...premiumUi.screens };
 const RUN_SCREENS = runUi.screens;
-const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions };
+const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions, ...premiumUi.actions };
 
 /* ------------------------------------------------------------------ *
  * Render
  * ------------------------------------------------------------------ */
 
 function currentScreen() {
+  if (store.ui.showPremium) return SCREENS.premium;
   if (store.ui.view === 'run' && store.run) {
     return RUN_SCREENS[store.run.phase] || RUN_SCREENS.forecast;
   }
@@ -3318,7 +3658,9 @@ function currentScreen() {
 }
 
 function draw() {
-  const view = store.ui.view === 'run' && store.run ? `run:${store.run.phase}` : store.ui.view;
+  const view = store.ui.showPremium
+    ? 'premium'
+    : store.ui.view === 'run' && store.run ? `run:${store.run.phase}` : store.ui.view;
   const screen = currentScreen()();
 
   screenEl.innerHTML = (store.ui.notice ? `<div class="notice">${store.ui.notice}</div>` : '') + screen.body;
@@ -3403,6 +3745,7 @@ const LIMITS = {
   order: { lemons: [0, 9999], sugar: [0, 9999], ice: [0, 9999], cups: [0, 9999] },
   restock: { lemons: [0, 99999], sugar: [0, 99999], cups: [0, 99999] },
   truckDraft: { amount: [25, 2000] },
+  enhancerOrder: Object.fromEntries(Object.keys(S.ENHANCERS).map((id) => [id, [0, 999]])),
 };
 
 /** Apply one tap of a stepper. Returns false when it could not move. */
@@ -3421,6 +3764,17 @@ function applyStep(group, field, step) {
     const next = clamp(store.ui.restock[field] + step, min, max);
     const trial = { ...store.ui.restock, [field]: next };
     return acceptRestock(trial, field, next);
+  }
+  if (group === 'enhancerOrder') {
+    const r = store.run;
+    const next = clamp(store.ui.order.enhancers[field] + step, min, max);
+    const trial = { ...store.ui.order.enhancers, [field]: next };
+    if (step > 0) {
+      const total = S.buyCost(r.today.prices, store.ui.order) + S.enhancerOrderCost(trial);
+      if (total > r.money) return false; // never overspend
+    }
+    store.ui.order.enhancers[field] = next;
+    return true;
   }
   if (group === 'truckDraft') {
     store.ui.truckDraft[field] = clamp(store.ui.truckDraft[field] + step, min, max);

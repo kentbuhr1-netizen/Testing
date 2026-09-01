@@ -54,6 +54,105 @@ export function withMods(mods) {
   return { ...NO_MODS, ...(mods || {}) };
 }
 
+/* ------------------------------------------------------------------ *
+ * Lemons spoil
+ *
+ * Lemons are tracked as dated batches, not just a running total, so a
+ * cooler full of them can go bad. Everything else (sugar, cups, ice-per-day)
+ * keeps indefinitely — only the fruit itself is perishable.
+ * ------------------------------------------------------------------ */
+
+export const LEMON_SHELF_LIFE_DAYS = 7;
+
+/** Add lemons to the cooler, dated so they can spoil on schedule. */
+export function receiveLemons(state, qty) {
+  if (qty <= 0) return;
+  state.inventory.lemons += qty;
+  const batches = state.inventory.lemonBatches || (state.inventory.lemonBatches = []);
+  batches.push({ day: state.day, qty });
+}
+
+/**
+ * A full shopping order: lemons go through receiveLemons so they can spoil
+ * on schedule, an `enhancers` sub-order tops up enhancer stock, and the rest
+ * (sugar, ice, cups) adds straight in.
+ */
+export function receiveOrder(state, order) {
+  for (const key of Object.keys(order)) {
+    if (key === 'lemons') {
+      receiveLemons(state, order.lemons || 0);
+    } else if (key === 'enhancers') {
+      for (const [id, qty] of Object.entries(order.enhancers || {})) {
+        state.inventory.enhancers[id] = (state.inventory.enhancers[id] || 0) + (qty || 0);
+      }
+    } else {
+      state.inventory[key] = (state.inventory[key] || 0) + (order[key] || 0);
+    }
+  }
+}
+
+/** Use the oldest lemons first, so the freshest batch is the one left to spoil last. */
+function consumeLemons(state, qty) {
+  let remaining = qty;
+  const batches = state.inventory.lemonBatches || [];
+  while (remaining > 0 && batches.length) {
+    const take = Math.min(remaining, batches[0].qty);
+    batches[0].qty -= take;
+    remaining -= take;
+    if (batches[0].qty <= 0) batches.shift();
+  }
+  state.inventory.lemons = Math.max(0, state.inventory.lemons - qty);
+}
+
+/**
+ * Discard any batch older than the shelf life, as of the current day. A
+ * never-expire unlock skips this entirely — the one thing real money buys.
+ */
+function spoilLemons(state) {
+  if (state.premium?.neverExpireLemons) return 0;
+  const batches = state.inventory.lemonBatches || [];
+  let spoiled = 0;
+  const fresh = [];
+  for (const b of batches) {
+    if (state.day - b.day >= LEMON_SHELF_LIFE_DAYS) spoiled += b.qty;
+    else fresh.push(b);
+  }
+  state.inventory.lemonBatches = fresh;
+  if (spoiled > 0) state.inventory.lemons = Math.max(0, state.inventory.lemons - spoiled);
+  return spoiled;
+}
+
+/** How many days the oldest lemon in the cooler has left before it spoils. */
+export function daysUntilLemonsSpoil(state) {
+  const batches = state.inventory.lemonBatches || [];
+  if (!batches.length) return null;
+  const age = state.day - batches[0].day;
+  return Math.max(0, LEMON_SHELF_LIFE_DAYS - age);
+}
+
+/* ------------------------------------------------------------------ *
+ * Enhancers — optional add-ins customers can pay extra for
+ * ------------------------------------------------------------------ */
+
+export const ENHANCERS = {
+  strawberry: { id: 'strawberry', label: 'Strawberry Splash', icon: '🍓', addPrice: 0.35, unitCost: 0.16, appeal: 1.0 },
+  mango:      { id: 'mango',      label: 'Mango Twist',       icon: '🥭', addPrice: 0.4,  unitCost: 0.2,  appeal: 0.9 },
+  mint:       { id: 'mint',       label: 'Mint Cooler',       icon: '🌿', addPrice: 0.3,  unitCost: 0.12, appeal: 1.0, coolant: true },
+  caffeine:   { id: 'caffeine',   label: 'Caffeine Kick',     icon: '☕', addPrice: 0.55, unitCost: 0.24, appeal: 0.75 },
+};
+
+const emptyEnhancerInventory = () =>
+  Object.fromEntries(Object.keys(ENHANCERS).map((id) => [id, 0]));
+const allEnhancersOff = () =>
+  Object.fromEntries(Object.keys(ENHANCERS).map((id) => [id, false]));
+
+/** How likely a customer who is already buying is to add this enhancer too. */
+function enhancerUptake(enh, heat) {
+  let chance = 0.55 * enh.appeal - 0.4 * enh.addPrice;
+  if (enh.coolant) chance *= 1 + heat * 0.35; // a cool add-on sells better when it's hot
+  return clamp(chance, 0, 0.9);
+}
+
 export const WEATHER = {
   scorcher:  { id: 'scorcher',  label: 'Scorcher',      icon: '🔥', traffic: 1.35, tempRange: [92, 104], hot: true },
   sunny:     { id: 'sunny',     label: 'Sunny',         icon: '☀️', traffic: 1.15, tempRange: [76, 92], hot: true },
@@ -203,6 +302,7 @@ export function newRun({
   target = null,
   mods = null,
   corner = null,
+  premium = null,
 } = {}) {
   const state = {
     seed,
@@ -212,9 +312,11 @@ export function newRun({
     target,
     corner,               // { cityId, index, name } when played from the campaign
     mods: withMods(mods),
+    premium: { neverExpireLemons: false, ...(premium || {}) },
     money: stake,
     reputation: 0.5,
-    inventory: { lemons: 0, sugar: 0, ice: 0, cups: 0 },
+    inventory: { lemons: 0, sugar: 0, ice: 0, cups: 0, lemonBatches: [], enhancers: emptyEnhancerInventory() },
+    enhancersOffered: allEnhancersOff(),
     recipe: { lemons: 5, sugar: 5, ice: 2 },
     price: 0.5,
     history: [],
@@ -255,6 +357,13 @@ export function buyCost(prices, order) {
   );
 }
 
+/** Enhancer stock has a fixed wholesale price — no daily jitter, no bulk break. */
+export function enhancerOrderCost(order) {
+  return round2(
+    Object.entries(order || {}).reduce((sum, [id, qty]) => sum + (ENHANCERS[id]?.unitCost || 0) * (qty || 0), 0)
+  );
+}
+
 /**
  * Run the day. Walks every potential customer past the stand and asks
  * whether they'd pay your price for what you're pouring.
@@ -290,17 +399,45 @@ export function simulateDay(state) {
   const lostToStockout = Math.max(0, interested - stock);
   const pitchersMade = Math.ceil(sold / CUPS_PER_PITCHER);
 
+  // Enhancers are an independent upsell: every cup sold is offered whichever
+  // ones are switched on and still in stock, and each customer decides for
+  // themself — it never affects whether the base cup gets bought at all.
+  const enhancerSales = {};
+  let enhancerRevenue = 0;
+  let enhancerCost = 0;
+  for (const id of Object.keys(ENHANCERS)) {
+    if (!state.enhancersOffered?.[id]) continue;
+    let stockLeft = state.inventory.enhancers?.[id] || 0;
+    if (stockLeft <= 0) continue;
+    const enh = ENHANCERS[id];
+    const uptake = enhancerUptake(enh, heat);
+    let used = 0;
+    for (let i = 0; i < sold && stockLeft > 0; i++) {
+      if (rng() < uptake) {
+        used++;
+        stockLeft--;
+      }
+    }
+    if (used > 0) {
+      enhancerSales[id] = { cups: used, revenue: round2(used * enh.addPrice), cost: round2(used * enh.unitCost) };
+      enhancerRevenue += used * enh.addPrice;
+      enhancerCost += used * enh.unitCost;
+    }
+  }
+
   const used = {
     lemons: pitchersMade * state.recipe.lemons,
     sugar: pitchersMade * state.recipe.sugar,
     ice: sold * state.recipe.ice,
     cups: sold,
+    enhancers: Object.fromEntries(Object.entries(enhancerSales).map(([id, s]) => [id, s.cups])),
   };
-  const revenue = round2(sold * state.price);
+  const revenue = round2(sold * state.price + enhancerRevenue);
   const cogs = round2(
     pitchersMade * (state.recipe.lemons * today.prices.lemon + state.recipe.sugar * today.prices.sugar) +
     used.ice * today.prices.ice +
-    used.cups * today.prices.cup
+    used.cups * today.prices.cup +
+    enhancerCost
   );
 
   // Reputation follows the drink first, then how you priced it. Word only
@@ -337,6 +474,8 @@ export function simulateDay(state) {
     cogs,
     profit: round2(revenue - cogs - mods.rent),
     used,
+    enhancers: enhancerSales,
+    enhancerRevenue: round2(enhancerRevenue),
     repDelta,
   };
   result.notes = customerNotes(state.recipe, today.temp, result, mods);
@@ -347,14 +486,18 @@ export function simulateDay(state) {
 export function commitDay(state, result) {
   const days = state.days ?? TOTAL_DAYS;
   state.money = round2(state.money + result.revenue - (result.rent || 0));
-  state.inventory.lemons -= result.used.lemons;
+  consumeLemons(state, result.used.lemons);
   state.inventory.sugar -= result.used.sugar;
   state.inventory.cups -= result.used.cups;
+  for (const [id, qty] of Object.entries(result.used.enhancers || {})) {
+    state.inventory.enhancers[id] = Math.max(0, (state.inventory.enhancers[id] || 0) - qty);
+  }
   result.melted = Math.max(0, state.inventory.ice - result.used.ice);
   state.inventory.ice = 0; // whatever is left melts overnight
   state.reputation = clamp(state.reputation + result.repDelta, 0.05, 1);
   state.history.push(result);
   state.day += 1;
+  result.spoiledLemons = spoilLemons(state); // checked as of the day that's about to start
   if (state.day > days) {
     state.phase = 'gameover';
   } else if (isBankrupt(state)) {
@@ -384,9 +527,11 @@ export function finalScore(state) {
       acc.revenue += d.revenue;
       acc.profit += d.profit;
       acc.sold += d.sold;
+      acc.enhancerCups += Object.values(d.used?.enhancers || {}).reduce((a, b) => a + b, 0);
+      acc.enhancerRevenue += d.enhancerRevenue || 0;
       return acc;
     },
-    { revenue: 0, profit: 0, sold: 0 }
+    { revenue: 0, profit: 0, sold: 0, enhancerCups: 0, enhancerRevenue: 0 }
   );
   const best = state.history.reduce((a, b) => (b.profit > (a?.profit ?? -Infinity) ? b : a), null);
   const net = round2(state.money - state.stake);
@@ -396,6 +541,8 @@ export function finalScore(state) {
     revenue: round2(totals.revenue),
     profit: round2(totals.profit),
     cupsSold: totals.sold,
+    enhancerCups: totals.enhancerCups,
+    enhancerRevenue: round2(totals.enhancerRevenue),
     bestDay: best,
     reputation: state.reputation,
     target: state.target,
@@ -497,7 +644,7 @@ export function parProfit(config) {
     state.price = plan.price;
     const order = affordableOrder(state, plan.recipe, plan.cups);
     state.money = round2(state.money - buyCost(state.today.prices, order));
-    for (const key of Object.keys(order)) state.inventory[key] += order[key];
+    receiveOrder(state, order);
     commitDay(state, simulateDay(state));
   }
   return round2(state.money - state.stake);
