@@ -121,6 +121,10 @@ function opsReportCard(report) {
       ${units > 0
         ? `<p class="muted">It drew ${units} units out of your depots — about ${money(restockCost(used))} to replace.</p>`
         : ''}
+      ${report.produced && (report.produced.lemons + report.produced.sugar + report.produced.cups) > 0
+        ? `<p class="muted">Farms and the factory pressed ${report.produced.lemons + report.produced.sugar + report.produced.cups} units straight into the depots, for free.</p>`
+        : ''}
+      ${report.trucked > 0 ? `<p class="muted">Trucks hauled ${report.trucked} units between depots.</p>` : ''}
       ${report.dry.length ? `<p class="warn">⚠️ Ran short in ${report.dry.map((id) => C.getCity(id).name).join(', ')}.</p>` : ''}
     </div>`;
 }

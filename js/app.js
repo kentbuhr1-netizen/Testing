@@ -118,14 +118,15 @@ const LIMITS = {
   price: { price: [0.05, 5] },
   order: { lemons: [0, 9999], sugar: [0, 9999], ice: [0, 9999], cups: [0, 9999] },
   restock: { lemons: [0, 99999], sugar: [0, 99999], cups: [0, 99999] },
+  truckDraft: { amount: [25, 2000] },
 };
 
 /** Apply one tap of a stepper. Returns false when it could not move. */
 function applyStep(group, field, step) {
   const [min, max] = LIMITS[group][field];
-  const r = store.run;
 
   if (group === 'order') {
+    const r = store.run;
     const next = clamp(store.ui.order[field] + step, min, max);
     const trial = { ...store.ui.order, [field]: next };
     if (step > 0 && S.buyCost(r.today.prices, trial) > r.money) return false; // never overspend
@@ -137,11 +138,15 @@ function applyStep(group, field, step) {
     const trial = { ...store.ui.restock, [field]: next };
     return acceptRestock(trial, field, next);
   }
-  if (group === 'price') {
-    r.price = Math.round(clamp(r.price + step, min, max) * 100) / 100;
+  if (group === 'truckDraft') {
+    store.ui.truckDraft[field] = clamp(store.ui.truckDraft[field] + step, min, max);
     return true;
   }
-  r.recipe[field] = clamp(r.recipe[field] + step, min, max);
+  if (group === 'price') {
+    store.run.price = Math.round(clamp(store.run.price + step, min, max) * 100) / 100;
+    return true;
+  }
+  store.run.recipe[field] = clamp(store.run.recipe[field] + step, min, max);
   return true;
 }
 

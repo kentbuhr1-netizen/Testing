@@ -68,6 +68,15 @@ Claimed corners can be put to work:
 - **Staff** — hire onto any corner you own. Wages and depot upkeep are owed every
   day, sold out or not, and a depot that runs dry leaves your corners standing
   idle on full pay.
+- **Farms & factories** — a Lemon Farm, Sugar Cane Farm and Cup Factory each
+  press free stock into their city's depot every morning, up to a daily cap;
+  an Ice Maker instead hands staffed corners a free daily allowance of ice
+  before the street price applies. One of each per city, and every building
+  costs upkeep whether or not it has anywhere to put its output.
+- **Trucks** — bought once, then routed between any two depot cities to haul
+  one good, one amount, every day. Concentrate a farm in one city and truck
+  its surplus to corners you staff elsewhere, instead of building the same
+  farm five times over.
 - **Time** — the network trades one day for every day you work a corner by hand,
   so the empire earns exactly as fast as you play.
 
@@ -82,7 +91,7 @@ js/ops.js               depots, wholesale, staffing, the daily network tick
 js/store.js             shared state and the save file
 js/app.js               router, HUD, input
 js/ui/                  screens: map.js, run.js, opsui.js, kit.js
-tests/                  45 tests across the rules, the campaign and operations
+tests/                  61 tests across the rules, the campaign and operations
 tools/make-icons.mjs    regenerates icons/*.png from icons/icon.svg
 ```
 
@@ -90,7 +99,7 @@ tools/make-icons.mjs    regenerates icons/*.png from icons/icon.svg
 be played and balanced from node. The same seed always replays the same season.
 
 ```bash
-npm test           # 45 tests
+npm test           # 61 tests
 npm run icons      # rebuild PNG icons from the SVG (needs headless Chromium)
 ```
 

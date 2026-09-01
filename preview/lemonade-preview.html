@@ -1499,7 +1499,8 @@ const NEUTRAL = {
 /* ---- js/ops.js ---- */
 __modules["ops"] = (function () {
 /**
- * Lemonade Stand — operations: warehouses, wholesale buying and distribution.
+ * Lemonade Stand — operations: warehouses, wholesale buying, production and
+ * distribution.
  *
  * Unlocked once five cities are complete. Corners you have already claimed can
  * be staffed and supplied from a city warehouse, so they trade on their own
@@ -1507,8 +1508,9 @@ __modules["ops"] = (function () {
  * play, so the network earns exactly as fast as you do.
  *
  * Ice is deliberately absent from the warehouse: it melts, so staffed corners
- * buy it locally at street prices. The same rule that shapes the core game
- * shapes the empire.
+ * buy it locally at street prices — unless the city has an ice maker, which
+ * presses a fresh batch every morning instead of ever stockpiling any. The
+ * same rule that shapes the core game shapes the empire.
  */
 const { CITIES, getCity, cornersFor, claimedIn, TIERS, mergeMods } = __modules["campaign"];
 const { withMods, mulberry32 } = __modules["sim"];
@@ -1538,20 +1540,55 @@ function wholesaleCost(unit, qty) {
   return Math.round(WHOLESALE[unit] * qty * bulkDiscount(qty) * 100) / 100;
 }
 
+/**
+ * Production buildings — at most one of each per city. Each needs a depot to
+ * work with and costs upkeep every day whether or not it has anywhere to put
+ * its output. Three of them press raw stock into the depot each morning; the
+ * ice maker instead hands staffed corners a free daily allowance of ice
+ * before the street price kicks in, since ice is never warehoused.
+ */
+const BUILDINGS = {
+  lemonFarm:  { id: 'lemonFarm',  label: 'Lemon Farm',      icon: '🍋', unit: 'lemons', cost: 450, dailyYield: 220, upkeep: 4 },
+  caneFarm:   { id: 'caneFarm',   label: 'Sugar Cane Farm', icon: '🎋', unit: 'sugar',  cost: 450, dailyYield: 220, upkeep: 4 },
+  cupFactory: { id: 'cupFactory', label: 'Cup Factory',     icon: '📦', unit: 'cups',   cost: 380, dailyYield: 450, upkeep: 3 },
+  iceMaker:   { id: 'iceMaker',   label: 'Ice Maker',       icon: '🧊', unit: 'ice',    cost: 320, dailyYield: 400, upkeep: 5 },
+};
+
+/** Which building supplies which warehoused good (the ice maker is not one — see above). */
+const STOCK_BUILDING_FOR = { lemons: 'lemonFarm', sugar: 'caneFarm', cups: 'cupFactory' };
+
+const TRUCK_COST = 300;
+const TRUCK_UPKEEP = 2;   // per day, only while a truck is running a route
+const TRUCK_CARGO = ['lemons', 'sugar', 'cups'];
+
 function newOps() {
   return {
     day: 0,
     warehouses: {},   // cityId → { capacity, stock: { lemons, sugar, cups } }
     staffed: {},      // cityId → [cornerIndex]
+    buildings: {},    // cityId → { lemonFarm: true, caneFarm: true, ... }
+    trucks: [],       // [{ id, from, to, cargo, amount }] — from/to/cargo null until assigned
+    nextTruckId: 1,
     ledger: [],       // most recent days first
     alerts: [],
     totals: { income: 0, costs: 0, cups: 0 },
   };
 }
 
+/** Fills in fields a save made before buildings/trucks existed won't have. */
+function ensureOpsShape(ops) {
+  if (!ops) return ops;
+  if (!ops.buildings) ops.buildings = {};
+  if (!ops.trucks) ops.trucks = [];
+  if (ops.nextTruckId == null) ops.nextTruckId = ops.trucks.reduce((n, t) => Math.max(n, t.id || 0), 0) + 1;
+  return ops;
+}
+
 const hasWarehouse = (ops, cityId) => Boolean(ops?.warehouses?.[cityId]);
 const staffedIn = (ops, cityId) => ops?.staffed?.[cityId] || [];
 const isStaffed = (ops, cityId, i) => staffedIn(ops, cityId).includes(i);
+const buildingsIn = (ops, cityId) => Object.keys(ops?.buildings?.[cityId] || {}).filter((id) => ops.buildings[cityId][id]);
+const hasBuilding = (ops, cityId, buildingId) => Boolean(ops?.buildings?.[cityId]?.[buildingId]);
 
 function stockTotal(warehouse) {
   if (!warehouse) return 0;
@@ -1561,6 +1598,14 @@ function stockTotal(warehouse) {
 
 function spaceLeft(warehouse) {
   return Math.max(0, warehouse.capacity - stockTotal(warehouse));
+}
+
+/** Adds stock without ever pushing a depot over capacity. Returns what fit. */
+function addStock(warehouse, unit, amount) {
+  if (!warehouse || amount <= 0) return 0;
+  const fit = Math.min(amount, spaceLeft(warehouse));
+  warehouse.stock[unit] += fit;
+  return fit;
 }
 
 /* ------------------------------------------------------------------ *
@@ -1588,7 +1633,9 @@ function cornerOutlook(cityId, cornerIndex) {
   const price = Math.round(0.7 * willingness * 0.85 * 100) / 100;
 
   const icePerCup = clamp(Math.round((avgTemp - 52) / 12) + mods.iceExtra, 0, 7);
-  const iceCost = Math.round(cups * icePerCup * 0.05 * mods.icePrice * 100) / 100;
+  const iceUnits = cups * icePerCup;
+  const icePriceEach = 0.05 * mods.icePrice;
+  const iceCost = Math.round(iceUnits * icePriceEach * 100) / 100;
 
   // 5 lemons + 5 sugar per 10 cups, plus a cup each
   const needs = { lemons: Math.ceil(cups / 2), sugar: Math.ceil(cups / 2), cups };
@@ -1597,6 +1644,8 @@ function cornerOutlook(cityId, cornerIndex) {
     price,
     revenue: Math.round(cups * price * 100) / 100,
     iceCost,
+    iceUnits,
+    icePriceEach,
     rent: mods.rent,
     needs,
     // Stock was paid for at the depot, but a day still eats this much value.
@@ -1606,7 +1655,7 @@ function cornerOutlook(cityId, cornerIndex) {
 
 /** Everything a city's staffed corners would do in one day, if stocked. */
 function cityOutlook(campaign, cityId) {
-  const ops = campaign.ops;
+  const ops = ensureOpsShape(campaign.ops);
   const staffed = staffedIn(ops, cityId);
   const rows = staffed.map((i) => ({ index: i, ...cornerOutlook(cityId, i) }));
   const sum = (key) => rows.reduce((n, r) => n + r[key], 0);
@@ -1618,32 +1667,69 @@ function cityOutlook(campaign, cityId) {
     }),
     { lemons: 0, sugar: 0, cups: 0 }
   );
+
+  const built = buildingsIn(ops, cityId);
+  const buildingUpkeep = built.reduce((n, id) => n + BUILDINGS[id].upkeep, 0);
+
+  // A farm or factory offsets the wholesale cost of what it can supply.
+  const farmSavings = ['lemons', 'sugar', 'cups'].reduce((n, unit) => {
+    const bId = STOCK_BUILDING_FOR[unit];
+    if (!hasBuilding(ops, cityId, bId)) return n;
+    return n + Math.min(needs[unit], BUILDINGS[bId].dailyYield) * WHOLESALE[unit];
+  }, 0);
+
+  // An ice maker covers ice up to its daily press before the street price applies.
+  const iceUnitsNeeded = sum('iceUnits');
+  const iceCostGross = sum('iceCost');
+  const avgIcePrice = iceUnitsNeeded > 0 ? iceCostGross / iceUnitsNeeded : 0;
+  const freeIce = hasBuilding(ops, cityId, 'iceMaker') ? Math.min(iceUnitsNeeded, BUILDINGS.iceMaker.dailyYield) : 0;
+
   const wages = staffed.length * STAFF_WAGE;
-  const upkeep = hasWarehouse(ops, cityId) ? WAREHOUSE_UPKEEP : 0;
+  const upkeep = (hasWarehouse(ops, cityId) ? WAREHOUSE_UPKEEP : 0) + buildingUpkeep;
   const revenue = Math.round(sum('revenue') * 100) / 100;
-  const stockCost = Math.round(sum('stockCost') * 100) / 100;
-  const costs = Math.round((sum('iceCost') + sum('rent') + wages + upkeep + stockCost) * 100) / 100;
+  const stockCost = Math.round(Math.max(0, sum('stockCost') - farmSavings) * 100) / 100;
+  const iceCost = Math.round(Math.max(0, iceCostGross - freeIce * avgIcePrice) * 100) / 100;
+  const costs = Math.round((iceCost + sum('rent') + wages + upkeep + stockCost) * 100) / 100;
   return {
     cityId,
     corners: rows.length,
     cups: sum('cups'),
     revenue,
     stockCost,
+    iceCost,
+    farmSavings: Math.round(farmSavings * 100) / 100,
     wages,
     upkeep,
+    buildingUpkeep,
+    buildings: built,
     costs,
     net: Math.round((revenue - costs) * 100) / 100,
     needs,
-    daysOfStock: daysOfStock(ops.warehouses[cityId], needs),
+    daysOfStock: daysOfStock(ops.warehouses[cityId], needs, buildingYields(ops, cityId)),
   };
 }
 
-/** How many more days the warehouse can feed this city's staffed corners. */
-function daysOfStock(warehouse, needs) {
+/** What a city's farms and factory add to the depot each day, by unit. */
+function buildingYields(ops, cityId) {
+  const out = { lemons: 0, sugar: 0, cups: 0 };
+  for (const [unit, buildingId] of Object.entries(STOCK_BUILDING_FOR)) {
+    if (hasBuilding(ops, cityId, buildingId)) out[unit] = BUILDINGS[buildingId].dailyYield;
+  }
+  return out;
+}
+
+/**
+ * How many more days the warehouse can feed this city's staffed corners.
+ * `Infinity` means production keeps up (or nothing at all is being drawn
+ * down) — the UI shows that as a steady supply rather than a number of days.
+ */
+function daysOfStock(warehouse, needs, production = { lemons: 0, sugar: 0, cups: 0 }) {
   if (!warehouse) return 0;
-  const per = (unit) => (needs[unit] > 0 ? Math.floor(warehouse.stock[unit] / needs[unit]) : Infinity);
-  const days = Math.min(per('lemons'), per('sugar'), per('cups'));
-  return Number.isFinite(days) ? days : 0;
+  const per = (unit) => {
+    const net = needs[unit] - (production[unit] || 0);
+    return net <= 0 ? Infinity : Math.floor(warehouse.stock[unit] / net);
+  };
+  return Math.min(per('lemons'), per('sugar'), per('cups'));
 }
 
 function networkOutlook(campaign) {
@@ -1663,10 +1749,11 @@ function networkOutlook(campaign) {
  * ------------------------------------------------------------------ */
 
 function buyWarehouse(campaign, cityId) {
-  if (hasWarehouse(campaign.ops, cityId)) return { ok: false, why: 'You already have a depot here.' };
+  const ops = ensureOpsShape(campaign.ops);
+  if (hasWarehouse(ops, cityId)) return { ok: false, why: 'You already have a depot here.' };
   if (campaign.treasury < WAREHOUSE_COST) return { ok: false, why: 'Not enough in the treasury.' };
   campaign.treasury = round2(campaign.treasury - WAREHOUSE_COST);
-  campaign.ops.warehouses[cityId] = {
+  ops.warehouses[cityId] = {
     capacity: WAREHOUSE_BASE_CAPACITY,
     stock: { lemons: 0, sugar: 0, cups: 0 },
   };
@@ -1727,6 +1814,56 @@ function closeStand(campaign, cityId, cornerIndex) {
   return { ok: true };
 }
 
+/** Build one of the four production buildings. One of each per city, at most. */
+function buildBuilding(campaign, cityId, buildingId) {
+  const ops = ensureOpsShape(campaign.ops);
+  const def = BUILDINGS[buildingId];
+  if (!def) return { ok: false, why: 'No such building.' };
+  if (!hasWarehouse(ops, cityId)) return { ok: false, why: 'Build a depot in this city first.' };
+  if (hasBuilding(ops, cityId, buildingId)) return { ok: false, why: 'Already built here.' };
+  if (campaign.treasury < def.cost) return { ok: false, why: 'Not enough in the treasury.' };
+  campaign.treasury = round2(campaign.treasury - def.cost);
+  const cityBuildings = ops.buildings[cityId] || (ops.buildings[cityId] = {});
+  cityBuildings[buildingId] = true;
+  return { ok: true };
+}
+
+/** Buy an unassigned truck. Give it a route with assignTruckRoute. */
+function buyTruck(campaign) {
+  const ops = ensureOpsShape(campaign.ops);
+  if (campaign.treasury < TRUCK_COST) return { ok: false, why: 'Not enough in the treasury.' };
+  campaign.treasury = round2(campaign.treasury - TRUCK_COST);
+  const id = ops.nextTruckId++;
+  ops.trucks.push({ id, from: null, to: null, cargo: 'lemons', amount: 100 });
+  return { ok: true, id };
+}
+
+/** Point a truck at a route: it hauls `amount` of `cargo` from one depot to another, every day. */
+function assignTruckRoute(campaign, truckId, { from, to, cargo, amount }) {
+  const ops = ensureOpsShape(campaign.ops);
+  const truck = ops.trucks.find((t) => t.id === truckId);
+  if (!truck) return { ok: false, why: 'No such truck.' };
+  if (!from || !to) return { ok: false, why: 'Pick both a pickup and a drop-off city.' };
+  if (from === to) return { ok: false, why: 'Pick two different cities.' };
+  if (!hasWarehouse(ops, from) || !hasWarehouse(ops, to)) return { ok: false, why: 'Both ends need a depot.' };
+  if (!TRUCK_CARGO.includes(cargo)) return { ok: false, why: 'Not a haulable good.' };
+  truck.from = from;
+  truck.to = to;
+  truck.cargo = cargo;
+  truck.amount = Math.max(1, Math.round(amount) || 0);
+  return { ok: true };
+}
+
+/** Parks a truck — it costs nothing and moves nothing until reassigned. */
+function unassignTruck(campaign, truckId) {
+  const ops = ensureOpsShape(campaign.ops);
+  const truck = ops.trucks.find((t) => t.id === truckId);
+  if (!truck) return { ok: false, why: 'No such truck.' };
+  truck.from = null;
+  truck.to = null;
+  return { ok: true };
+}
+
 /* ------------------------------------------------------------------ *
  * Time
  * ------------------------------------------------------------------ */
@@ -1734,23 +1871,73 @@ function closeStand(campaign, cityId, cornerIndex) {
 const round2 = (n) => Math.round(n * 100) / 100;
 
 /**
- * Advance the network by `days` (one per day you played by hand). Corners
- * trade only as far as the depot can feed them; anything short goes on the
- * alert list rather than silently vanishing.
+ * Advance the network by `days` (one per day you played by hand). Each day:
+ * farms and factories press their yield into the depot, trucks haul whatever
+ * is sitting there to wherever they are routed, and only then do staffed
+ * corners trade against what is left. Corners trade only as far as the depot
+ * can feed them; anything short goes on the alert list rather than silently
+ * vanishing.
  */
 function tickOps(campaign, days) {
-  const ops = campaign.ops;
+  const ops = ensureOpsShape(campaign.ops);
   if (!ops) return null;
-  const summary = { days, income: 0, costs: 0, cups: 0, stockUsed: { lemons: 0, sugar: 0, cups: 0 }, dry: [] };
+  const summary = {
+    days,
+    income: 0,
+    costs: 0,
+    cups: 0,
+    stockUsed: { lemons: 0, sugar: 0, cups: 0 },
+    produced: { lemons: 0, sugar: 0, cups: 0 },
+    trucked: 0,
+    dry: [],
+  };
 
   for (let d = 0; d < days; d++) {
     ops.day += 1;
+
+    // 1. Farms and the factory press their yield into the depot; the ice
+    //    maker instead banks a free daily allowance for the corners below.
+    const freeIce = {};
+    for (const cityData of CITIES) {
+      const cityId = cityData.id;
+      const built = buildingsIn(ops, cityId);
+      if (built.length === 0) continue;
+      const w = ops.warehouses[cityId];
+      let buildingCost = 0;
+      for (const id of built) {
+        const b = BUILDINGS[id];
+        buildingCost += b.upkeep;
+        if (id === 'iceMaker') freeIce[cityId] = (freeIce[cityId] || 0) + b.dailyYield;
+        else if (w) summary.produced[b.unit] += addStock(w, b.unit, b.dailyYield);
+      }
+      campaign.treasury = round2(campaign.treasury - buildingCost);
+      summary.costs += buildingCost;
+    }
+
+    // 2. Trucks haul cargo between depots before the day's trading starts.
+    for (const truck of ops.trucks) {
+      if (!truck.from || !truck.to) continue;
+      const src = ops.warehouses[truck.from];
+      const dst = ops.warehouses[truck.to];
+      if (!src || !dst) continue;
+      const moved = Math.min(truck.amount, src.stock[truck.cargo], spaceLeft(dst));
+      if (moved > 0) {
+        src.stock[truck.cargo] -= moved;
+        dst.stock[truck.cargo] += moved;
+        summary.trucked += moved;
+      }
+      campaign.treasury = round2(campaign.treasury - TRUCK_UPKEEP);
+      summary.costs += TRUCK_UPKEEP;
+    }
+
+    // 3. Staffed corners trade against whatever the depot now holds.
     for (const cityData of CITIES) {
       const cityId = cityData.id;
       const staffed = staffedIn(ops, cityId);
       if (staffed.length === 0) continue;
       const w = ops.warehouses[cityId];
       const rng = mulberry32(ops.day * 7717 + cityId.length * 131);
+      let cityFreeIce = freeIce[cityId] || 0;
 
       let dayCosts = (hasWarehouse(ops, cityId) ? WAREHOUSE_UPKEEP : 0) + staffed.length * STAFF_WAGE;
       let dayIncome = 0;
@@ -1781,9 +1968,15 @@ function tickOps(campaign, days) {
         summary.stockUsed.lemons += lemonsUsed;
         summary.stockUsed.sugar += sugarUsed;
         summary.stockUsed.cups += canPour;
+
         const share = look.cups > 0 ? canPour / look.cups : 0;
+        const iceNeeded = look.iceUnits * share;
+        const fromFree = Math.min(cityFreeIce, iceNeeded);
+        cityFreeIce -= fromFree;
+        const paidIce = Math.round((iceNeeded - fromFree) * look.icePriceEach * 100) / 100;
+
         dayIncome += look.price * canPour;
-        dayCosts += look.iceCost * share + look.rent;
+        dayCosts += paidIce + look.rent;
         served += canPour;
       }
 
@@ -1811,7 +2004,7 @@ function tickOps(campaign, days) {
   return summary;
 }
 
-  return { bulkDiscount, wholesaleCost, newOps, stockTotal, spaceLeft, cornerOutlook, cityOutlook, daysOfStock, networkOutlook, buyWarehouse, upgradeWarehouse, restock, restockCost, hireStaff, closeStand, tickOps, WAREHOUSE_COST, WAREHOUSE_BASE_CAPACITY, CAPACITY_UPGRADE_COST, CAPACITY_UPGRADE_STEP, STAFF_HIRE_COST, STAFF_WAGE, WAREHOUSE_UPKEEP, WHOLESALE, hasWarehouse, staffedIn, isStaffed };
+  return { bulkDiscount, wholesaleCost, newOps, stockTotal, spaceLeft, cornerOutlook, cityOutlook, daysOfStock, networkOutlook, buyWarehouse, upgradeWarehouse, restock, restockCost, hireStaff, closeStand, buildBuilding, buyTruck, assignTruckRoute, unassignTruck, tickOps, WAREHOUSE_COST, WAREHOUSE_BASE_CAPACITY, CAPACITY_UPGRADE_COST, CAPACITY_UPGRADE_STEP, STAFF_HIRE_COST, STAFF_WAGE, WAREHOUSE_UPKEEP, WHOLESALE, BUILDINGS, TRUCK_COST, TRUCK_UPKEEP, TRUCK_CARGO, hasWarehouse, staffedIn, isStaffed, buildingsIn, hasBuilding };
 })();
 
 /* ---- js/store.js ---- */
@@ -1837,6 +2030,8 @@ const store = {
     restock: { lemons: 0, sugar: 0, cups: 0 },
     pending: null,      // simulated day awaiting its report
     opsReport: null,    // what the network did while you were working
+    editingTruck: null, // id of the truck whose route is being set, or null
+    truckDraft: null,   // { from, to, cargo, amount } while editingTruck is set
     lastKey: null,
     notice: null,
   },
@@ -2073,6 +2268,10 @@ function opsReportCard(report) {
       ${units > 0
         ? `<p class="muted">It drew ${units} units out of your depots — about ${money(restockCost(used))} to replace.</p>`
         : ''}
+      ${report.produced && (report.produced.lemons + report.produced.sugar + report.produced.cups) > 0
+        ? `<p class="muted">Farms and the factory pressed ${report.produced.lemons + report.produced.sugar + report.produced.cups} units straight into the depots, for free.</p>`
+        : ''}
+      ${report.trucked > 0 ? `<p class="muted">Trucks hauled ${report.trucked} units between depots.</p>` : ''}
       ${report.dry.length ? `<p class="warn">⚠️ Ran short in ${report.dry.map((id) => C.getCity(id).name).join(', ')}.</p>` : ''}
     </div>`;
 }
@@ -2676,6 +2875,9 @@ const { money, whole, fact, bar, backBar, row, stepper, tierPill } = __modules["
 
 const ops = () => store.campaign.ops;
 
+const CARGO_ICON = { lemons: '🍋', sugar: '🥄', cups: '🥤' };
+const CARGO_LABEL = { lemons: 'lemons', sugar: 'sugar', cups: 'paper cups' };
+
 /* ------------------------------------------------------------------ *
  * Network overview
  * ------------------------------------------------------------------ */
@@ -2704,6 +2906,8 @@ function opsScreen() {
       </button>`;
   }).join('');
 
+  const editing = store.ui.editingTruck != null ? ops().trucks.find((t) => t.id === store.ui.editingTruck) : null;
+
   return {
     body: `
       ${backBar('The Map', 'to-world')}
@@ -2721,9 +2925,105 @@ function opsScreen() {
       ${ops().alerts.length
         ? `<div class="card warn-card"><h2>Alerts</h2>${ops().alerts.map((a) => `<p>⚠️ ${a.text}</p>`).join('')}</div>`
         : ''}
+      ${editing ? truckEditorCard(editing) : trucksCard()}
       <div class="city-list">${rows || '<p class="muted center">Claim some corners first.</p>'}</div>`,
-    actions: `<button class="btn" data-act="to-world">Back to the Map</button>`,
+    actions: editing
+      ? `<button class="btn" data-act="confirm-truck-route" ${store.ui.truckDraft.from && store.ui.truckDraft.to ? '' : 'disabled'}>Set Route</button>
+         <button class="btn-ghost" data-act="cancel-truck-edit">Cancel</button>`
+      : `<button class="btn" data-act="to-world">Back to the Map</button>`,
   };
+}
+
+function truckRouteLabel(truck) {
+  if (!truck.from || !truck.to) return 'Not assigned yet';
+  const from = C.getCity(truck.from);
+  const to = C.getCity(truck.to);
+  return `${from.flag} ${from.name} → ${to.flag} ${to.name} · ${truck.amount} ${CARGO_LABEL[truck.cargo]}/day`;
+}
+
+function trucksCard() {
+  const trucks = ops().trucks;
+  const rows = trucks.map((truck) => `
+    <div class="row">
+      <div class="row-main">
+        <div class="row-name">Truck #${truck.id}</div>
+        <div class="row-sub">${truckRouteLabel(truck)}</div>
+      </div>
+      <button class="chip" data-act="edit-truck" data-truck="${truck.id}">${truck.from ? 'Reroute' : 'Assign'}</button>
+    </div>`).join('');
+
+  return `
+    <div class="card">
+      <h2>Trucks</h2>
+      ${rows || '<p class="muted">No trucks yet — buy one to start hauling stock between your depots.</p>'}
+      <div class="chip-row" style="margin-top:10px">
+        <button class="chip" data-act="buy-truck" ${store.campaign.treasury < O.TRUCK_COST ? 'disabled' : ''}>
+          🚚 Buy Truck · ${money(O.TRUCK_COST)}
+        </button>
+      </div>
+      <p class="muted" style="margin-top:10px">A truck hauls one good between two depots every day, for ${money(O.TRUCK_UPKEEP)} a day while it has a route.</p>
+    </div>`;
+}
+
+function truckEditorCard(truck) {
+  const depotCities = C.CITIES.filter((c) => O.hasWarehouse(ops(), c.id));
+  const draft = store.ui.truckDraft;
+  const cityChip = (city, group) => `
+    <button class="chip ${draft[group] === city.id ? 'chip-on' : ''}" data-act="truck-pick-${group}" data-city="${city.id}">
+      ${city.flag} ${city.name}
+    </button>`;
+
+  return `
+    <div class="card">
+      <h2>Route for Truck #${truck.id}</h2>
+      ${depotCities.length < 2
+        ? '<p class="muted">You need depots in at least two cities before a truck has anywhere to run.</p>'
+        : `
+          <p class="row-sub">Pick up in</p>
+          <div class="chip-row">${depotCities.map((c) => cityChip(c, 'from')).join('')}</div>
+          <p class="row-sub" style="margin-top:12px">Drop off in</p>
+          <div class="chip-row">${depotCities.filter((c) => c.id !== draft.from).map((c) => cityChip(c, 'to')).join('')}</div>
+          <p class="row-sub" style="margin-top:12px">Cargo</p>
+          <div class="chip-row">
+            ${O.TRUCK_CARGO.map((cargo) => `
+              <button class="chip ${draft.cargo === cargo ? 'chip-on' : ''}" data-act="truck-pick-cargo" data-cargo="${cargo}">
+                ${CARGO_ICON[cargo]} ${CARGO_LABEL[cargo]}
+              </button>`).join('')}
+          </div>
+          ${row('Amount per day', null, stepper('truckDraft', 'amount', draft.amount, 25, 25, 2000))}
+        `}
+    </div>`;
+}
+
+function stockDaysLabel(days) {
+  if (!Number.isFinite(days)) return 'production is keeping up — steady supply';
+  return `about <strong>${days}</strong> day${days === 1 ? '' : 's'} of stock`;
+}
+
+function buildingsCard(campaign, cityId) {
+  const rows = Object.values(O.BUILDINGS).map((b) => {
+    const built = O.hasBuilding(ops(), cityId, b.id);
+    const yieldLabel = b.id === 'iceMaker'
+      ? `${b.dailyYield} free ice cubes/day`
+      : `${b.dailyYield} ${b.unit}/day`;
+    return `<div class="row">
+        <div class="row-main">
+          <div class="row-name">${b.icon} ${b.label}</div>
+          <div class="row-sub">${built ? `Built · ${yieldLabel}` : `${yieldLabel} · ${money(b.upkeep)}/day upkeep`}</div>
+        </div>
+        ${built
+          ? '<span class="chip chip-on">Built ✓</span>'
+          : `<button class="chip" data-act="build-building" data-city="${cityId}" data-building="${b.id}"
+               ${campaign.treasury < b.cost ? 'disabled' : ''}>Build ${money(b.cost)}</button>`}
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="card">
+      <h2>Farms &amp; Factories</h2>
+      ${rows}
+      <p class="muted" style="margin-top:10px">A farm or factory feeds this depot for free, up to its daily output. The ice maker never stocks ice — it just covers what corners need before they pay street price.</p>
+    </div>`;
 }
 
 /* ------------------------------------------------------------------ *
@@ -2800,7 +3100,7 @@ function opsCityScreen() {
         <h2>Depot</h2>
         ${bar(O.stockTotal(depot) / depot.capacity, look && look.daysOfStock <= 2 ? 'bar-warn' : '')}
         <p class="muted" style="margin-top:8px">${O.stockTotal(depot)} of ${depot.capacity} units held${
-          look ? ` · about <strong>${look.daysOfStock}</strong> day${look.daysOfStock === 1 ? '' : 's'} of stock` : ''}</p>
+          look ? ` · ${stockDaysLabel(look.daysOfStock)}` : ''}</p>
         ${stockRow('lemons', 'Lemons 🍋')}
         ${stockRow('sugar', 'Sugar 🥄')}
         ${stockRow('cups', 'Paper cups 🥤')}
@@ -2816,6 +3116,7 @@ function opsCityScreen() {
         </div>
         ${units > space ? `<p class="warn" style="margin-top:10px">Only ${space} units of space left.</p>` : ''}
       </div>
+      ${buildingsCard(campaign, cityId)}
       <div class="card">
         <h2>Corners you own here</h2>
         ${staffRows || '<p class="muted">No claimed corners in this city yet.</p>'}
@@ -2829,6 +3130,8 @@ function opsCityScreen() {
           ${fact('Stock used', money(look.stockCost))}
           ${fact('Net', money(look.net), look.net >= 0 ? 'good' : 'bad')}
         </div>
+        ${look.farmSavings > 0 ? `<p class="muted" style="margin-top:8px">Farms and the factory are covering ${money(look.farmSavings)} of that stock for free.</p>` : ''}
+        ${look.buildingUpkeep > 0 ? `<p class="muted">Building upkeep: ${money(look.buildingUpkeep)}/day.</p>` : ''}
       </div>` : ''}`,
     actions: `
       <button class="btn" data-act="confirm-restock" data-city="${cityId}"
@@ -2932,6 +3235,45 @@ const actions = {
     const result = O.restock(store.campaign, el.dataset.city, store.ui.restock);
     if (result.ok) store.ui.restock = emptyRestock();
     else store.ui.notice = result.why;
+  },
+  'build-building': (el) => {
+    const result = O.buildBuilding(store.campaign, el.dataset.city, el.dataset.building);
+    store.ui.notice = result.ok ? null : result.why;
+  },
+  'buy-truck': () => {
+    const result = O.buyTruck(store.campaign);
+    if (result.ok) {
+      store.ui.editingTruck = result.id;
+      store.ui.truckDraft = { from: null, to: null, cargo: 'lemons', amount: 100 };
+    } else {
+      store.ui.notice = result.why;
+    }
+  },
+  'edit-truck': (el) => {
+    const id = Number(el.dataset.truck);
+    const truck = ops().trucks.find((t) => t.id === id);
+    if (!truck) return;
+    store.ui.editingTruck = id;
+    store.ui.truckDraft = { from: truck.from, to: truck.to, cargo: truck.cargo, amount: truck.amount };
+  },
+  'cancel-truck-edit': () => {
+    store.ui.editingTruck = null;
+    store.ui.truckDraft = null;
+  },
+  'truck-pick-from': (el) => {
+    store.ui.truckDraft.from = el.dataset.city;
+    if (store.ui.truckDraft.to === el.dataset.city) store.ui.truckDraft.to = null;
+  },
+  'truck-pick-to': (el) => { store.ui.truckDraft.to = el.dataset.city; },
+  'truck-pick-cargo': (el) => { store.ui.truckDraft.cargo = el.dataset.cargo; },
+  'confirm-truck-route': () => {
+    const result = O.assignTruckRoute(store.campaign, store.ui.editingTruck, store.ui.truckDraft);
+    if (result.ok) {
+      store.ui.editingTruck = null;
+      store.ui.truckDraft = null;
+    } else {
+      store.ui.notice = result.why;
+    }
   },
 };
 
@@ -3060,14 +3402,15 @@ const LIMITS = {
   price: { price: [0.05, 5] },
   order: { lemons: [0, 9999], sugar: [0, 9999], ice: [0, 9999], cups: [0, 9999] },
   restock: { lemons: [0, 99999], sugar: [0, 99999], cups: [0, 99999] },
+  truckDraft: { amount: [25, 2000] },
 };
 
 /** Apply one tap of a stepper. Returns false when it could not move. */
 function applyStep(group, field, step) {
   const [min, max] = LIMITS[group][field];
-  const r = store.run;
 
   if (group === 'order') {
+    const r = store.run;
     const next = clamp(store.ui.order[field] + step, min, max);
     const trial = { ...store.ui.order, [field]: next };
     if (step > 0 && S.buyCost(r.today.prices, trial) > r.money) return false; // never overspend
@@ -3079,11 +3422,15 @@ function applyStep(group, field, step) {
     const trial = { ...store.ui.restock, [field]: next };
     return acceptRestock(trial, field, next);
   }
-  if (group === 'price') {
-    r.price = Math.round(clamp(r.price + step, min, max) * 100) / 100;
+  if (group === 'truckDraft') {
+    store.ui.truckDraft[field] = clamp(store.ui.truckDraft[field] + step, min, max);
     return true;
   }
-  r.recipe[field] = clamp(r.recipe[field] + step, min, max);
+  if (group === 'price') {
+    store.run.price = Math.round(clamp(store.run.price + step, min, max) * 100) / 100;
+    return true;
+  }
+  store.run.recipe[field] = clamp(store.run.recipe[field] + step, min, max);
   return true;
 }
 
@@ -3169,15 +3516,21 @@ render();
     campaign.treasury = 5000;
     campaign.ops = O.newOps();
 
-    // NYC: a fully stocked, fully staffed depot — the screen worth landing on.
+    // NYC: a fully stocked, fully staffed depot with a farm and an ice maker
+    // already running — the screen worth landing on.
     O.buyWarehouse(campaign, 'nyc');
     O.restock(campaign, 'nyc', { lemons: 500, sugar: 500, cups: 1000 });
+    O.buildBuilding(campaign, 'nyc', 'lemonFarm');
+    O.buildBuilding(campaign, 'nyc', 'iceMaker');
     for (let i = 0; i < 6; i++) O.hireStaff(campaign, 'nyc', i);
 
-    // Austin: a smaller operation, so the network overview shows more than one city.
+    // Austin: a smaller operation, so the network overview shows more than one
+    // city, and a truck to show the distribution side of things.
     O.buyWarehouse(campaign, 'austin');
-    O.restock(campaign, 'austin', { lemons: 150, sugar: 150, cups: 300 });
+    O.restock(campaign, 'austin', { lemons: 60, sugar: 150, cups: 300 });
     for (let i = 0; i < 2; i++) O.hireStaff(campaign, 'austin', i);
+    const truck = O.buyTruck(campaign);
+    O.assignTruckRoute(campaign, truck.id, { from: 'nyc', to: 'austin', cargo: 'lemons', amount: 150 });
 
     O.tickOps(campaign, 3); // a few days of history so the ledger isn't empty
 

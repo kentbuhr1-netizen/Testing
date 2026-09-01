@@ -6,6 +6,9 @@ import { money, whole, fact, bar, backBar, row, stepper, tierPill } from './kit.
 
 const ops = () => store.campaign.ops;
 
+const CARGO_ICON = { lemons: '🍋', sugar: '🥄', cups: '🥤' };
+const CARGO_LABEL = { lemons: 'lemons', sugar: 'sugar', cups: 'paper cups' };
+
 /* ------------------------------------------------------------------ *
  * Network overview
  * ------------------------------------------------------------------ */
@@ -34,6 +37,8 @@ function opsScreen() {
       </button>`;
   }).join('');
 
+  const editing = store.ui.editingTruck != null ? ops().trucks.find((t) => t.id === store.ui.editingTruck) : null;
+
   return {
     body: `
       ${backBar('The Map', 'to-world')}
@@ -51,9 +56,105 @@ function opsScreen() {
       ${ops().alerts.length
         ? `<div class="card warn-card"><h2>Alerts</h2>${ops().alerts.map((a) => `<p>⚠️ ${a.text}</p>`).join('')}</div>`
         : ''}
+      ${editing ? truckEditorCard(editing) : trucksCard()}
       <div class="city-list">${rows || '<p class="muted center">Claim some corners first.</p>'}</div>`,
-    actions: `<button class="btn" data-act="to-world">Back to the Map</button>`,
+    actions: editing
+      ? `<button class="btn" data-act="confirm-truck-route" ${store.ui.truckDraft.from && store.ui.truckDraft.to ? '' : 'disabled'}>Set Route</button>
+         <button class="btn-ghost" data-act="cancel-truck-edit">Cancel</button>`
+      : `<button class="btn" data-act="to-world">Back to the Map</button>`,
   };
+}
+
+function truckRouteLabel(truck) {
+  if (!truck.from || !truck.to) return 'Not assigned yet';
+  const from = C.getCity(truck.from);
+  const to = C.getCity(truck.to);
+  return `${from.flag} ${from.name} → ${to.flag} ${to.name} · ${truck.amount} ${CARGO_LABEL[truck.cargo]}/day`;
+}
+
+function trucksCard() {
+  const trucks = ops().trucks;
+  const rows = trucks.map((truck) => `
+    <div class="row">
+      <div class="row-main">
+        <div class="row-name">Truck #${truck.id}</div>
+        <div class="row-sub">${truckRouteLabel(truck)}</div>
+      </div>
+      <button class="chip" data-act="edit-truck" data-truck="${truck.id}">${truck.from ? 'Reroute' : 'Assign'}</button>
+    </div>`).join('');
+
+  return `
+    <div class="card">
+      <h2>Trucks</h2>
+      ${rows || '<p class="muted">No trucks yet — buy one to start hauling stock between your depots.</p>'}
+      <div class="chip-row" style="margin-top:10px">
+        <button class="chip" data-act="buy-truck" ${store.campaign.treasury < O.TRUCK_COST ? 'disabled' : ''}>
+          🚚 Buy Truck · ${money(O.TRUCK_COST)}
+        </button>
+      </div>
+      <p class="muted" style="margin-top:10px">A truck hauls one good between two depots every day, for ${money(O.TRUCK_UPKEEP)} a day while it has a route.</p>
+    </div>`;
+}
+
+function truckEditorCard(truck) {
+  const depotCities = C.CITIES.filter((c) => O.hasWarehouse(ops(), c.id));
+  const draft = store.ui.truckDraft;
+  const cityChip = (city, group) => `
+    <button class="chip ${draft[group] === city.id ? 'chip-on' : ''}" data-act="truck-pick-${group}" data-city="${city.id}">
+      ${city.flag} ${city.name}
+    </button>`;
+
+  return `
+    <div class="card">
+      <h2>Route for Truck #${truck.id}</h2>
+      ${depotCities.length < 2
+        ? '<p class="muted">You need depots in at least two cities before a truck has anywhere to run.</p>'
+        : `
+          <p class="row-sub">Pick up in</p>
+          <div class="chip-row">${depotCities.map((c) => cityChip(c, 'from')).join('')}</div>
+          <p class="row-sub" style="margin-top:12px">Drop off in</p>
+          <div class="chip-row">${depotCities.filter((c) => c.id !== draft.from).map((c) => cityChip(c, 'to')).join('')}</div>
+          <p class="row-sub" style="margin-top:12px">Cargo</p>
+          <div class="chip-row">
+            ${O.TRUCK_CARGO.map((cargo) => `
+              <button class="chip ${draft.cargo === cargo ? 'chip-on' : ''}" data-act="truck-pick-cargo" data-cargo="${cargo}">
+                ${CARGO_ICON[cargo]} ${CARGO_LABEL[cargo]}
+              </button>`).join('')}
+          </div>
+          ${row('Amount per day', null, stepper('truckDraft', 'amount', draft.amount, 25, 25, 2000))}
+        `}
+    </div>`;
+}
+
+function stockDaysLabel(days) {
+  if (!Number.isFinite(days)) return 'production is keeping up — steady supply';
+  return `about <strong>${days}</strong> day${days === 1 ? '' : 's'} of stock`;
+}
+
+function buildingsCard(campaign, cityId) {
+  const rows = Object.values(O.BUILDINGS).map((b) => {
+    const built = O.hasBuilding(ops(), cityId, b.id);
+    const yieldLabel = b.id === 'iceMaker'
+      ? `${b.dailyYield} free ice cubes/day`
+      : `${b.dailyYield} ${b.unit}/day`;
+    return `<div class="row">
+        <div class="row-main">
+          <div class="row-name">${b.icon} ${b.label}</div>
+          <div class="row-sub">${built ? `Built · ${yieldLabel}` : `${yieldLabel} · ${money(b.upkeep)}/day upkeep`}</div>
+        </div>
+        ${built
+          ? '<span class="chip chip-on">Built ✓</span>'
+          : `<button class="chip" data-act="build-building" data-city="${cityId}" data-building="${b.id}"
+               ${campaign.treasury < b.cost ? 'disabled' : ''}>Build ${money(b.cost)}</button>`}
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="card">
+      <h2>Farms &amp; Factories</h2>
+      ${rows}
+      <p class="muted" style="margin-top:10px">A farm or factory feeds this depot for free, up to its daily output. The ice maker never stocks ice — it just covers what corners need before they pay street price.</p>
+    </div>`;
 }
 
 /* ------------------------------------------------------------------ *
@@ -130,7 +231,7 @@ function opsCityScreen() {
         <h2>Depot</h2>
         ${bar(O.stockTotal(depot) / depot.capacity, look && look.daysOfStock <= 2 ? 'bar-warn' : '')}
         <p class="muted" style="margin-top:8px">${O.stockTotal(depot)} of ${depot.capacity} units held${
-          look ? ` · about <strong>${look.daysOfStock}</strong> day${look.daysOfStock === 1 ? '' : 's'} of stock` : ''}</p>
+          look ? ` · ${stockDaysLabel(look.daysOfStock)}` : ''}</p>
         ${stockRow('lemons', 'Lemons 🍋')}
         ${stockRow('sugar', 'Sugar 🥄')}
         ${stockRow('cups', 'Paper cups 🥤')}
@@ -146,6 +247,7 @@ function opsCityScreen() {
         </div>
         ${units > space ? `<p class="warn" style="margin-top:10px">Only ${space} units of space left.</p>` : ''}
       </div>
+      ${buildingsCard(campaign, cityId)}
       <div class="card">
         <h2>Corners you own here</h2>
         ${staffRows || '<p class="muted">No claimed corners in this city yet.</p>'}
@@ -159,6 +261,8 @@ function opsCityScreen() {
           ${fact('Stock used', money(look.stockCost))}
           ${fact('Net', money(look.net), look.net >= 0 ? 'good' : 'bad')}
         </div>
+        ${look.farmSavings > 0 ? `<p class="muted" style="margin-top:8px">Farms and the factory are covering ${money(look.farmSavings)} of that stock for free.</p>` : ''}
+        ${look.buildingUpkeep > 0 ? `<p class="muted">Building upkeep: ${money(look.buildingUpkeep)}/day.</p>` : ''}
       </div>` : ''}`,
     actions: `
       <button class="btn" data-act="confirm-restock" data-city="${cityId}"
@@ -262,5 +366,44 @@ export const actions = {
     const result = O.restock(store.campaign, el.dataset.city, store.ui.restock);
     if (result.ok) store.ui.restock = emptyRestock();
     else store.ui.notice = result.why;
+  },
+  'build-building': (el) => {
+    const result = O.buildBuilding(store.campaign, el.dataset.city, el.dataset.building);
+    store.ui.notice = result.ok ? null : result.why;
+  },
+  'buy-truck': () => {
+    const result = O.buyTruck(store.campaign);
+    if (result.ok) {
+      store.ui.editingTruck = result.id;
+      store.ui.truckDraft = { from: null, to: null, cargo: 'lemons', amount: 100 };
+    } else {
+      store.ui.notice = result.why;
+    }
+  },
+  'edit-truck': (el) => {
+    const id = Number(el.dataset.truck);
+    const truck = ops().trucks.find((t) => t.id === id);
+    if (!truck) return;
+    store.ui.editingTruck = id;
+    store.ui.truckDraft = { from: truck.from, to: truck.to, cargo: truck.cargo, amount: truck.amount };
+  },
+  'cancel-truck-edit': () => {
+    store.ui.editingTruck = null;
+    store.ui.truckDraft = null;
+  },
+  'truck-pick-from': (el) => {
+    store.ui.truckDraft.from = el.dataset.city;
+    if (store.ui.truckDraft.to === el.dataset.city) store.ui.truckDraft.to = null;
+  },
+  'truck-pick-to': (el) => { store.ui.truckDraft.to = el.dataset.city; },
+  'truck-pick-cargo': (el) => { store.ui.truckDraft.cargo = el.dataset.cargo; },
+  'confirm-truck-route': () => {
+    const result = O.assignTruckRoute(store.campaign, store.ui.editingTruck, store.ui.truckDraft);
+    if (result.ok) {
+      store.ui.editingTruck = null;
+      store.ui.truckDraft = null;
+    } else {
+      store.ui.notice = result.why;
+    }
   },
 };

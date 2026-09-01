@@ -19,6 +19,8 @@ export const store = {
     restock: { lemons: 0, sugar: 0, cups: 0 },
     pending: null,      // simulated day awaiting its report
     opsReport: null,    // what the network did while you were working
+    editingTruck: null, // id of the truck whose route is being set, or null
+    truckDraft: null,   // { from, to, cargo, amount } while editingTruck is set
     lastKey: null,
     notice: null,
   },
