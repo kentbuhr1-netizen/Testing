@@ -2,40 +2,71 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
-<title>Lemonade Stand</title>
-<meta name="description" content="The classic lemonade stand game. Read the weather, mix the pitcher, set your price, and run a 30-day season." />
-<meta name="theme-color" content="#f7c948" />
-<meta name="mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="default" />
-<meta name="apple-mobile-web-app-title" content="Lemonade" />
-<link rel="manifest" href="manifest.webmanifest" />
-<link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
-<link rel="apple-touch-icon" href="icons/icon-180.png" />
-<link rel="stylesheet" href="css/styles.css" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Games</title>
+<meta name="description" content="A series of phone-first browser games. One new game a week." />
+<meta name="theme-color" content="#1c2718" />
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f4f5f2; --card: #fff; --ink: #1b2118; --soft: #626b5e; --line: #dfe3da;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14170f; --card: #1d2118; --ink: #eef1e9; --soft: #99a292; --line: #2c3227; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
+    font: 16px/1.5 ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, -apple-system, sans-serif;
+    display: flex; justify-content: center;
+    padding: 40px 20px calc(40px + env(safe-area-inset-bottom));
+  }
+  main { width: 100%; max-width: 460px; }
+  h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: -.02em; }
+  .sub { margin: 0 0 28px; color: var(--soft); }
+  a.game {
+    display: flex; align-items: center; gap: 16px;
+    padding: 16px 18px; margin-bottom: 12px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+    text-decoration: none; color: inherit;
+    box-shadow: 0 1px 0 rgba(20,40,10,.04), 0 8px 24px rgba(30,60,20,.07);
+  }
+  a.game:active { transform: scale(.99); }
+  .emoji { font-size: 34px; line-height: 1; flex: none; }
+  .name { font-weight: 700; font-size: 17px; }
+  .blurb { font-size: 13.5px; color: var(--soft); }
+  footer { margin-top: 26px; font-size: 13px; color: var(--soft); }
+  footer a { color: inherit; }
+</style>
 </head>
 <body>
-  <div id="app" class="app">
-    <header id="hud" class="hud" hidden>
-      <div class="hud-item">
-        <span class="hud-label">Day</span>
-        <span class="hud-value" id="hud-day">1</span>
-      </div>
-      <div class="hud-item">
-        <span class="hud-label">Cash</span>
-        <span class="hud-value" id="hud-money">$20.00</span>
-      </div>
-      <div class="hud-item hud-rep">
-        <span class="hud-label">Reputation</span>
-        <span class="meter" role="img" aria-label="Reputation"><i id="hud-rep-fill"></i></span>
-      </div>
-    </header>
+  <main>
+    <h1>Games</h1>
+    <p class="sub">Phone-first, offline, no build step. One new one a week.</p>
 
-    <main id="screen" class="screen" aria-live="polite"></main>
+    <a class="game" href="games/lemonade/">
+      <span class="emoji">🍋</span>
+      <span>
+        <span class="name">Lemonade Stand</span><br />
+        <span class="blurb">Read the weather, mix the pitcher, set your price.</span>
+      </span>
+    </a>
+    <a class="game" href="games/outbreak/">
+      <span class="emoji">🦠</span>
+      <span>
+        <span class="name">Outbreak</span><br />
+        <span class="blurb">Contain an epidemic with four levers that fight each other.</span>
+      </span>
+    </a>
+    <a class="game" href="games/the-round/">
+      <span class="emoji">🌱</span>
+      <span>
+        <span class="name">The Round</span><br />
+        <span class="blurb">Plan a grass-cutting round against the daylight.</span>
+      </span>
+    </a>
 
-    <footer id="actions" class="actions" hidden></footer>
-  </div>
-  <script type="module" src="js/app.js"></script>
+    <footer>Add any of them to your home screen and it runs offline.</footer>
+  </main>
 </body>
 </html>

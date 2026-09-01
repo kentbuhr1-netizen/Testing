@@ -25,7 +25,7 @@ const SOURCES = [
 ];
 
 const GAMES = [
-  { name: 'lemonade', dir: '.' },
+  { name: 'lemonade', dir: 'games/lemonade' },
   { name: 'outbreak', dir: 'games/outbreak' },
   { name: 'the-round', dir: 'games/the-round' },
 ];
