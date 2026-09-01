@@ -57,7 +57,7 @@ function opsScreen() {
       ${ops().alerts.length
         ? `<div class="card warn-card"><h2>Alerts</h2>${ops().alerts.map((a) => `<p>⚠️ ${a.text}</p>`).join('')}</div>`
         : ''}
-      ${editing ? truckEditorCard(editing) : trucksCard()}
+      ${editing ? truckEditorCard(editing) : fleetCard()}
       ${officeCard(campaign)}
       <div class="city-list">${rows || '<p class="muted center">Claim some corners first.</p>'}</div>`,
     actions: editing
@@ -74,27 +74,33 @@ function truckRouteLabel(truck) {
   return `${from.flag} ${from.name} → ${to.flag} ${to.name} · ${truck.amount} ${CARGO_LABEL[truck.cargo]}/day`;
 }
 
-function trucksCard() {
-  const trucks = ops().trucks;
-  const rows = trucks.map((truck) => `
-    <div class="row">
+/** The whole fleet: domestic trucks plus overseas ships and planes, bought by tier. */
+function fleetCard() {
+  const campaign = store.campaign;
+  const vehicles = ops().trucks;
+  const rows = vehicles.map((v) => {
+    const def = O.VEHICLES[v.tier] || O.VEHICLES.semi;
+    return `<div class="row">
       <div class="row-main">
-        <div class="row-name">Truck #${truck.id}</div>
-        <div class="row-sub">${truckRouteLabel(truck)}</div>
+        <div class="row-name">${def.icon} ${def.label} #${v.id}</div>
+        <div class="row-sub">${truckRouteLabel(v)}</div>
       </div>
-      <button class="chip" data-act="edit-truck" data-truck="${truck.id}">${truck.from ? 'Reroute' : 'Assign'}</button>
-    </div>`).join('');
+      <button class="chip" data-act="edit-truck" data-truck="${v.id}">${v.from ? 'Reroute' : 'Assign'}</button>
+    </div>`;
+  }).join('');
+
+  const buyButtons = Object.values(O.VEHICLES).map((def) => `
+    <button class="chip" data-act="buy-truck" data-tier="${def.id}" ${campaign.treasury < def.cost ? 'disabled' : ''}>
+      ${def.icon} ${def.label} · ${money(def.cost)}
+    </button>`).join('');
 
   return `
     <div class="card">
-      <h2>Trucks</h2>
-      ${rows || '<p class="muted">No trucks yet — buy one to start hauling stock between your depots.</p>'}
-      <div class="chip-row" style="margin-top:10px">
-        <button class="chip" data-act="buy-truck" ${store.campaign.treasury < O.TRUCK_COST ? 'disabled' : ''}>
-          🚚 Buy Truck · ${money(O.TRUCK_COST)}
-        </button>
-      </div>
-      <p class="muted" style="margin-top:10px">A truck hauls one good between two depots every day, for ${money(O.effectiveTruckUpkeep(store.campaign))} a day while it has a route.</p>
+      <h2>Fleet</h2>
+      ${rows || '<p class="muted">Nothing bought yet — a truck moves stock within a region; a ship or plane crosses to the other one.</p>'}
+      <div class="chip-row" style="margin-top:10px">${buyButtons}</div>
+      <p class="muted" style="margin-top:10px">Trucks haul up to their tier's daily maximum within one region.
+        Ships and planes only cross between the US and Europe — a plane costs less to buy, a ship hauls far more per day.</p>
     </div>`;
 }
 
@@ -126,8 +132,17 @@ function officeCard(campaign) {
 }
 
 function truckEditorCard(truck) {
+  const def = O.VEHICLES[truck.tier] || O.VEHICLES.semi;
   const depotCities = C.CITIES.filter((c) => O.hasWarehouse(ops(), c.id));
   const draft = store.ui.truckDraft;
+  const fromCity = draft.from ? C.getCity(draft.from) : null;
+  // A truck only pairs same-region depots; a ship or plane only pairs different-region ones.
+  const toCities = depotCities.filter((c) => {
+    if (c.id === draft.from) return false;
+    if (!fromCity) return true;
+    const sameRegion = c.region === fromCity.region;
+    return def.overseas ? !sameRegion : sameRegion;
+  });
   const cityChip = (city, group) => `
     <button class="chip ${draft[group] === city.id ? 'chip-on' : ''}" data-act="truck-pick-${group}" data-city="${city.id}">
       ${city.flag} ${city.name}
@@ -135,14 +150,16 @@ function truckEditorCard(truck) {
 
   return `
     <div class="card">
-      <h2>Route for Truck #${truck.id}</h2>
+      <h2>Route for ${def.icon} ${def.label} #${truck.id}</h2>
+      <p class="muted">${def.overseas ? 'Crosses between the US and Europe only.' : 'Stays within one region — US to US, or EU to EU.'}
+        Hauls up to ${def.maxAmount}/day.</p>
       ${depotCities.length < 2
-        ? '<p class="muted">You need depots in at least two cities before a truck has anywhere to run.</p>'
+        ? '<p class="muted">You need depots in at least two cities before this can run anywhere.</p>'
         : `
           <p class="row-sub">Pick up in</p>
           <div class="chip-row">${depotCities.map((c) => cityChip(c, 'from')).join('')}</div>
           <p class="row-sub" style="margin-top:12px">Drop off in</p>
-          <div class="chip-row">${depotCities.filter((c) => c.id !== draft.from).map((c) => cityChip(c, 'to')).join('')}</div>
+          <div class="chip-row">${toCities.map((c) => cityChip(c, 'to')).join('') || '<span class="muted">No matching depot yet.</span>'}</div>
           <p class="row-sub" style="margin-top:12px">Cargo</p>
           <div class="chip-row">
             ${O.TRUCK_CARGO.map((cargo) => `
@@ -150,7 +167,7 @@ function truckEditorCard(truck) {
                 ${CARGO_ICON[cargo]} ${CARGO_LABEL[cargo]}
               </button>`).join('')}
           </div>
-          ${row('Amount per day', null, stepper('truckDraft', 'amount', draft.amount, 25, 25, 2000))}
+          ${row('Amount per day', null, stepper('truckDraft', 'amount', draft.amount, 25, 25, def.maxAmount))}
         `}
     </div>`;
 }
@@ -162,19 +179,25 @@ function stockDaysLabel(days) {
 
 function buildingsCard(campaign, cityId) {
   const rows = Object.values(O.BUILDINGS).map((b) => {
-    const built = O.hasBuilding(ops(), cityId, b.id);
-    const yieldLabel = b.id === 'iceMaker'
-      ? `${b.dailyYield} free ice cubes/day`
-      : `${b.dailyYield} ${b.unit}/day`;
+    const level = O.buildingLevel(ops(), cityId, b.id);
+    const built = level >= 1;
+    const yieldNow = built ? O.buildingYieldFor(b.id, level) : b.dailyYield;
+    const upkeepNow = built ? O.buildingUpkeepFor(b.id, level) : b.upkeep;
+    const yieldLabel = b.id === 'iceMaker' ? `${yieldNow} free ice cubes/day` : `${yieldNow} ${b.unit}/day`;
+    const maxed = level >= O.BUILDING_MAX_LEVEL;
+    const upgradeCost = built && !maxed ? O.buildingUpgradeCost(level) : 0;
     return `<div class="row">
         <div class="row-main">
-          <div class="row-name">${b.icon} ${b.label}</div>
-          <div class="row-sub">${built ? `Built · ${yieldLabel}` : `${yieldLabel} · ${money(b.upkeep)}/day upkeep`}</div>
+          <div class="row-name">${b.icon} ${b.label}${built ? ` · Level ${level}${maxed ? ' (max)' : ''}` : ''}</div>
+          <div class="row-sub">${built ? `${yieldLabel} · ${money(upkeepNow)}/day upkeep` : `${yieldLabel} · ${money(b.upkeep)}/day upkeep`}</div>
         </div>
-        ${built
-          ? '<span class="chip chip-on">Built ✓</span>'
-          : `<button class="chip" data-act="build-building" data-city="${cityId}" data-building="${b.id}"
-               ${campaign.treasury < b.cost ? 'disabled' : ''}>Build ${money(b.cost)}</button>`}
+        ${!built
+          ? `<button class="chip" data-act="build-building" data-city="${cityId}" data-building="${b.id}"
+               ${campaign.treasury < b.cost ? 'disabled' : ''}>Build ${money(b.cost)}</button>`
+          : maxed
+            ? '<span class="chip chip-on">Maxed ✓</span>'
+            : `<button class="chip" data-act="upgrade-building" data-city="${cityId}" data-building="${b.id}"
+                 ${campaign.treasury < upgradeCost ? 'disabled' : ''}>Grow ${money(upgradeCost)}</button>`}
       </div>`;
   }).join('');
 
@@ -182,7 +205,9 @@ function buildingsCard(campaign, cityId) {
     <div class="card">
       <h2>Farms &amp; Factories</h2>
       ${rows}
-      <p class="muted" style="margin-top:10px">A farm or factory feeds this depot for free, up to its daily output. The ice maker never stocks ice — it just covers what corners need before they pay street price.</p>
+      <p class="muted" style="margin-top:10px">A farm or factory feeds this depot for free, up to its daily output — grow one
+        up to level ${O.BUILDING_MAX_LEVEL} and both its output and its upkeep scale with it. The ice maker never stocks ice —
+        it just covers what corners need before they pay street price.</p>
     </div>`;
 }
 
@@ -402,16 +427,22 @@ export const actions = {
     if (!result.ok) { store.ui.notice = result.why; return; }
     store.ui.notice = achievementToast(checkAchievements());
   },
+  'upgrade-building': (el) => {
+    const result = O.upgradeBuilding(store.campaign, el.dataset.city, el.dataset.building);
+    if (!result.ok) { store.ui.notice = result.why; return; }
+    store.ui.notice = achievementToast(checkAchievements({ builtToMaxLevel: result.level >= O.BUILDING_MAX_LEVEL }));
+  },
   'hire-employee': (el) => {
     const result = E.hire(store.campaign, el.dataset.role);
     if (!result.ok) { store.ui.notice = result.why; return; }
     store.ui.notice = achievementToast(checkAchievements());
   },
-  'buy-truck': () => {
-    const result = O.buyTruck(store.campaign);
+  'buy-truck': (el) => {
+    const tier = el.dataset.tier;
+    const result = O.buyTruck(store.campaign, tier);
     if (!result.ok) { store.ui.notice = result.why; return; }
     store.ui.editingTruck = result.id;
-    store.ui.truckDraft = { from: null, to: null, cargo: 'lemons', amount: 100 };
+    store.ui.truckDraft = { from: null, to: null, cargo: 'lemons', amount: Math.min(100, O.VEHICLES[tier].maxAmount) };
     store.ui.notice = achievementToast(checkAchievements());
   },
   'edit-truck': (el) => {
@@ -426,8 +457,15 @@ export const actions = {
     store.ui.truckDraft = null;
   },
   'truck-pick-from': (el) => {
-    store.ui.truckDraft.from = el.dataset.city;
-    if (store.ui.truckDraft.to === el.dataset.city) store.ui.truckDraft.to = null;
+    const draft = store.ui.truckDraft;
+    draft.from = el.dataset.city;
+    const truck = ops().trucks.find((t) => t.id === store.ui.editingTruck);
+    const def = truck ? (O.VEHICLES[truck.tier] || O.VEHICLES.semi) : null;
+    if (draft.to) {
+      const sameRegion = C.getCity(draft.from).region === C.getCity(draft.to).region;
+      const stillValid = draft.to !== draft.from && def && (def.overseas ? !sameRegion : sameRegion);
+      if (!stillValid) draft.to = null;
+    }
   },
   'truck-pick-to': (el) => { store.ui.truckDraft.to = el.dataset.city; },
   'truck-pick-cargo': (el) => { store.ui.truckDraft.cargo = el.dataset.cargo; },
@@ -436,8 +474,17 @@ export const actions = {
     if (result.ok) {
       store.ui.editingTruck = null;
       store.ui.truckDraft = null;
+      store.ui.notice = achievementToast(checkAchievements({ hasOverseasRoute: isOverseasRouted() }));
     } else {
       store.ui.notice = result.why;
     }
   },
 };
+
+/** Any ship or plane actually routed right now — the achievement should track use, not just ownership. */
+function isOverseasRouted() {
+  return ops().trucks.some((t) => {
+    const def = O.VEHICLES[t.tier];
+    return def?.overseas && t.from && t.to;
+  });
+}

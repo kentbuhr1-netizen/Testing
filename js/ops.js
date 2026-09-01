@@ -46,13 +46,15 @@ export function wholesaleCost(unit, qty) {
 export const effectiveWage = (campaign) => Math.round(STAFF_WAGE * Employees.wageMult(campaign) * 100) / 100;
 export const effectiveHireCost = (campaign) => Math.round(STAFF_HIRE_COST * Employees.hireCostMult(campaign) * 100) / 100;
 export const effectiveWarehouseUpkeep = (campaign) => Math.round(WAREHOUSE_UPKEEP * Employees.upkeepMult(campaign) * 100) / 100;
-export const effectiveTruckUpkeep = (campaign) => Math.round(TRUCK_UPKEEP * Employees.upkeepMult(campaign) * 100) / 100;
+export const effectiveTruckUpkeep = (campaign, tier = 'semi') =>
+  Math.round((VEHICLES[tier]?.upkeep ?? VEHICLES.semi.upkeep) * Employees.upkeepMult(campaign) * 100) / 100;
 
 /**
- * Production buildings — at most one of each per city. Each needs a depot to
- * work with and costs upkeep every day whether or not it has anywhere to put
- * its output. Three of them press raw stock into the depot each morning; the
- * ice maker instead hands staffed corners a free daily allowance of ice
+ * Production buildings — at most one of each per city, but each can be grown
+ * up to BUILDING_MAX_LEVEL: yield and upkeep both scale with level, so a
+ * bigger farm produces more and also costs more to run. Each needs a depot
+ * to work with. Three of them press raw stock into the depot each morning;
+ * the ice maker instead hands staffed corners a free daily allowance of ice
  * before the street price kicks in, since ice is never warehoused.
  */
 export const BUILDINGS = {
@@ -62,11 +64,28 @@ export const BUILDINGS = {
   iceMaker:   { id: 'iceMaker',   label: 'Ice Maker',       icon: '🧊', unit: 'ice',    cost: 320, dailyYield: 400, upkeep: 5 },
 };
 
+export const BUILDING_MAX_LEVEL = 3;
+export const BUILDING_UPGRADE_COST = 300; // for the 1→2 step; each further step costs one more multiple of this
+
 /** Which building supplies which warehoused good (the ice maker is not one — see above). */
 const STOCK_BUILDING_FOR = { lemons: 'lemonFarm', sugar: 'caneFarm', cups: 'cupFactory' };
 
-export const TRUCK_COST = 300;
-export const TRUCK_UPKEEP = 2;   // per day, only while a truck is running a route
+/**
+ * Every vehicle you can buy, trucks and overseas haulers alike, in one
+ * catalog: `overseas: false` vehicles may only route within a region (US or
+ * EU); `overseas: true` vehicles may only route between them — a plane or a
+ * ship crossing the Atlantic, never puddle-jumping between two cities that
+ * share a coast. Bigger trucks cost more and haul more per day; a plane
+ * costs less than a ship but caps out much lower, the fast, small option
+ * next to the slow, enormous one.
+ */
+export const VEHICLES = {
+  pickup:     { id: 'pickup',     kind: 'truck', label: 'Pickup Truck', icon: '🛻', cost: 300,  maxAmount: 500,  upkeep: 2,  overseas: false },
+  box:        { id: 'box',        kind: 'truck', label: 'Box Truck',    icon: '🚚', cost: 700,  maxAmount: 1400, upkeep: 4,  overseas: false },
+  semi:       { id: 'semi',       kind: 'truck', label: 'Semi Trailer', icon: '🚛', cost: 1500, maxAmount: 3000, upkeep: 8,  overseas: false },
+  cargoPlane: { id: 'cargoPlane', kind: 'plane', label: 'Cargo Plane',  icon: '✈️', cost: 1800, maxAmount: 1800, upkeep: 20, overseas: true },
+  cargoShip:  { id: 'cargoShip',  kind: 'ship',  label: 'Cargo Ship',   icon: '🚢', cost: 2600, maxAmount: 6000, upkeep: 14, overseas: true },
+};
 export const TRUCK_CARGO = ['lemons', 'sugar', 'cups'];
 
 export function newOps() {
@@ -74,8 +93,8 @@ export function newOps() {
     day: 0,
     warehouses: {},   // cityId → { capacity, stock: { lemons, sugar, cups } }
     staffed: {},      // cityId → [cornerIndex]
-    buildings: {},    // cityId → { lemonFarm: true, caneFarm: true, ... }
-    trucks: [],       // [{ id, from, to, cargo, amount }] — from/to/cargo null until assigned
+    buildings: {},    // cityId → { lemonFarm: <level>, caneFarm: <level>, ... }
+    trucks: [],       // [{ id, tier, from, to, cargo, amount }] — from/to/cargo null until assigned
     nextTruckId: 1,
     ledger: [],       // most recent days first
     alerts: [],
@@ -83,11 +102,14 @@ export function newOps() {
   };
 }
 
-/** Fills in fields a save made before buildings/trucks existed won't have. */
+/** Fills in fields a save made before buildings/trucks/vehicle tiers existed won't have. */
 function ensureOpsShape(ops) {
   if (!ops) return ops;
   if (!ops.buildings) ops.buildings = {};
   if (!ops.trucks) ops.trucks = [];
+  // A truck bought before vehicle tiers existed hauled up to 2000/day flat —
+  // 'semi' is the closest tier to that, so an old fleet doesn't get nerfed.
+  for (const truck of ops.trucks) if (!truck.tier) truck.tier = 'semi';
   if (ops.nextTruckId == null) ops.nextTruckId = ops.trucks.reduce((n, t) => Math.max(n, t.id || 0), 0) + 1;
   return ops;
 }
@@ -96,7 +118,17 @@ export const hasWarehouse = (ops, cityId) => Boolean(ops?.warehouses?.[cityId]);
 export const staffedIn = (ops, cityId) => ops?.staffed?.[cityId] || [];
 export const isStaffed = (ops, cityId, i) => staffedIn(ops, cityId).includes(i);
 export const buildingsIn = (ops, cityId) => Object.keys(ops?.buildings?.[cityId] || {}).filter((id) => ops.buildings[cityId][id]);
-export const hasBuilding = (ops, cityId, buildingId) => Boolean(ops?.buildings?.[cityId]?.[buildingId]);
+
+/** A building built before levels existed is stored as `true` — treat that as level 1. */
+export function buildingLevel(ops, cityId, buildingId) {
+  const v = ops?.buildings?.[cityId]?.[buildingId];
+  if (!v) return 0;
+  return typeof v === 'number' ? v : 1;
+}
+export const hasBuilding = (ops, cityId, buildingId) => buildingLevel(ops, cityId, buildingId) >= 1;
+export const buildingYieldFor = (buildingId, level) => BUILDINGS[buildingId].dailyYield * level;
+export const buildingUpkeepFor = (buildingId, level) => BUILDINGS[buildingId].upkeep * level;
+export const buildingUpgradeCost = (level) => BUILDING_UPGRADE_COST * level; // cost of level → level+1
 
 export function stockTotal(warehouse) {
   if (!warehouse) return 0;
@@ -177,20 +209,22 @@ export function cityOutlook(campaign, cityId) {
   );
 
   const built = buildingsIn(ops, cityId);
-  const buildingUpkeep = built.reduce((n, id) => n + BUILDINGS[id].upkeep, 0);
+  const buildingUpkeep = built.reduce((n, id) => n + buildingUpkeepFor(id, buildingLevel(ops, cityId, id)), 0);
 
   // A farm or factory offsets the wholesale cost of what it can supply.
   const farmSavings = ['lemons', 'sugar', 'cups'].reduce((n, unit) => {
     const bId = STOCK_BUILDING_FOR[unit];
-    if (!hasBuilding(ops, cityId, bId)) return n;
-    return n + Math.min(needs[unit], BUILDINGS[bId].dailyYield) * WHOLESALE[unit];
+    const level = buildingLevel(ops, cityId, bId);
+    if (level < 1) return n;
+    return n + Math.min(needs[unit], buildingYieldFor(bId, level)) * WHOLESALE[unit];
   }, 0);
 
   // An ice maker covers ice up to its daily press before the street price applies.
   const iceUnitsNeeded = sum('iceUnits');
   const iceCostGross = sum('iceCost');
   const avgIcePrice = iceUnitsNeeded > 0 ? iceCostGross / iceUnitsNeeded : 0;
-  const freeIce = hasBuilding(ops, cityId, 'iceMaker') ? Math.min(iceUnitsNeeded, BUILDINGS.iceMaker.dailyYield) : 0;
+  const iceMakerLevel = buildingLevel(ops, cityId, 'iceMaker');
+  const freeIce = iceMakerLevel >= 1 ? Math.min(iceUnitsNeeded, buildingYieldFor('iceMaker', iceMakerLevel)) : 0;
 
   const wages = Math.round(staffed.length * effectiveWage(campaign) * 100) / 100;
   const upkeep = (hasWarehouse(ops, cityId) ? effectiveWarehouseUpkeep(campaign) : 0) + buildingUpkeep;
@@ -221,7 +255,8 @@ export function cityOutlook(campaign, cityId) {
 function buildingYields(ops, cityId) {
   const out = { lemons: 0, sugar: 0, cups: 0 };
   for (const [unit, buildingId] of Object.entries(STOCK_BUILDING_FOR)) {
-    if (hasBuilding(ops, cityId, buildingId)) out[unit] = BUILDINGS[buildingId].dailyYield;
+    const level = buildingLevel(ops, cityId, buildingId);
+    if (level >= 1) out[unit] = buildingYieldFor(buildingId, level);
   }
   return out;
 }
@@ -334,21 +369,40 @@ export function buildBuilding(campaign, cityId, buildingId) {
   if (campaign.treasury < def.cost) return { ok: false, why: 'Not enough in the treasury.' };
   campaign.treasury = round2(campaign.treasury - def.cost);
   const cityBuildings = ops.buildings[cityId] || (ops.buildings[cityId] = {});
-  cityBuildings[buildingId] = true;
+  cityBuildings[buildingId] = 1;
   return { ok: true };
 }
 
-/** Buy an unassigned truck. Give it a route with assignTruckRoute. */
-export function buyTruck(campaign) {
+/** Grow a built farm or factory by one level, up to BUILDING_MAX_LEVEL. Yield and upkeep both scale with it. */
+export function upgradeBuilding(campaign, cityId, buildingId) {
   const ops = ensureOpsShape(campaign.ops);
-  if (campaign.treasury < TRUCK_COST) return { ok: false, why: 'Not enough in the treasury.' };
-  campaign.treasury = round2(campaign.treasury - TRUCK_COST);
+  const level = buildingLevel(ops, cityId, buildingId);
+  if (level < 1) return { ok: false, why: 'Build it first.' };
+  if (level >= BUILDING_MAX_LEVEL) return { ok: false, why: 'Already as big as it gets.' };
+  const cost = buildingUpgradeCost(level);
+  if (campaign.treasury < cost) return { ok: false, why: 'Not enough in the treasury.' };
+  campaign.treasury = round2(campaign.treasury - cost);
+  ops.buildings[cityId][buildingId] = level + 1;
+  return { ok: true, level: level + 1 };
+}
+
+/** Buy an unassigned vehicle of the given tier. Give it a route with assignTruckRoute. */
+export function buyTruck(campaign, tier = 'pickup') {
+  const ops = ensureOpsShape(campaign.ops);
+  const def = VEHICLES[tier];
+  if (!def) return { ok: false, why: 'No such vehicle.' };
+  if (campaign.treasury < def.cost) return { ok: false, why: 'Not enough in the treasury.' };
+  campaign.treasury = round2(campaign.treasury - def.cost);
   const id = ops.nextTruckId++;
-  ops.trucks.push({ id, from: null, to: null, cargo: 'lemons', amount: 100 });
+  ops.trucks.push({ id, tier, from: null, to: null, cargo: 'lemons', amount: Math.min(100, def.maxAmount) });
   return { ok: true, id };
 }
 
-/** Point a truck at a route: it hauls `amount` of `cargo` from one depot to another, every day. */
+/**
+ * Point a vehicle at a route: it hauls `amount` of `cargo` from one depot to
+ * another, every day, capped at its tier's daily maximum. Trucks stay within
+ * a region; ships and planes only cross between them — see VEHICLES.
+ */
 export function assignTruckRoute(campaign, truckId, { from, to, cargo, amount }) {
   const ops = ensureOpsShape(campaign.ops);
   const truck = ops.trucks.find((t) => t.id === truckId);
@@ -357,10 +411,14 @@ export function assignTruckRoute(campaign, truckId, { from, to, cargo, amount })
   if (from === to) return { ok: false, why: 'Pick two different cities.' };
   if (!hasWarehouse(ops, from) || !hasWarehouse(ops, to)) return { ok: false, why: 'Both ends need a depot.' };
   if (!TRUCK_CARGO.includes(cargo)) return { ok: false, why: 'Not a haulable good.' };
+  const def = VEHICLES[truck.tier] || VEHICLES.semi;
+  const sameRegion = getCity(from).region === getCity(to).region;
+  if (def.overseas && sameRegion) return { ok: false, why: `A ${def.label.toLowerCase()} is for overseas routes — a truck is cheaper here.` };
+  if (!def.overseas && !sameRegion) return { ok: false, why: 'Trucks cannot cross the ocean — route a ship or a plane instead.' };
   truck.from = from;
   truck.to = to;
   truck.cargo = cargo;
-  truck.amount = Math.max(1, Math.round(amount) || 0);
+  truck.amount = Math.min(def.maxAmount, Math.max(1, Math.round(amount) || 0));
   return { ok: true };
 }
 
@@ -416,9 +474,11 @@ export function tickOps(campaign, days) {
       let buildingCost = 0;
       for (const id of built) {
         const b = BUILDINGS[id];
-        buildingCost += b.upkeep;
-        if (id === 'iceMaker') freeIce[cityId] = (freeIce[cityId] || 0) + b.dailyYield;
-        else if (w) summary.produced[b.unit] += addStock(w, b.unit, b.dailyYield);
+        const level = buildingLevel(ops, cityId, id);
+        buildingCost += buildingUpkeepFor(id, level);
+        const yieldNow = buildingYieldFor(id, level);
+        if (id === 'iceMaker') freeIce[cityId] = (freeIce[cityId] || 0) + yieldNow;
+        else if (w) summary.produced[b.unit] += addStock(w, b.unit, yieldNow);
       }
       campaign.treasury = round2(campaign.treasury - buildingCost);
       summary.costs += buildingCost;
@@ -436,7 +496,7 @@ export function tickOps(campaign, days) {
         dst.stock[truck.cargo] += moved;
         summary.trucked += moved;
       }
-      const truckUpkeep = effectiveTruckUpkeep(campaign);
+      const truckUpkeep = effectiveTruckUpkeep(campaign, truck.tier);
       campaign.treasury = round2(campaign.treasury - truckUpkeep);
       summary.costs += truckUpkeep;
     }

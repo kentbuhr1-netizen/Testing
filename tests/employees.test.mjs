@@ -84,7 +84,7 @@ test('the Logistics Manager discounts depot/truck upkeep and wholesale orders', 
   const after = O.restockCost({ lemons: 100, sugar: 100, cups: 100 }, campaign);
   assert.ok(after < before, 'wholesale orders get cheaper once hired');
   assert.equal(O.effectiveWarehouseUpkeep(campaign), Math.round(O.WAREHOUSE_UPKEEP * 0.75 * 100) / 100);
-  assert.equal(O.effectiveTruckUpkeep(campaign), Math.round(O.TRUCK_UPKEEP * 0.75 * 100) / 100);
+  assert.equal(O.effectiveTruckUpkeep(campaign, 'semi'), Math.round(O.VEHICLES.semi.upkeep * 0.75 * 100) / 100);
 });
 
 test('the HR Manager discounts staff wages and hiring cost', () => {

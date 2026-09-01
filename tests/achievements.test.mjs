@@ -115,6 +115,11 @@ test('office and M&A achievements read the campaign, not a single day', () => {
   assert.deepEqual(evaluateAchievements({ acquiredCorner: true }, {}), ['corporateRaider']);
 });
 
+test('fleet achievements read the fleet, not the office', () => {
+  assert.deepEqual(evaluateAchievements({ hasOverseasRoute: true }, {}), ['wentOverseas']);
+  assert.deepEqual(evaluateAchievements({ builtToMaxLevel: true }, {}), ['megaFarm']);
+});
+
 test('a rich context can unlock several achievements in one pass', () => {
   const ctx = {
     cupsSoldEver: 200,

@@ -76,6 +76,10 @@ export const ACHIEVEMENTS = {
   officeStarted:   { icon: '🧑‍💼', title: 'Built An Office',  desc: 'Hire your first employee.' },
   fullCSuite:      { icon: '🏢', title: 'Full C-Suite',      desc: 'Hire all five office roles.' },
   corporateRaider: { icon: '🤝', title: 'Corporate Raider',  desc: 'Buy out a corner outright through your M&A Specialist.' },
+
+  // The fleet
+  wentOverseas:    { icon: '🚢', title: 'Across The Atlantic', desc: 'Route a ship or a plane between the US and Europe.' },
+  megaFarm:        { icon: '🌾', title: 'Mega Farm',           desc: 'Grow a farm or factory to its maximum size.' },
 };
 
 /**
@@ -149,6 +153,9 @@ export function evaluateAchievements(ctx, unlocked) {
   check('officeStarted', (ctx.employeesHired || 0) >= 1);
   check('fullCSuite', !!ctx.allEmployeesHired);
   check('corporateRaider', !!ctx.acquiredCorner);
+
+  check('wentOverseas', !!ctx.hasOverseasRoute);
+  check('megaFarm', !!ctx.builtToMaxLevel);
 
   return newly;
 }

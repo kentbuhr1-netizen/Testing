@@ -16,7 +16,7 @@ import * as premiumUi from './ui/premium.js';
 import * as tutorialUi from './ui/tutorial.js';
 import * as achievementsUi from './ui/achievements.js';
 import { money, whole, bar } from './ui/kit.js';
-import { restockCost, spaceLeft } from './ops.js';
+import { restockCost, spaceLeft, VEHICLES } from './ops.js';
 
 const screenEl = document.getElementById('screen');
 const actionsEl = document.getElementById('actions');
@@ -137,7 +137,7 @@ const LIMITS = {
   cupPrice: { small: [0.05, 5], large: [0.05, 5], byo: [0.05, 5] },
   order: { lemons: [0, 9999], sugar: [0, 9999], ice: [0, 9999], cups: [0, 9999] },
   restock: { lemons: [0, 99999], sugar: [0, 99999], cups: [0, 99999] },
-  truckDraft: { amount: [25, 2000] },
+  truckDraft: { amount: [25, Math.max(...Object.values(VEHICLES).map((v) => v.maxAmount))] },
   bankAmount: { amount: [0, 999999] },
   enhancerOrder: Object.fromEntries(Object.keys(S.ENHANCERS).map((id) => [id, [0, 999]])),
 };
@@ -177,7 +177,11 @@ function applyStep(group, field, step) {
     return true;
   }
   if (group === 'truckDraft') {
-    store.ui.truckDraft[field] = clamp(store.ui.truckDraft[field] + step, min, max);
+    // The stepper's global ceiling above is a safe upper bound; the vehicle
+    // actually being edited caps it further, to its own tier's daily max.
+    const truck = store.campaign?.ops?.trucks?.find((t) => t.id === store.ui.editingTruck);
+    const tierMax = truck ? (VEHICLES[truck.tier]?.maxAmount ?? max) : max;
+    store.ui.truckDraft[field] = clamp(store.ui.truckDraft[field] + step, min, Math.min(max, tierMax));
     return true;
   }
   if (group === 'bankAmount') {

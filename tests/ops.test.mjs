@@ -229,6 +229,47 @@ test('an ice maker never touches the warehoused stock — ice still melts', () =
   assert.equal(campaign.ops.warehouses.nyc.stock.ice, undefined);
 });
 
+test('a farm can be grown up to its max level, and yield and upkeep both scale with it', () => {
+  const campaign = empire();
+  O.buyWarehouse(campaign, 'nyc');
+  assert.equal(O.upgradeBuilding(campaign, 'nyc', 'lemonFarm').ok, false, 'nothing to grow yet');
+
+  O.buildBuilding(campaign, 'nyc', 'lemonFarm');
+  assert.equal(O.buildingLevel(campaign.ops, 'nyc', 'lemonFarm'), 1);
+  assert.equal(O.buildingYieldFor('lemonFarm', 1), O.BUILDINGS.lemonFarm.dailyYield);
+
+  const before = campaign.treasury;
+  const up = O.upgradeBuilding(campaign, 'nyc', 'lemonFarm');
+  assert.equal(up.ok, true);
+  assert.equal(up.level, 2);
+  assert.equal(campaign.treasury, Math.round((before - O.buildingUpgradeCost(1)) * 100) / 100);
+  assert.equal(O.buildingYieldFor('lemonFarm', 2), O.BUILDINGS.lemonFarm.dailyYield * 2);
+  assert.equal(O.buildingUpkeepFor('lemonFarm', 2), O.BUILDINGS.lemonFarm.upkeep * 2);
+
+  O.upgradeBuilding(campaign, 'nyc', 'lemonFarm');
+  assert.equal(O.buildingLevel(campaign.ops, 'nyc', 'lemonFarm'), O.BUILDING_MAX_LEVEL);
+  assert.equal(O.upgradeBuilding(campaign, 'nyc', 'lemonFarm').ok, false, 'already at max size');
+});
+
+test('a grown farm presses proportionally more into the depot each day', () => {
+  const campaign = empire();
+  O.buyWarehouse(campaign, 'nyc');
+  O.buildBuilding(campaign, 'nyc', 'lemonFarm');
+  O.upgradeBuilding(campaign, 'nyc', 'lemonFarm');
+  const before = campaign.ops.warehouses.nyc.stock.lemons;
+  const summary = O.tickOps(campaign, 1);
+  assert.equal(campaign.ops.warehouses.nyc.stock.lemons, before + O.BUILDINGS.lemonFarm.dailyYield * 2);
+  assert.equal(summary.produced.lemons, O.BUILDINGS.lemonFarm.dailyYield * 2);
+});
+
+test('a boolean-true building from before levels existed reads as level 1', () => {
+  const campaign = empire();
+  O.buyWarehouse(campaign, 'nyc');
+  campaign.ops.buildings.nyc = { lemonFarm: true };
+  assert.equal(O.buildingLevel(campaign.ops, 'nyc', 'lemonFarm'), 1);
+  assert.equal(O.hasBuilding(campaign.ops, 'nyc', 'lemonFarm'), true);
+});
+
 test('farm production shows up as a real profit gain in the daily estimate', () => {
   const campaign = empire();
   O.buyWarehouse(campaign, 'nyc');
@@ -323,6 +364,71 @@ test('unassigning a truck parks it for free', () => {
   const before = campaign.treasury;
   O.tickOps(campaign, 3);
   assert.equal(campaign.treasury, before, 'a parked truck should not be charged upkeep');
+});
+
+/* -------------------------------------------------------------- *
+ * Fleet tiers, and ships/planes crossing the Atlantic
+ * -------------------------------------------------------------- */
+
+test('bigger trucks cost more, haul more, and cost more upkeep', () => {
+  const campaign = empire();
+  const pickup = O.buyTruck(campaign, 'pickup');
+  const semi = O.buyTruck(campaign, 'semi');
+  assert.equal(campaign.treasury, 3000 - O.VEHICLES.pickup.cost - O.VEHICLES.semi.cost);
+  assert.ok(O.VEHICLES.semi.maxAmount > O.VEHICLES.pickup.maxAmount);
+  assert.ok(O.effectiveTruckUpkeep(campaign, 'semi') > O.effectiveTruckUpkeep(campaign, 'pickup'));
+});
+
+test('a route can never be assigned more than its vehicle\'s daily maximum', () => {
+  const campaign = empire();
+  O.buyWarehouse(campaign, 'nyc');
+  O.buyWarehouse(campaign, 'austin');
+  const { id } = O.buyTruck(campaign, 'pickup');
+  O.assignTruckRoute(campaign, id, { from: 'nyc', to: 'austin', cargo: 'lemons', amount: 999999 });
+  const truck = campaign.ops.trucks.find((t) => t.id === id);
+  assert.equal(truck.amount, O.VEHICLES.pickup.maxAmount);
+});
+
+test('trucks stay on one continent — ships and planes are for crossing the ocean', () => {
+  const campaign = empire(10000);
+  O.buyWarehouse(campaign, 'nyc');
+  O.buyWarehouse(campaign, 'rome');
+  const truck = O.buyTruck(campaign, 'box');
+  const overseas = O.assignTruckRoute(campaign, truck.id, { from: 'nyc', to: 'rome', cargo: 'lemons', amount: 100 });
+  assert.equal(overseas.ok, false, 'a truck cannot cross the Atlantic');
+
+  const ship = O.buyTruck(campaign, 'cargoShip');
+  assert.equal(O.assignTruckRoute(campaign, ship.id, { from: 'nyc', to: 'rome', cargo: 'lemons', amount: 100 }).ok, true);
+});
+
+test('ships and planes cannot be used for a same-region route — a truck is cheaper there', () => {
+  const campaign = empire();
+  O.buyWarehouse(campaign, 'nyc');
+  O.buyWarehouse(campaign, 'austin');
+  const plane = O.buyTruck(campaign, 'cargoPlane');
+  const result = O.assignTruckRoute(campaign, plane.id, { from: 'nyc', to: 'austin', cargo: 'lemons', amount: 100 });
+  assert.equal(result.ok, false);
+});
+
+test('a cargo ship actually hauls cargo across the Atlantic every day', () => {
+  const campaign = empire(10000);
+  O.buyWarehouse(campaign, 'nyc');
+  O.buyWarehouse(campaign, 'rome');
+  O.restock(campaign, 'nyc', { lemons: 2000, sugar: 0, cups: 0 }); // depot capacity is 2500
+  const { id } = O.buyTruck(campaign, 'cargoShip');
+  O.assignTruckRoute(campaign, id, { from: 'nyc', to: 'rome', cargo: 'lemons', amount: 2000 });
+  const summary = O.tickOps(campaign, 1);
+  assert.equal(summary.trucked, 2000);
+  assert.equal(campaign.ops.warehouses.rome.stock.lemons, 2000);
+});
+
+test('a truck bought before vehicle tiers existed defaults to the old flat behavior, not a nerf', () => {
+  const campaign = empire();
+  O.buyWarehouse(campaign, 'nyc');
+  O.buyWarehouse(campaign, 'austin');
+  campaign.ops.trucks.push({ id: 999, from: null, to: null, cargo: 'lemons', amount: 100 }); // no `tier` field
+  const result = O.assignTruckRoute(campaign, 999, { from: 'nyc', to: 'austin', cargo: 'lemons', amount: 2000 });
+  assert.equal(result.ok, true, 'an old truck should still cap near its old 2000/day ceiling, not far below it');
 });
 
 test('a farm can feed a truck that feeds a staffed corner in a different city', () => {

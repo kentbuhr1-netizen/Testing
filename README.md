@@ -99,11 +99,13 @@ Claimed corners can be put to work:
   press free stock into their city's depot every morning, up to a daily cap;
   an Ice Maker instead hands staffed corners a free daily allowance of ice
   before the street price applies. One of each per city, and every building
-  costs upkeep whether or not it has anywhere to put its output.
-- **Trucks** — bought once, then routed between any two depot cities to haul
-  one good, one amount, every day. Concentrate a farm in one city and truck
-  its surplus to corners you staff elsewhere, instead of building the same
-  farm five times over.
+  costs upkeep whether or not it has anywhere to put its output. Grow one up
+  to level 3 and both its output and its upkeep scale up with it.
+- **Fleet** — 🛻 Pickup, 🚚 Box and 🚛 Semi trucks haul stock between depots in
+  the *same* region (US↔US or EU↔EU), each tier costing more up front for a
+  bigger daily cap. ✈️ Cargo Planes and 🚢 Cargo Ships do the opposite: they
+  only cross *between* the US and Europe — a plane is the cheap, small
+  option, a ship the expensive one that hauls far more.
 - **Time** — the network trades one day for every day you work a corner by hand,
   so the empire earns exactly as fast as you play.
 
@@ -142,15 +144,16 @@ explanation of the loop — nothing gated behind it, nothing to miss by
 skipping.
 
 Achievements (`js/achievements.js`) are a record of what you've actually
-done — 48 of them, spanning first cup, first corner, clearing an
+done — 50 of them, spanning first cup, first corner, clearing an
 Impossible corner, winning every difficulty tier at least once, taking a
-city, building every farm and factory in three cities, running a fleet of
-ten trucks, selling your first small/large/BYO/card-paid cup, your first
-bank deposit, hiring your whole office, buying out a corner through M&A,
-going 50 or 100 or 365 days without stopping, and going a whole run without
-a spoiled lemon — with no reward attached beyond a small toast and a line on
-the list. They're checked fresh from live game state after anything that
-could have earned one, so there's nothing to keep in sync by hand.
+city, building every farm and factory in three cities, growing a farm to
+its max size, routing a ship or plane overseas, selling your first
+small/large/BYO/card-paid cup, your first bank deposit, hiring your whole
+office, buying out a corner through M&A, going 50 or 100 or 365 days
+without stopping, and going a whole run without a spoiled lemon — with no
+reward attached beyond a small toast and a line on the list. They're
+checked fresh from live game state after anything that could have earned
+one, so there's nothing to keep in sync by hand.
 
 ## Project layout
 
@@ -167,7 +170,7 @@ js/store.js             shared state, the save file, stats and unlocks
 js/app.js               router, HUD, input
 js/ui/                  screens: map.js, run.js, opsui.js, bankui.js,
                          premium.js, tutorial.js, achievements.js, kit.js
-tests/                  126 tests across the rules, the campaign, operations, the bank and the office
+tests/                  136 tests across the rules, the campaign, operations, the bank and the office
 tools/make-icons.mjs    regenerates icons/*.png from icons/icon.svg
 ```
 
@@ -176,7 +179,7 @@ tools/make-icons.mjs    regenerates icons/*.png from icons/icon.svg
 balanced from node. The same seed always replays the same season.
 
 ```bash
-npm test           # 126 tests
+npm test           # 136 tests
 npm run icons      # rebuild PNG icons from the SVG (needs headless Chromium)
 ```
 
