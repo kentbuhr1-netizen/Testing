@@ -1,0 +1,73 @@
+# Each week's game arrives as its own branch. This turns it into a pull
+# request so it shows up for review instead of sitting there unnoticed.
+#
+# Needs "Allow GitHub Actions to create and approve pull requests" under
+# Settings → Actions → General. Without it the run logs a warning and the
+# branch is still pushed — nothing is lost, it just has to be opened by hand.
+name: Open a PR for a new game
+
+on:
+  push:
+    branches:
+      - 'claude/game-*'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  open-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Open a pull request, unless one is already open
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          existing=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number' || true)
+          if [ -n "$existing" ]; then
+            echo "PR #$existing is already open for $BRANCH — this push updates it."
+            exit 0
+          fi
+
+          git fetch origin main
+          slug="${BRANCH#claude/game-}"
+          readme="games/$slug/README.md"
+
+          # The game's own README names it far better than the branch does.
+          title="Add $slug"
+          if [ -f "$readme" ]; then
+            heading=$(head -n 20 "$readme" | grep -m1 '^# ' | sed 's/^# *//' || true)
+            [ -n "$heading" ] && title="Add $heading"
+          fi
+
+          {
+            echo "This week's game."
+            echo
+            if [ -f "$readme" ]; then
+              echo "See [\`$readme\`]($readme) for what it is, how it plays, and what the model does and does not do."
+              echo
+            fi
+            echo "## What landed"
+            echo
+            git log --format='- %s' origin/main..HEAD
+            echo
+            echo "## Before merging"
+            echo
+            echo '- `npm run test:all` — every game'"'"'s tests, plus the payments tests'
+            echo "- Play it: \`npm start\` at the repo root, then open \`/games/$slug/\`"
+            echo
+            echo '---'
+            echo '_Opened automatically by `.github/workflows/open-game-pr.yml`._'
+          } > /tmp/pr-body.md
+
+          if ! gh pr create --base main --head "$BRANCH" --title "$title" --body-file /tmp/pr-body.md; then
+            echo "::warning::Could not open a pull request. Enable Settings → Actions → General → 'Allow GitHub Actions to create and approve pull requests', then open one by hand for $BRANCH."
+            exit 0
+          fi
