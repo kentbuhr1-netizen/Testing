@@ -48,13 +48,15 @@ export function withdraw(campaign, amount) {
 /**
  * Compound the bank balance for `days` days. Called once per settled run
  * with the number of days that run actually took, campaign or free play
- * alike. Returns the interest earned, for a report line.
+ * alike. `rateBonus` is an optional daily rate on top of DAILY_RATE — the
+ * hook a Finance Manager plugs into, without this file needing to know
+ * employees exist. Returns the interest earned, for a report line.
  */
-export function accrueInterest(campaign, days) {
+export function accrueInterest(campaign, days, rateBonus = 0) {
   ensureBank(campaign);
   const before = campaign.bank.balance;
   if (before <= 0 || days <= 0) return 0;
-  const after = round2(before * Math.pow(1 + DAILY_RATE, days));
+  const after = round2(before * Math.pow(1 + DAILY_RATE + rateBonus, days));
   campaign.bank.balance = after;
   return round2(after - before);
 }

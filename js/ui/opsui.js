@@ -1,6 +1,7 @@
 /** Operations: the depot network, wholesale buying and staffed corners. */
 import * as C from '../campaign.js';
 import * as O from '../ops.js';
+import * as E from '../employees.js';
 import { store, checkAchievements, achievementToast } from '../store.js';
 import { money, whole, fact, bar, backBar, row, stepper, tierPill } from './kit.js';
 
@@ -57,6 +58,7 @@ function opsScreen() {
         ? `<div class="card warn-card"><h2>Alerts</h2>${ops().alerts.map((a) => `<p>⚠️ ${a.text}</p>`).join('')}</div>`
         : ''}
       ${editing ? truckEditorCard(editing) : trucksCard()}
+      ${officeCard(campaign)}
       <div class="city-list">${rows || '<p class="muted center">Claim some corners first.</p>'}</div>`,
     actions: editing
       ? `<button class="btn" data-act="confirm-truck-route" ${store.ui.truckDraft.from && store.ui.truckDraft.to ? '' : 'disabled'}>Set Route</button>
@@ -92,7 +94,34 @@ function trucksCard() {
           🚚 Buy Truck · ${money(O.TRUCK_COST)}
         </button>
       </div>
-      <p class="muted" style="margin-top:10px">A truck hauls one good between two depots every day, for ${money(O.TRUCK_UPKEEP)} a day while it has a route.</p>
+      <p class="muted" style="margin-top:10px">A truck hauls one good between two depots every day, for ${money(O.effectiveTruckUpkeep(store.campaign))} a day while it has a route.</p>
+    </div>`;
+}
+
+/** The office: hire once per role, paid the same way the bank and the network are — one day at a time. */
+function officeCard(campaign) {
+  E.ensureStaff(campaign);
+  const rows = Object.values(E.EMPLOYEES).map((e) => {
+    const hired = E.isHired(campaign, e.id);
+    return `<div class="row">
+        <div class="row-main">
+          <div class="row-name">${e.icon} ${e.title}</div>
+          <div class="row-sub">${e.blurb}${hired ? ` · ${money(e.wage)}/day` : ''}</div>
+        </div>
+        ${hired
+          ? '<span class="chip chip-on">Hired ✓</span>'
+          : `<button class="chip" data-act="hire-employee" data-role="${e.id}"
+               ${campaign.treasury < e.cost ? 'disabled' : ''}>Hire ${money(e.cost)}</button>`}
+      </div>`;
+  }).join('');
+  const wages = E.dailyWages(campaign);
+
+  return `
+    <div class="card">
+      <h2>Office</h2>
+      ${rows}
+      <p class="muted" style="margin-top:10px">Wages are paid once per run for every day it took — the same clock the bank
+        and the network already run on${wages > 0 ? `. Right now that's ${money(wages)}/day, ${E.headcount(campaign)} hired.` : '.'}</p>
     </div>`;
 }
 
@@ -195,7 +224,7 @@ function opsCityScreen() {
 
   const order = store.ui.restock;
   const units = order.lemons + order.sugar + order.cups;
-  const cost = O.restockCost(order);
+  const cost = O.restockCost(order, campaign);
   const space = O.spaceLeft(depot);
   const discount = O.bulkDiscount(units);
 
@@ -206,6 +235,7 @@ function opsCityScreen() {
       stepper('restock', unit, order[unit], 100, 0, 99999));
   };
 
+  const hireCost = O.effectiveHireCost(campaign);
   const staffRows = claimed.map((i) => {
     const corner = corners[i];
     const staffed = O.isStaffed(ops(), cityId, i);
@@ -217,8 +247,8 @@ function opsCityScreen() {
         </div>
         <button class="chip ${staffed ? 'chip-on' : ''}"
                 data-act="${staffed ? 'close-stand' : 'hire-staff'}" data-city="${cityId}" data-index="${i}"
-                ${!staffed && campaign.treasury < O.STAFF_HIRE_COST ? 'disabled' : ''}>
-          ${staffed ? 'Staffed ✓' : `Hire ${money(O.STAFF_HIRE_COST)}`}
+                ${!staffed && campaign.treasury < hireCost ? 'disabled' : ''}>
+          ${staffed ? 'Staffed ✓' : `Hire ${money(hireCost)}`}
         </button>
       </div>`;
   }).join('');
@@ -251,7 +281,7 @@ function opsCityScreen() {
       <div class="card">
         <h2>Corners you own here</h2>
         ${staffRows || '<p class="muted">No claimed corners in this city yet.</p>'}
-        <p class="muted" style="margin-top:10px">Staff cost ${money(O.STAFF_WAGE)} a day each, and the depot ${money(O.WAREHOUSE_UPKEEP)} a day — paid whether they sell or not.</p>
+        <p class="muted" style="margin-top:10px">Staff cost ${money(O.effectiveWage(campaign))} a day each, and the depot ${money(O.effectiveWarehouseUpkeep(campaign))} a day — paid whether they sell or not.</p>
       </div>
       ${look ? `<div class="card">
         <h2>Every day, as things stand</h2>
@@ -295,7 +325,7 @@ function restockForDays(days) {
     sugar: Math.max(0, look.needs.sugar * days - depot.stock.sugar),
     cups: Math.max(0, look.needs.cups * days - depot.stock.cups),
   };
-  order = trimToFit(order, O.spaceLeft(depot), campaign.treasury);
+  order = trimToFit(order, O.spaceLeft(depot), campaign.treasury, campaign);
   store.ui.restock = order;
 }
 
@@ -310,18 +340,18 @@ function fillDepot() {
   const unitsPerSet = 4; // 1 lemon + 1 sugar + 2 cups
   const sets = Math.floor(space / unitsPerSet);
   let order = { lemons: sets, sugar: sets, cups: sets * 2 };
-  order = trimToFit(order, space, campaign.treasury);
+  order = trimToFit(order, space, campaign.treasury, campaign);
   store.ui.restock = order;
 }
 
-function trimToFit(order, space, budget) {
+function trimToFit(order, space, budget, campaign) {
   let scale = 1;
   const units = () => Math.round(order.lemons * scale) + Math.round(order.sugar * scale) + Math.round(order.cups * scale);
   const cost = () => O.restockCost({
     lemons: Math.round(order.lemons * scale),
     sugar: Math.round(order.sugar * scale),
     cups: Math.round(order.cups * scale),
-  });
+  }, campaign);
   let guard = 60;
   while ((units() > space || cost() > budget) && scale > 0.01 && guard-- > 0) scale *= 0.9;
   return {
@@ -369,6 +399,11 @@ export const actions = {
   },
   'build-building': (el) => {
     const result = O.buildBuilding(store.campaign, el.dataset.city, el.dataset.building);
+    if (!result.ok) { store.ui.notice = result.why; return; }
+    store.ui.notice = achievementToast(checkAchievements());
+  },
+  'hire-employee': (el) => {
+    const result = E.hire(store.campaign, el.dataset.role);
     if (!result.ok) { store.ui.notice = result.why; return; }
     store.ui.notice = achievementToast(checkAchievements());
   },

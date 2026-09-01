@@ -116,6 +116,24 @@ everywhere" rule that drives the supply network: park cash you are not about
 to spend on a depot or a truck, and it is worth more by the time you pull it
 back out. Deposits and withdrawals are instant and free either way.
 
+## The office
+
+Five roles, hireable once each from an **Office** card inside Operations,
+each a flat monthly-hire that turns into a small daily wage — paid the same
+way the bank and the network already are, once per settled run, for exactly
+the days that run took:
+
+- **💹 Finance Manager** — the bank earns 0.2%/day more interest.
+- **🧭 Logistics Manager** — depot and truck upkeep down 25%, wholesale orders down 5%.
+- **🧑‍💼 HR Manager** — staff wages and hiring cost down 25%.
+- **🧪 Flavor Scientist** — staffed corners earn 8% more from a better recipe.
+- **🤝 M&A Specialist** — unlocks buying out an unclaimed corner outright,
+  from its briefing screen, for three times its profit target — a shortcut
+  for cash, not a bargain, and no operating profit since you didn't earn it.
+
+Every effect is a plain multiplier that is exactly 1x — untouched — until
+the relevant role is hired.
+
 ## Tutorial and achievements
 
 A five-slide welcome sequence plays automatically the first time the page
@@ -124,15 +142,15 @@ explanation of the loop — nothing gated behind it, nothing to miss by
 skipping.
 
 Achievements (`js/achievements.js`) are a record of what you've actually
-done — 45 of them, spanning first cup, first corner, clearing an
+done — 48 of them, spanning first cup, first corner, clearing an
 Impossible corner, winning every difficulty tier at least once, taking a
 city, building every farm and factory in three cities, running a fleet of
 ten trucks, selling your first small/large/BYO/card-paid cup, your first
-bank deposit, going 50 or 100 or 365 days without stopping, and going a
-whole run without a spoiled lemon — with no reward attached beyond a small
-toast and a line on the list. They're checked fresh from live game state
-after anything that could have earned one, so there's nothing to keep in
-sync by hand.
+bank deposit, hiring your whole office, buying out a corner through M&A,
+going 50 or 100 or 365 days without stopping, and going a whole run without
+a spoiled lemon — with no reward attached beyond a small toast and a line on
+the list. They're checked fresh from live game state after anything that
+could have earned one, so there's nothing to keep in sync by hand.
 
 ## Project layout
 
@@ -143,21 +161,22 @@ js/sim.js               day simulation, modifiers, and the reference player
 js/campaign.js          cities, corners, tiers, targets, progression
 js/ops.js               depots, wholesale, staffing, the daily network tick
 js/bank.js              deposits, withdrawals, and daily-compounding interest
+js/employees.js         the five office roles and their passive effects
 js/achievements.js      the achievement catalog and its unlock rules
 js/store.js             shared state, the save file, stats and unlocks
 js/app.js               router, HUD, input
 js/ui/                  screens: map.js, run.js, opsui.js, bankui.js,
                          premium.js, tutorial.js, achievements.js, kit.js
-tests/                  114 tests across the rules, the campaign, operations and the bank
+tests/                  126 tests across the rules, the campaign, operations, the bank and the office
 tools/make-icons.mjs    regenerates icons/*.png from icons/icon.svg
 ```
 
-`sim.js`, `campaign.js`, `ops.js`, `bank.js` and `achievements.js` are pure
-and DOM-free, so the whole game can be played and balanced from node. The
-same seed always replays the same season.
+`sim.js`, `campaign.js`, `ops.js`, `bank.js`, `employees.js` and
+`achievements.js` are pure and DOM-free, so the whole game can be played and
+balanced from node. The same seed always replays the same season.
 
 ```bash
-npm test           # 114 tests
+npm test           # 126 tests
 npm run icons      # rebuild PNG icons from the SVG (needs headless Chromium)
 ```
 

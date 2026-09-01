@@ -1,5 +1,6 @@
 /** The bank: park treasury cash to earn interest while you're out playing. */
 import * as B from '../bank.js';
+import * as E from '../employees.js';
 import { store, checkAchievements, achievementToast } from '../store.js';
 import { money, whole, fact, row, stepper, backBar } from './kit.js';
 
@@ -8,7 +9,8 @@ function bankScreen() {
   B.ensureBank(campaign);
   const amount = store.ui.bankAmount;
   const balance = campaign.bank.balance;
-  const dailyEarnings = Math.round(balance * B.DAILY_RATE * 100) / 100;
+  const rate = B.DAILY_RATE + E.interestBonus(campaign);
+  const dailyEarnings = Math.round(balance * rate * 100) / 100;
 
   return {
     body: `
@@ -19,10 +21,11 @@ function bankScreen() {
           ${fact('In the bank', money(balance), 'good')}
           ${fact('Treasury cash', money(campaign.treasury))}
           ${fact('Combined', whole(balance + campaign.treasury))}
-          ${fact('Interest rate', `${(B.DAILY_RATE * 100).toFixed(1)}%/day`)}
+          ${fact('Interest rate', `${(rate * 100).toFixed(1)}%/day`)}
         </div>
         ${balance > 0 ? `<p class="muted" style="margin-top:8px">At this balance, that's roughly ${money(dailyEarnings)} a day —
            it compounds for every day you spend working a corner, campaign or free play.</p>` : ''}
+        ${E.isHired(campaign, 'finance') ? '<p class="muted good" style="margin-top:8px">💹 Your Finance Manager is adding 0.2%/day on top of the base rate.</p>' : ''}
       </div>
       <div class="card">
         <h2>Move money</h2>

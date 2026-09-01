@@ -3,7 +3,8 @@ import * as C from '../campaign.js';
 import * as S from '../sim.js';
 import { opsUnlocked } from '../campaign.js';
 import { restockCost } from '../ops.js';
-import { store, save, loadSave, clearSave, bestScore, loadUnlockedAchievements } from '../store.js';
+import * as E from '../employees.js';
+import { store, save, loadSave, clearSave, bestScore, loadUnlockedAchievements, checkAchievements, achievementToast } from '../store.js';
 import { ACHIEVEMENTS } from '../achievements.js';
 import { money, whole, fact, tierPill, bar, backBar } from './kit.js';
 
@@ -127,7 +128,7 @@ function opsReportCard(report) {
         <strong class="${report.net >= 0 ? 'good' : 'bad'}">${money(report.net)}</strong>
         into the treasury from ${report.cups} cups.</p>
       ${units > 0
-        ? `<p class="muted">It drew ${units} units out of your depots — about ${money(restockCost(used))} to replace.</p>`
+        ? `<p class="muted">It drew ${units} units out of your depots — about ${money(restockCost(used, store.campaign))} to replace.</p>`
         : ''}
       ${report.produced && (report.produced.lemons + report.produced.sugar + report.produced.cups) > 0
         ? `<p class="muted">Farms and the factory pressed ${report.produced.lemons + report.produced.sugar + report.produced.cups} units straight into the depots, for free.</p>`
@@ -218,11 +219,29 @@ function cornerScreen() {
         <ul class="notes">
           ${notes.map((n) => `<li>${n.icon} ${n.text}</li>`).join('') || '<li>An ordinary corner. No excuses.</li>'}
         </ul>
-      </div>`,
+      </div>
+      ${E.hasMA(campaign) ? acquireCard(campaign, cityId, cornerIndex) : ''}`,
     actions: `
       <button class="btn" data-act="start-run">Set Up Here</button>
       <button class="btn-ghost" data-act="to-city">Pick Another Corner</button>`,
   };
+}
+
+/** M&A: skip playing this corner and just buy it, at a stiff premium. */
+function acquireCard(campaign, cityId, cornerIndex) {
+  const cost = C.acquisitionCost(campaign, cityId, cornerIndex);
+  return `
+    <div class="card">
+      <h2>🤝 M&amp;A</h2>
+      <p class="muted">Your specialist can buy this corner outright instead of you playing it —
+        at three times the profit target, since a shortcut is not a bargain.</p>
+      <div class="chip-row" style="margin-top:10px">
+        <button class="chip" data-act="acquire-corner" data-city="${cityId}" data-index="${cornerIndex}"
+          ${campaign.treasury < cost ? 'disabled' : ''}>
+          Buy It Out · ${money(cost)}
+        </button>
+      </div>
+    </div>`;
 }
 
 /* ------------------------------------------------------------------ *
@@ -273,5 +292,15 @@ export const actions = {
     if (next == null) return;
     store.ui.cornerIndex = next;
     store.ui.view = 'corner';
+  },
+  'acquire-corner': (el) => {
+    const cityId = el.dataset.city;
+    const index = Number(el.dataset.index);
+    const result = C.acquireCorner(store.campaign, cityId, index);
+    if (!result.ok) { store.ui.notice = result.why; return; }
+    store.ui.claimResult = result;
+    const toast = achievementToast(checkAchievements({ acquiredCorner: true }));
+    store.ui.notice = toast || `🤝 ${C.getCity(cityId).name} corner acquired.`;
+    store.ui.view = 'city';
   },
 };

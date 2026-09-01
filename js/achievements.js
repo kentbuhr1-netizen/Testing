@@ -71,6 +71,11 @@ export const ACHIEVEMENTS = {
 
   // Card payments
   cardCarrier:     { icon: '💳', title: 'Card Carrier',     desc: 'Sell 100 cups paid for by card, over your lifetime.' },
+
+  // The office
+  officeStarted:   { icon: '🧑‍💼', title: 'Built An Office',  desc: 'Hire your first employee.' },
+  fullCSuite:      { icon: '🏢', title: 'Full C-Suite',      desc: 'Hire all five office roles.' },
+  corporateRaider: { icon: '🤝', title: 'Corporate Raider',  desc: 'Buy out a corner outright through your M&A Specialist.' },
 };
 
 /**
@@ -140,6 +145,10 @@ export function evaluateAchievements(ctx, unlocked) {
   check('compoundInterest', (ctx.interestEarnedEver || 0) >= 500);
 
   check('cardCarrier', (ctx.cardCupsEver || 0) >= 100);
+
+  check('officeStarted', (ctx.employeesHired || 0) >= 1);
+  check('fullCSuite', !!ctx.allEmployeesHired);
+  check('corporateRaider', !!ctx.acquiredCorner);
 
   return newly;
 }

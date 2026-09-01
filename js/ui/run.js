@@ -2,6 +2,7 @@
 import * as S from '../sim.js';
 import * as C from '../campaign.js';
 import * as B from '../bank.js';
+import * as Emp from '../employees.js';
 import { tickOps, newOps } from '../ops.js';
 import { store, render, recordBest, isPremiumUnlocked, recordDay, recordTierWon, recordInterest, checkAchievements, achievementToast } from '../store.js';
 import { money, whole, cents, fact, stepper, row, tierPill } from './kit.js';
@@ -418,6 +419,7 @@ function runOverScreen() {
           </div>
           ${score.enhancerCups > 0 ? `<p class="muted" style="margin-top:8px">${score.enhancerCups} enhancers sold for ${money(score.enhancerRevenue)} on top of the base price.</p>` : ''}
           ${store.ui.interestEarned > 0 ? `<p class="muted good" style="margin-top:8px">🏦 Your bank balance earned ${money(store.ui.interestEarned)} in interest while you played.</p>` : ''}
+          ${store.ui.wagesPaid > 0 ? `<p class="muted" style="margin-top:8px">🧑‍💼 Your office was paid ${money(store.ui.wagesPaid)} for the days you were out.</p>` : ''}
           ${chart}
           <p class="muted" style="margin-top:6px">Daily profit, day 1 → ${r.history.length}</p>
         </div>`,
@@ -451,6 +453,7 @@ function runOverScreen() {
         ? `<div class="card">
              <p>${money(score.net)} goes into the treasury.</p>
              ${store.ui.interestEarned > 0 ? `<p class="muted good">🏦 Your bank balance earned ${money(store.ui.interestEarned)} in interest while you played.</p>` : ''}
+             ${store.ui.wagesPaid > 0 ? `<p class="muted">🧑‍💼 Your office was paid ${money(store.ui.wagesPaid)} for the days you were out.</p>` : ''}
              ${claimed?.cityJustDone ? `<p class="good"><strong>${city.name} is yours — all ${C.CORNERS_PER_CITY} corners.</strong></p>` : ''}
              ${claimed?.opsJustUnlocked ? '<p class="good"><strong>🏭 Operations unlocked.</strong> You can now run depots, buy wholesale and staff the corners you own.</p>' : ''}
            </div>`
@@ -557,12 +560,14 @@ function settleRun() {
   }
 
   store.ui.interestEarned = 0;
+  store.ui.wagesPaid = 0;
   if (store.campaign) {
-    const earned = B.accrueInterest(store.campaign, r.history.length);
+    const earned = B.accrueInterest(store.campaign, r.history.length, Emp.interestBonus(store.campaign));
     if (earned > 0) {
       recordInterest(earned);
       store.ui.interestEarned = earned;
     }
+    store.ui.wagesPaid = Emp.payWages(store.campaign, r.history.length);
   }
 
   const cleanRunFinished = r.history.every((d) => !(d.spoiledLemons > 0));

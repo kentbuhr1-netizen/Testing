@@ -107,6 +107,14 @@ test('card payment achievements read lifetime card cups, not one day', () => {
   assert.deepEqual(evaluateAchievements({ cardCupsEver: 100 }, {}), ['cardCarrier']);
 });
 
+test('office and M&A achievements read the campaign, not a single day', () => {
+  assert.deepEqual(evaluateAchievements({ employeesHired: 1 }, {}), ['officeStarted']);
+  assert.deepEqual(evaluateAchievements({ employeesHired: 4 }, {}), ['officeStarted']);
+  assert.deepEqual(evaluateAchievements({ employeesHired: 5, allEmployeesHired: true }, {}).sort(),
+    ['officeStarted', 'fullCSuite'].sort());
+  assert.deepEqual(evaluateAchievements({ acquiredCorner: true }, {}), ['corporateRaider']);
+});
+
 test('a rich context can unlock several achievements in one pass', () => {
   const ctx = {
     cupsSoldEver: 200,

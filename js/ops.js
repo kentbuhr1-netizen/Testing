@@ -14,6 +14,7 @@
  */
 import { CITIES, getCity, cornersFor, claimedIn, TIERS, mergeMods } from './campaign.js';
 import { withMods, mulberry32 } from './sim.js';
+import * as Employees from './employees.js';
 
 export const WAREHOUSE_COST = 250;
 export const WAREHOUSE_BASE_CAPACITY = 2500;  // units of stock (any mix)
@@ -39,6 +40,13 @@ export function bulkDiscount(qty) {
 export function wholesaleCost(unit, qty) {
   return Math.round(WHOLESALE[unit] * qty * bulkDiscount(qty) * 100) / 100;
 }
+
+// Employee discounts read as multipliers off the base constants above, so
+// "no employee hired" always reduces to the numbers this file already had.
+export const effectiveWage = (campaign) => Math.round(STAFF_WAGE * Employees.wageMult(campaign) * 100) / 100;
+export const effectiveHireCost = (campaign) => Math.round(STAFF_HIRE_COST * Employees.hireCostMult(campaign) * 100) / 100;
+export const effectiveWarehouseUpkeep = (campaign) => Math.round(WAREHOUSE_UPKEEP * Employees.upkeepMult(campaign) * 100) / 100;
+export const effectiveTruckUpkeep = (campaign) => Math.round(TRUCK_UPKEEP * Employees.upkeepMult(campaign) * 100) / 100;
 
 /**
  * Production buildings — at most one of each per city. Each needs a depot to
@@ -184,10 +192,10 @@ export function cityOutlook(campaign, cityId) {
   const avgIcePrice = iceUnitsNeeded > 0 ? iceCostGross / iceUnitsNeeded : 0;
   const freeIce = hasBuilding(ops, cityId, 'iceMaker') ? Math.min(iceUnitsNeeded, BUILDINGS.iceMaker.dailyYield) : 0;
 
-  const wages = staffed.length * STAFF_WAGE;
-  const upkeep = (hasWarehouse(ops, cityId) ? WAREHOUSE_UPKEEP : 0) + buildingUpkeep;
-  const revenue = Math.round(sum('revenue') * 100) / 100;
-  const stockCost = Math.round(Math.max(0, sum('stockCost') - farmSavings) * 100) / 100;
+  const wages = Math.round(staffed.length * effectiveWage(campaign) * 100) / 100;
+  const upkeep = (hasWarehouse(ops, cityId) ? effectiveWarehouseUpkeep(campaign) : 0) + buildingUpkeep;
+  const revenue = Math.round(sum('revenue') * Employees.flavorMult(campaign) * 100) / 100;
+  const stockCost = Math.round(Math.max(0, sum('stockCost') * Employees.wholesaleMult(campaign) - farmSavings) * 100) / 100;
   const iceCost = Math.round(Math.max(0, iceCostGross - freeIce * avgIcePrice) * 100) / 100;
   const costs = Math.round((iceCost + sum('rent') + wages + upkeep + stockCost) * 100) / 100;
   return {
@@ -275,21 +283,22 @@ export function restock(campaign, cityId, order) {
   const units = (order.lemons || 0) + (order.sugar || 0) + (order.cups || 0);
   if (units <= 0) return { ok: false, why: 'Nothing ordered.' };
   if (units > spaceLeft(w)) return { ok: false, why: 'The depot cannot hold that much.' };
-  const cost = restockCost(order);
+  const cost = restockCost(order, campaign);
   if (cost > campaign.treasury) return { ok: false, why: 'Not enough in the treasury.' };
   campaign.treasury = round2(campaign.treasury - cost);
   for (const unit of ['lemons', 'sugar', 'cups']) w.stock[unit] += order[unit] || 0;
   return { ok: true, cost };
 }
 
-export function restockCost(order) {
+/** `campaign` is optional — omit it for a discount-free estimate (a Logistics Manager only ever lowers this). */
+export function restockCost(order, campaign) {
   const units = (order.lemons || 0) + (order.sugar || 0) + (order.cups || 0);
   const discount = bulkDiscount(units); // the whole order counts toward the break
   const raw =
     WHOLESALE.lemons * (order.lemons || 0) +
     WHOLESALE.sugar * (order.sugar || 0) +
     WHOLESALE.cups * (order.cups || 0);
-  return Math.round(raw * discount * 100) / 100;
+  return Math.round(raw * discount * Employees.wholesaleMult(campaign) * 100) / 100;
 }
 
 export function hireStaff(campaign, cityId, cornerIndex) {
@@ -299,8 +308,9 @@ export function hireStaff(campaign, cityId, cornerIndex) {
   }
   if (isStaffed(ops, cityId, cornerIndex)) return { ok: false, why: 'Already staffed.' };
   if (!hasWarehouse(ops, cityId)) return { ok: false, why: 'Build a depot in this city first.' };
-  if (campaign.treasury < STAFF_HIRE_COST) return { ok: false, why: 'Not enough in the treasury.' };
-  campaign.treasury = round2(campaign.treasury - STAFF_HIRE_COST);
+  const hireCost = effectiveHireCost(campaign);
+  if (campaign.treasury < hireCost) return { ok: false, why: 'Not enough in the treasury.' };
+  campaign.treasury = round2(campaign.treasury - hireCost);
   (ops.staffed[cityId] || (ops.staffed[cityId] = [])).push(cornerIndex);
   ops.staffed[cityId].sort((a, b) => a - b);
   return { ok: true };
@@ -426,8 +436,9 @@ export function tickOps(campaign, days) {
         dst.stock[truck.cargo] += moved;
         summary.trucked += moved;
       }
-      campaign.treasury = round2(campaign.treasury - TRUCK_UPKEEP);
-      summary.costs += TRUCK_UPKEEP;
+      const truckUpkeep = effectiveTruckUpkeep(campaign);
+      campaign.treasury = round2(campaign.treasury - truckUpkeep);
+      summary.costs += truckUpkeep;
     }
 
     // 3. Staffed corners trade against whatever the depot now holds.
@@ -439,7 +450,7 @@ export function tickOps(campaign, days) {
       const rng = mulberry32(ops.day * 7717 + cityId.length * 131);
       let cityFreeIce = freeIce[cityId] || 0;
 
-      let dayCosts = (hasWarehouse(ops, cityId) ? WAREHOUSE_UPKEEP : 0) + staffed.length * STAFF_WAGE;
+      let dayCosts = (hasWarehouse(ops, cityId) ? effectiveWarehouseUpkeep(campaign) : 0) + staffed.length * effectiveWage(campaign);
       let dayIncome = 0;
       let served = 0;
 
@@ -475,7 +486,7 @@ export function tickOps(campaign, days) {
         cityFreeIce -= fromFree;
         const paidIce = Math.round((iceNeeded - fromFree) * look.icePriceEach * 100) / 100;
 
-        dayIncome += look.price * canPour;
+        dayIncome += look.price * canPour * Employees.flavorMult(campaign);
         dayCosts += paidIce + look.rent;
         served += canPour;
       }

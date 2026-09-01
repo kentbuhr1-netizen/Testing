@@ -202,7 +202,7 @@ function acceptRestock(trial, field, next) {
   if (!depot) return false;
   const units = trial.lemons + trial.sugar + trial.cups;
   if (units > spaceLeft(depot)) return false;
-  if (restockCost(trial) > store.campaign.treasury) return false;
+  if (restockCost(trial, store.campaign) > store.campaign.treasury) return false;
   store.ui.restock[field] = next;
   return true;
 }

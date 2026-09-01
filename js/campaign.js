@@ -13,6 +13,7 @@
  */
 import { parProfit, mulberry32 } from './sim.js';
 import { newBank } from './bank.js';
+import { newStaff, hasMA } from './employees.js';
 
 export const CORNERS_PER_CITY = 25;
 /**
@@ -309,6 +310,7 @@ export function newCampaign() {
     targets: {},   // "cityId:index" → the bar, cached once shown
     ops: null,     // built by ops.js once five cities are done
     bank: newBank(),
+    employees: newStaff(),
     stats: { runsPlayed: 0, runsWon: 0, cupsSold: 0 },
   };
 }
@@ -356,6 +358,26 @@ export function claimCorner(campaign, cityId, i, profit) {
 }
 
 export const opsUnlocked = (campaign) => completedCities(campaign).length >= CITIES_FOR_OPS;
+
+/* ------------------------------------------------------------------ *
+ * M&A — buying a corner instead of playing it
+ * ------------------------------------------------------------------ */
+
+/** A stiff premium over playing it yourself — this is a shortcut, not a bargain. */
+export function acquisitionCost(campaign, cityId, cornerIndex) {
+  return Math.round(targetFor(campaign, cityId, cornerIndex) * 3 * 100) / 100;
+}
+
+/** Claims a corner outright for cash, via the M&A specialist. No operating profit — you didn't earn it, you bought it. */
+export function acquireCorner(campaign, cityId, cornerIndex) {
+  if (!hasMA(campaign)) return { ok: false, why: 'Hire an M&A Specialist first.' };
+  if (!isCornerUnlocked(campaign, cityId, cornerIndex)) return { ok: false, why: 'That corner is not open yet.' };
+  if (isClaimed(campaign, cityId, cornerIndex)) return { ok: false, why: 'Already yours.' };
+  const cost = acquisitionCost(campaign, cityId, cornerIndex);
+  if (campaign.treasury < cost) return { ok: false, why: 'Not enough in the treasury.' };
+  campaign.treasury = Math.round((campaign.treasury - cost) * 100) / 100;
+  return { ok: true, ...claimCorner(campaign, cityId, cornerIndex, 0) };
+}
 
 export function campaignProgress(campaign) {
   const claimed = CITIES.reduce((n, c) => n + claimedIn(campaign, c.id).length, 0);

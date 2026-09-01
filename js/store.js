@@ -8,6 +8,7 @@
 import { ENHANCERS } from './sim.js';
 import { getCity, completedCities, CITIES } from './campaign.js';
 import { ACHIEVEMENTS, evaluateAchievements } from './achievements.js';
+import { EMPLOYEES, headcount } from './employees.js';
 
 const SAVE_KEY = 'lemonade-stand-campaign-v2';
 const BEST_KEY = 'lemonade-stand-best-v1';
@@ -33,6 +34,7 @@ export const store = {
     truckDraft: null,   // { from, to, cargo, amount } while editingTruck is set
     bankAmount: 0,      // draft deposit/withdraw amount on the bank screen
     interestEarned: 0,  // interest the bank paid out at the end of the last settled run
+    wagesPaid: 0,       // employee wages paid at the end of the last settled run
     showPremium: false,      // the never-expire paywall screen, shown over whatever's current
     showAchievements: false, // the achievements list, shown over whatever's current
     showTutorial: false,     // the first-time welcome sequence
@@ -260,6 +262,8 @@ export function checkAchievements(extra = {}) {
     cardCupsEver: stats.cardCupsEver,
     interestEarnedEver: stats.interestEarnedEver,
     everDeposited: campaign?.bank?.hasDeposited || false,
+    employeesHired: campaign ? headcount(campaign) : 0,
+    allEmployeesHired: campaign ? headcount(campaign) >= Object.keys(EMPLOYEES).length : false,
     tiersWon: stats.tiersWon,
     neverExpireLemons: isPremiumUnlocked('neverExpireLemons'),
     ...extra,
