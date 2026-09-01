@@ -13,6 +13,8 @@ import * as runUi from './ui/run.js';
 import * as opsUi from './ui/opsui.js';
 import { money, lives, bar } from './ui/kit.js';
 import { wholesaleCost, spaceLeft } from './ops.js';
+import * as Entitlements from './payments/client/entitlements.js';
+import { PAYMENTS } from './payments.config.js';
 
 const screenEl = document.getElementById('screen');
 const actionsEl = document.getElementById('actions');
@@ -199,6 +201,18 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });
+}
+
+/**
+ * Work out what has been paid for before the first paint, so a player who
+ * owns the game never sees a locked world flash past. An unconfigured build,
+ * an offline start and a dead shop server all resolve to "carry on".
+ */
+Entitlements.configure(PAYMENTS);
+try {
+  await Entitlements.init();
+} catch {
+  /* never let the shop stop the game from starting */
 }
 
 // Always open on the title screen; Continue picks the saved game back up.

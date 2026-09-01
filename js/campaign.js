@@ -319,6 +319,17 @@ export function completedCities(campaign) {
   return CITIES.filter((c) => cityDone(campaign, c.id)).map((c) => c.id);
 }
 
+/**
+ * Is this city inside the free tier?
+ *
+ * Purely positional, and kept here with the rest of the progression rules
+ * rather than in the shop: the campaign decides what the free tier *is*, and
+ * the payments layer only decides whether it applies.
+ */
+export function isCityFree(cityId, freeCities) {
+  return CITY_INDEX[cityId] < freeCities;
+}
+
 /** Cities open up two at a time, so there is always somewhere else to go. */
 export function isCityUnlocked(campaign, cityId) {
   return CITY_INDEX[cityId] <= completedCities(campaign).length + 1;

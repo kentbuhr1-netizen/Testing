@@ -100,3 +100,27 @@ Two constants set how long the campaign runs, in `js/campaign.js`:
 
 Progress saves to `localStorage` after every action. **Free Play** — the original
 open-ended 30-day season with nothing stacked against you — is still on the menu.
+
+---
+
+## The other games, and the shop
+
+This repository is turning into a series — one new game a week, each a
+self-contained project sharing the same spine (pure DOM-free simulation
+modules, seeded determinism, targets measured against reference play, and an
+operations layer that unlocks partway through).
+
+| | |
+|---|---|
+| `.` | 🍋 **Lemonade Stand** — this game |
+| `games/outbreak` | 🦠 **Outbreak** — epidemic containment |
+| `shared/payments` | the shop: Stripe checkout, signed licences, one server for every game |
+
+```bash
+npm run test:all     # every game's tests, plus the payments tests
+npm run sync         # copy the shared payments client into each game
+```
+
+Payments are **off** unless configured: with `js/payments.config.js` left
+blank, every game here is the complete game. See
+[`shared/payments/README.md`](shared/payments/README.md) to switch the shop on.

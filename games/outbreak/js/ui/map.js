@@ -7,6 +7,14 @@ import * as S from '../sim.js';
 import { newOps } from '../ops.js';
 import { startDistrict } from './run.js';
 import { money, lives, fact, tierPill, bar, backBar } from './kit.js';
+import * as Entitlements from '../payments/client/entitlements.js';
+import { paywallScreen, paywallActions, resetPaywall } from '../payments/client/paywall.js';
+import { PAYMENTS } from '../payments.config.js';
+
+/** Regions this build lets the player into without paying. */
+const freeRegions = () => Entitlements.freeTier('outbreak').regions ?? C.REGIONS.length;
+const regionPaidFor = (regionId) =>
+  Entitlements.owns('outbreak') || C.isRegionFree(regionId, freeRegions());
 
 /* ------------------------------------------------------------------ *
  * Title
@@ -29,6 +37,8 @@ function title() {
       ${saved ? `<button class="btn primary" data-act="continueGame">Continue</button>` : ''}
       <button class="btn ${saved ? '' : 'primary'}" data-act="newCampaign">${saved ? 'New campaign' : 'Start a campaign'}</button>
       <button class="btn" data-act="freePlay">Free response</button>
+      ${Entitlements.configured() && !Entitlements.owns('outbreak')
+        ? `<button class="btn ghost" data-act="openShop">Unlock the full campaign</button>` : ''}
       <button class="btn ghost" data-act="openHelp">How to play</button>`,
   };
 }
@@ -42,17 +52,31 @@ function world() {
   const progress = C.campaignProgress(campaign);
 
   const rows = C.REGIONS.map((region) => {
-    const unlocked = C.isRegionUnlocked(campaign, region.id);
+    const reached = C.isRegionUnlocked(campaign, region.id);
+    const paid = regionPaidFor(region.id);
     const held = C.heldIn(campaign, region.id).length;
     const done = C.regionDone(campaign, region.id);
+
+    // Three states: not reached yet, reached but not bought, and open.
+    if (reached && !paid) {
+      return `
+        <button class="tile" data-act="openShop" data-region="${region.id}">
+          <span class="tile-flag">🔓</span>
+          <span class="tile-main">
+            <span class="tile-name">${region.name}</span>
+            <span class="tile-sub">${region.challenge.name} — unlock to play</span>
+          </span>
+          <span class="tile-meter"><span class="tile-count">Buy</span></span>
+        </button>`;
+    }
     return `
-      <button class="tile ${unlocked ? '' : 'locked'} ${done ? 'done' : ''}"
-              data-act="${unlocked ? 'openRegion' : ''}" data-region="${region.id}"
-              ${unlocked ? '' : 'disabled'}>
-        <span class="tile-flag">${unlocked ? region.flag : '🔒'}</span>
+      <button class="tile ${reached ? '' : 'locked'} ${done ? 'done' : ''}"
+              data-act="${reached ? 'openRegion' : ''}" data-region="${region.id}"
+              ${reached ? '' : 'disabled'}>
+        <span class="tile-flag">${reached ? region.flag : '🔒'}</span>
         <span class="tile-main">
           <span class="tile-name">${region.name}${done ? ' ✓' : ''}</span>
-          <span class="tile-sub">${unlocked ? region.challenge.name : 'Locked'}</span>
+          <span class="tile-sub">${reached ? region.challenge.name : 'Locked'}</span>
         </span>
         <span class="tile-meter">
           <span class="tile-count">${held}/${C.DISTRICTS_PER_REGION}</span>
@@ -61,6 +85,8 @@ function world() {
       </button>`;
   }).join('');
 
+  const gated = Entitlements.configured() && !Entitlements.owns('outbreak');
+
   return {
     body: `
       <h1 class="title">The world</h1>
@@ -68,6 +94,7 @@ function world() {
       ${C.opsUnlocked(campaign) ? `<button class="btn wide" data-act="openOps">🏛️ The agency</button>` : ''}
       ${store.ui.opsReport ? agencyFlash(store.ui.opsReport) : ''}
       <div class="tiles">${rows}</div>
+      ${gated ? `<button class="btn wide primary" data-act="openShop">Unlock all ${C.REGIONS.length} regions</button>` : ''}
       <button class="btn ghost wide" data-act="openHelp">How to play</button>
       <button class="btn ghost wide danger" data-act="wipeSave">Delete this campaign</button>
     `,
@@ -241,13 +268,33 @@ function help() {
   };
 }
 
-export const screens = { title, world, region, district, help };
+function shop() {
+  return paywallScreen({ game: PAYMENTS.game, gameName: PAYMENTS.gameName });
+}
+
+export const screens = { title, world, region, district, help, shop };
 
 /* ------------------------------------------------------------------ *
  * Actions
  * ------------------------------------------------------------------ */
 
+const shopActions = paywallActions({
+  rerender: render,
+  close: () => {
+    resetPaywall();
+    store.ui.view = store.ui.shopFrom || (store.campaign ? 'world' : 'title');
+  },
+});
+
 export const actions = {
+  ...shopActions,
+
+  openShop() {
+    resetPaywall();
+    store.ui.shopFrom = store.ui.view === 'shop' ? store.ui.shopFrom : store.ui.view;
+    store.ui.view = 'shop';
+  },
+
   newCampaign() {
     clearSave();
     store.campaign = C.newCampaign();
@@ -274,7 +321,9 @@ export const actions = {
   },
 
   openRegion(el) {
-    store.ui.regionId = el.dataset.region;
+    const regionId = el.dataset.region;
+    if (!regionPaidFor(regionId)) return actions.openShop();
+    store.ui.regionId = regionId;
     store.ui.view = 'region';
   },
 

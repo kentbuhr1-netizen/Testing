@@ -515,3 +515,30 @@ h1 .of { font-size: 15px; font-weight: 600; color: var(--ink-soft); }
 }
 
 .subtotal { border: 0; padding-top: 4px; margin-top: 0; font-size: 14px; font-weight: 600; }
+
+/* ---------- Shop ---------- */
+
+.card-title {
+  margin: 0 0 8px;
+  font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.title { margin: 0 0 2px; font-size: 26px; line-height: 1.15; letter-spacing: -.02em; }
+.sub { margin: 0 0 16px; color: var(--ink-soft); font-size: 14px; }
+.small { font-size: 13px; }
+.row-value { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.text-input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.text-input:focus { outline: 2px solid var(--lemon-deep); outline-offset: 1px; }

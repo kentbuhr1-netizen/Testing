@@ -330,6 +330,17 @@ export function completedRegions(campaign) {
   return REGIONS.filter((r) => regionDone(campaign, r.id)).map((r) => r.id);
 }
 
+/**
+ * Is this region inside the free tier?
+ *
+ * Purely positional, and deliberately kept here with the rest of the
+ * progression rules rather than in the shop: the campaign decides what the
+ * free tier *is*, and the payments layer only decides whether it applies.
+ */
+export function isRegionFree(regionId, freeRegions) {
+  return REGION_INDEX[regionId] < freeRegions;
+}
+
 /** Regions open two at a time, so there is always somewhere else to go. */
 export function isRegionUnlocked(campaign, regionId) {
   return REGION_INDEX[regionId] <= completedRegions(campaign).length + 1;
