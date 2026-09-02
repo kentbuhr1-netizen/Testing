@@ -1,9 +1,10 @@
 /**
  * Pure-JS Monte Carlo used to pick FREE_PLAY_STAKES in js/sim.js: replays a
- * "reckless" buying/pricing policy against sim.js directly (no browser), so
- * thousands of seasons run in seconds. For each free-play difficulty tier,
- * binary-searches the starting stake that gives a careless player roughly
- * the target bankruptcy rate over a full 30-day season.
+ * "reckless" buying/pricing policy (tools/reckless-persona.mjs) against
+ * sim.js directly (no browser), so thousands of seasons run in seconds. For
+ * each free-play difficulty tier, binary-searches the starting stake that
+ * gives a careless player roughly the target bankruptcy rate over a full
+ * 30-day season.
  *
  *   node tools/calibrate-freeplay.mjs
  *
@@ -12,75 +13,14 @@
  * then copy the resulting stakes into FREE_PLAY_STAKES.
  */
 import * as S from '../js/sim.js';
-
-const rand = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
-const chance = (p) => Math.random() < p;
-const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-const round2 = (n) => Math.round(n * 100) / 100;
-
-const ORDER_FIELDS = [
-  ['lemons', 5], ['sugar', 5], ['ice', 25],
-  ['cupsSmall', 10], ['cups', 10], ['cupsLarge', 10],
-];
-
-function totalOrderCost(prices, order) {
-  return round2(S.buyCost(prices, order) + S.sizedCupOrderCost(prices, order) + S.enhancerOrderCost(order.enhancers));
-}
-
-function emptyOrder() {
-  return { lemons: 0, sugar: 0, ice: 0, cups: 0, cupsSmall: 0, cupsLarge: 0, enhancers: {} };
-}
-
-/** One reckless shopping trip: several random affordable increments. */
-function recklessBuy(state, reckless) {
-  const order = emptyOrder();
-  const picks = reckless ? rand(4, 7) : rand(1, 3);
-  for (let i = 0; i < picks; i++) {
-    const [field, step] = pick(ORDER_FIELDS);
-    const trial = { ...order, [field]: order[field] + step };
-    if (totalOrderCost(state.today.prices, trial) <= state.money) order[field] = trial[field];
-  }
-  const cost = totalOrderCost(state.today.prices, order);
-  if (cost <= state.money) {
-    state.money = round2(state.money - cost);
-    S.receiveOrder(state, order);
-  }
-}
-
-/** Fiddles the recipe and price like someone who has no idea what "ideal" means. */
-function recklessSetup(state) {
-  if (chance(0.5)) {
-    for (let i = 0; i < rand(1, 3); i++) {
-      const field = pick(['lemons', 'sugar', 'ice']);
-      const [lo, hi] = field === 'ice' ? [0, 7] : [1, 12];
-      const step = chance(0.5) ? 1 : -1;
-      state.recipe[field] = Math.min(hi, Math.max(lo, state.recipe[field] + step));
-    }
-  }
-  if (chance(0.3)) {
-    for (let i = 0; i < rand(1, 3); i++) {
-      const step = chance(0.5) ? 0.05 : -0.05;
-      state.price = round2(Math.min(5, Math.max(0.05, state.price + step)));
-    }
-  }
-}
-
-/** Runs one full reckless free-play season; returns true if it ended in bankruptcy. */
-function playOneSeason(stake, days) {
-  const state = S.newRun({ days, stake, target: null });
-  const reckless = chance(0.2);
-  while (state.phase !== 'gameover') {
-    recklessBuy(state, reckless);
-    recklessSetup(state);
-    const pending = S.simulateDay(state);
-    S.commitDay(state, pending);
-  }
-  return Boolean(state.bankrupt);
-}
+import { playReckless, round2 } from './reckless-persona.mjs';
 
 function bankruptcyRate(stake, days, trials) {
   let bankrupt = 0;
-  for (let i = 0; i < trials; i++) if (playOneSeason(stake, days)) bankrupt++;
+  for (let i = 0; i < trials; i++) {
+    const state = playReckless({ days, stake, target: null });
+    if (state.bankrupt) bankrupt++;
+  }
   return bankrupt / trials;
 }
 
