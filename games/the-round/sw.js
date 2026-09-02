@@ -1,5 +1,5 @@
 /* Offline shell: the game is static, so cache it and serve from cache first. */
-const CACHE = 'the-round-v1';
+const CACHE = 'the-round-v2';
 const ASSETS = [
   './',
   './index.html',
