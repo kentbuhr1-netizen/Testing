@@ -50,6 +50,8 @@ what make them good:
 |---|---|
 | [`shared/payments`](shared/payments) | The shop: Stripe checkout, signed licences, one server for every game |
 | `tools/sync-payments.mjs` | Copies the payments client into each game — a service worker only caches its own scope, so each game owns a copy |
+| `tools/check-structure.mjs` | Checks what no test can see: that every game caches everything it loads, ships everything its manifest promises, and imports nothing from outside itself |
+| `.github/workflows/check.yml` | Runs `npm run check` on every push and pull request |
 | `.github/workflows/open-game-pr.yml` | Opens a pull request automatically for each `claude/game-*` branch |
 
 Payments are **off** unless configured: with a game's `js/payments.config.js`
@@ -59,9 +61,15 @@ left blank, that game is the complete game. See
 ## Working on them
 
 ```bash
+npm run check        # the gate: structural checks, then every test. What CI runs.
 npm run test:all     # every game's tests, plus the payments tests
 npm run sync         # re-copy the shared payments client into each game
 ```
+
+`npm run check` needs nothing installed — the games have no dependencies, so it
+runs on a fresh clone. [`CLAUDE.md`](CLAUDE.md) has the house rules in full,
+including the two that bite: never edit a synced copy, and always bump a
+service worker's `CACHE` when you change its `ASSETS`.
 
 Inside any game directory:
 

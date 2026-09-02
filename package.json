@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "python3 -m http.server 8080",
+    "check": "node tools/check-structure.mjs && npm run test:all",
+    "check:structure": "node tools/check-structure.mjs",
     "test:all": "node tools/sync-payments.mjs --check && node --test games/lemonade/tests/*.test.mjs && node --test games/outbreak/tests/*.test.mjs && node --test games/the-round/tests/*.test.mjs && node --test shared/payments/tests/*.test.mjs && node --test shared/bonusshop/tests/*.test.mjs",
     "sync": "node tools/sync-payments.mjs"
   },
