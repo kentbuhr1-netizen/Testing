@@ -833,9 +833,138 @@ export function playPolicy(config, policy) {
   return round2(state.money - state.stake);
 }
 
+/* ------------------------------------------------------------------ *
+ * Plain play
+ *
+ * Par is the ceiling, and on its own it is a poor yardstick: the gap between
+ * par and a person is not the same on every round. Two rounds with identical
+ * par cleared at wildly different rates in simulated play — 100% on one, 11%
+ * on the next — because what makes a round awkward for somebody who is not
+ * paying full attention is not what makes it awkward for a router.
+ *
+ * Anchoring on a second bot does not fix it: a tidy reference player lands at
+ * 86-100% of par and moves with par rather than against it. What does fix it
+ * is measuring the round against a spread of *imperfect* attempts and asking
+ * the player to beat a share of them. Whatever it is that makes a round hard
+ * then shows up in the spread, without anyone having to name it.
+ *
+ * Seeded from the round, so the bar is the same every time it is drawn.
+ * ------------------------------------------------------------------ */
+
+/** How many imperfect seasons a round is measured against. */
+export const PLAIN_SAMPLES = 24;
+
+/**
+ * One plausible way of not playing very well.
+ *
+ * The range has to span how badly a person can actually play, not a tidy
+ * approximation of it. A first version left out the two commonest habits —
+ * knocking off with half the day left, and lingering over every lawn on the
+ * round — and set a bar that 54 of 100 simulated players could not clear once.
+ */
+function plainTraits(rng) {
+  return {
+    fill: 0.5 + rng() * 0.55,        // how much of the day they bother to use
+    sharpens: rng() < 0.45,
+    // Most people act on being told off; some linger over everybody, which
+    // costs them the day; some never touch it.
+    care: rng() < 0.62 ? 'told' : (rng() < 0.5 ? 'everyone' : 'never'),
+    remembers: 0.5 + rng() * 0.45,
+    takesOffers: rng() < 0.85,
+    // How often they take whoever is closest to cancelling rather than
+    // whoever is closest. The round list on screen is sorted by exactly that,
+    // so following it is the path of least resistance and most people do.
+    wander: 0.2 + rng() * 0.5,
+  };
+}
+
+/** A day's round as somebody distracted would plan it. */
+function plainRoute(state, traits, told, rng) {
+  const mods = state.mods;
+  const budget = state.today.workable * traits.fill;
+  const route = [];
+  const care = [];
+  let spent = state.sharpenToday ? SHARPEN_MINUTES : 0;
+  let sharpness = state.sharpenToday ? 1 : state.sharpness;
+  let at = DEPOT;
+
+  for (;;) {
+    const open = state.properties.filter(
+      (p) => p.active && isDue(p) && !route.includes(p.id));
+    if (!open.length) break;
+    // Nearest to hand, mostly — with a fair chance of just taking whoever is
+    // nearest to walking, which is who the list puts at the top.
+    open.sort((a, b) => travelMinutes(at, a, mods) - travelMinutes(at, b, mods));
+    const byRisk = open.slice().sort((a, b) => a.patience - b.patience);
+    const p = rng() < traits.wander ? byRisk[0] : open[0];
+
+    const careful = traits.care === 'everyone'
+      || (traits.care === 'told' && told.has(p.id) && rng() < traits.remembers);
+    const van = atSharpness(state, sharpness);
+    const drive = travelMinutes(at, p, mods);
+    const mow = mowMinutes(p, van, careful);
+    if (spent + drive + mow + travelMinutes(p, DEPOT, mods) > state.today.workable) break;
+    if (spent + drive + mow > budget) break;   // they call it a day early
+
+    route.push(p.id);
+    if (careful) care.push(p.id);
+    spent += drive + mow;
+    sharpness = clamp(sharpness - p.size * 0.012 * mods.dulling, 0.15, 1);
+    at = p;
+  }
+  return { route, care };
+}
+
+/** Play one imperfect season end to end. */
+function plainSeason(config, seed) {
+  const rng = mulberry32(seed);
+  const traits = plainTraits(rng);
+  const state = newRun({ ...config, target: null });
+  const told = new Set();   // clients who have complained about the finish
+
+  while (state.phase !== 'gameover') {
+    if (state.today.offer && traits.takesOffers) acceptOffer(state);
+    state.sharpenToday = traits.sharpens && state.sharpness < 0.45 && rng() < 0.7;
+    const plan = plainRoute(state, traits, told, rng);
+    state.route = plan.route;
+    state.care = plan.care;
+    const result = simulateDay(state);
+    // The only thing they learn from, and only about clients named at them.
+    for (const job of result.jobs) {
+      if (/hurry|said nothing/.test(job.note)) told.add(job.id);
+      if (/in and out/.test(job.note)) told.delete(job.id);
+    }
+    commitDay(state, result);
+  }
+  return round2(state.money - state.stake);
+}
+
+/**
+ * What imperfect play makes of this round, worst to best.
+ *
+ * Ask for the 40th of these and roughly 60% of plain attempts clear it; ask
+ * for the 90th and almost none do. That is a bar that means the same thing on
+ * every round in the game.
+ */
+export function plainSpread(config, samples = PLAIN_SAMPLES) {
+  const out = [];
+  for (let i = 0; i < samples; i++) {
+    out.push(plainSeason(config, ((config.seed ?? 1) + i * 2654435761) >>> 0));
+  }
+  return out.sort((a, b) => a - b);
+}
+
+/** The profit that beats `share` of imperfect attempts at this round. */
+export function plainPercentile(spread, share) {
+  const at = clamp(share, 0, 1) * (spread.length - 1);
+  const lo = Math.floor(at);
+  const hi = Math.min(spread.length - 1, lo + 1);
+  return spread[lo] + (spread[hi] - spread[lo]) * (at - lo);
+}
+
 /**
  * Profit the best policy in the family clears on this neighbourhood.
- * This is what targets are measured against.
+ * This is the ceiling a target is measured against.
  */
 export function parProfit(config) {
   let best = -Infinity;

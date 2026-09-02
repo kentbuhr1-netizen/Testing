@@ -97,19 +97,19 @@ rather than just minutes.
 🔴 Impossible ×4 — shorter float, fussier clients and faster-blunting blades as
 you climb.
 
-**Targets are measured, not guessed.** Before a round is offered, a family of 26
-reference routers (`parProfit` in `js/sim.js`) each plays that exact round — its
-distances, its weather, its clients — and the target is a share of what the best
-of them cleared: 40% on Easy up to 93% on Impossible. A test asserts that for
-all 625.
+**Targets are measured, not guessed.** Before a round is offered, two dozen
+seasons of *ordinary* play are played out on that exact round — its distances,
+its weather, its clients — and the bar is set among them. The first round of a
+town asks for about what a poor season makes; the last asks for better than all
+but the best of them. A separate family of 26 reference routers sets the ceiling
+that no target may exceed, and a test asserts that for all 625.
 
-The family crosses three routers — nearest hop, best return per minute, and
-nearest-then-untangled — with four ways of deciding who gets the extra time:
-never; whenever the finish looks like heading for trouble; and two that know
-what each client will accept, differing in how far short things have to be
-before the minutes are worth spending. Knowing the client sets par on 45 of 52
-sampled rounds, which is the measurement that says the hidden standard is
-doing work.
+Measuring the floor as well as the ceiling is the point. A share of par cannot
+tell two rounds apart when one is far harder to play *badly* on than the other:
+under the old scheme simulated players cleared one round at 100% and the next at
+2%, with the tier and the share identical. Setting the bar inside the spread of
+imperfect play cut the difference between rounds by a third, and made a target
+mean the same thing everywhere in the country.
 
 **The weather never changes.** Retry a round and the same season comes back, so
 a round you lost is a puzzle you can learn rather than a dice roll.
@@ -155,7 +155,7 @@ js/ops.js               yards, supplies, crews, the daily tick
 js/store.js             shared state and the save file
 js/app.js               router, HUD, input
 js/ui/                  screens: map.js, run.js, opsui.js, kit.js
-tests/                  60 tests across the day, the campaign and the firm
+tests/                  63 tests across the day, the campaign and the firm
 tools/make-icons.mjs    regenerates icons/*.png from icons/icon.svg
 ```
 
@@ -164,7 +164,7 @@ can be played and balanced from node. The same seed always replays the same
 season.
 
 ```bash
-npm test           # 60 tests
+npm test           # 63 tests
 npm run icons      # rebuild PNG icons from the SVG (needs headless Chromium)
 ```
 
@@ -217,6 +217,19 @@ design after the fact.
   table rather than sampled — with the mean lawn, the mean hop and the 88% of a
   day a real route fills all measured over played rounds. Crew wages moved to
   $82 to keep the firm buildable in the towns you own when it unlocks.
+
+- **A target has to know how hard a round is to play badly.** A hundred
+  simulated players — someone who skipped the help, taps from the top of the
+  list, forgets the blade — got a median of 8 rounds into a campaign of 625 and
+  none got past 14. Ramping the ask across a town's 25 rounds fixed the wall at
+  each tier boundary and took the median to 13. What it could not fix was the
+  jaggedness *within* a tier, because a share of par is blind to it: at 60
+  seasons a round, clear rates swung with a spread of 0.37 against a sampling
+  floor of 0.07. Measuring each round against two dozen seasons of ordinary play
+  on that same round cut that spread to **0.24**, and the campaign stopped
+  collapsing at the top: Hard rounds went from 10% cleared to 57%, the tiers now
+  clear at 71 / 62 / 57 / 14% rather than 85 / 61 / 10 / —, and the best
+  simulated player reached 23 rounds rather than 15.
 
 Each layer of attention is worth roughly one tier, measured over 52 rounds:
 

@@ -24,7 +24,7 @@ test('the tier ramp is 7 / 7 / 7 / 4 and gets harder throughout', () => {
   assert.deepEqual(counts, { easy: 7, medium: 7, hard: 7, impossible: 4 });
   const order = ['easy', 'medium', 'hard', 'impossible'];
   for (let i = 1; i < order.length; i++) {
-    assert.ok(C.TIERS[order[i]].parFrom > C.TIERS[order[i - 1]].parFrom, order[i]);
+    assert.ok(C.TIERS[order[i]].days > C.TIERS[order[i - 1]].days, order[i]);
     assert.ok(C.TIERS[order[i]].stake <= C.TIERS[order[i - 1]].stake, order[i]);
   }
 });
@@ -145,17 +145,49 @@ test('no round asks for more than it can give', { timeout: 180_000 }, () => {
 });
 
 test('the ask climbs round by round, with no step at a tier boundary', () => {
-  // A flat share per tier put a wall at each boundary: simulated play cleared
-  // Easy at 151% of target and the very next round at 96%.
-  const factors = [];
-  for (let i = 0; i < C.ROUNDS_PER_TOWN; i++) factors.push(C.parFactorFor(i));
-
-  for (let i = 1; i < factors.length; i++) {
-    assert.ok(factors[i] > factors[i - 1],
-      `round ${i + 1} asks ${factors[i]} against ${factors[i - 1]} the round before`);
-    assert.ok(factors[i] - factors[i - 1] < 0.06,
-      `round ${i + 1} jumps ${(factors[i] - factors[i - 1]).toFixed(3)} in one step`);
+  // A flat share of par per tier put a wall at each boundary and could not
+  // tell two rounds apart when one was far harder to play badly on.
+  const asks = [];
+  for (let i = 0; i < C.ROUNDS_PER_TOWN; i++) asks.push(C.askFor(i));
+  for (let i = 1; i < asks.length; i++) {
+    assert.ok(asks[i] > asks[i - 1], `round ${i + 1} asks ${asks[i]} against ${asks[i - 1]}`);
+    assert.ok(asks[i] - asks[i - 1] < 0.06, `round ${i + 1} jumps in one step`);
   }
-  assert.ok(factors[0] < 0.4, 'the first round of a town should be an on-ramp');
-  assert.ok(factors[factors.length - 1] > 0.9, 'the last should be near what par manages');
+  assert.ok(asks[0] < 0.35, 'the first round of a town should be an on-ramp');
+  assert.ok(asks[asks.length - 1] > 0.9,
+    'the last round of a town should ask for better than almost any ordinary season');
+});
+
+test('a round is measured against ordinary play on that same round', () => {
+  const config = C.runConfigFor('oakridge', 4);
+  const spread = S.plainSpread(config);
+  assert.equal(spread.length, S.PLAIN_SAMPLES);
+  for (let i = 1; i < spread.length; i++) assert.ok(spread[i] >= spread[i - 1], 'sorted');
+  assert.ok(spread[spread.length - 1] > spread[0], 'plain play should vary');
+  assert.ok(spread[spread.length - 1] <= S.parProfit(config) + 1,
+    'nobody playing plainly should beat the whole reference family');
+
+  // The same round always gives the same bar.
+  assert.deepEqual(S.plainSpread(config), spread);
+  assert.equal(C.targetFor(C.newCampaign(), 'oakridge', 4),
+               C.targetFor(C.newCampaign(), 'oakridge', 4));
+});
+
+test('the early rounds are beatable by ordinary play, the late ones are not', () => {
+  const campaign = C.newCampaign();
+  for (const townId of ['willowbrook', 'northgate']) {
+    const first = C.targetFor(campaign, townId, 0);
+    const last = C.targetFor(campaign, townId, C.ROUNDS_PER_TOWN - 1);
+    const beats = (i, target) => S.plainSpread(C.runConfigFor(townId, i))
+      .filter((p) => p >= target).length;
+
+    assert.ok(beats(0, first) >= S.PLAIN_SAMPLES * 0.5,
+      `${townId} round 1 was cleared by ${beats(0, first)} of ${S.PLAIN_SAMPLES} plain seasons`);
+    // The bar sits at the top of the spread, so a couple of the best ordinary
+    // seasons reach it and nothing else does.
+    assert.ok(beats(C.ROUNDS_PER_TOWN - 1, last) <= 3,
+      `${townId} round 25 was cleared by ${beats(C.ROUNDS_PER_TOWN - 1, last)} of ${S.PLAIN_SAMPLES} plain seasons`);
+    assert.ok(beats(C.ROUNDS_PER_TOWN - 1, last) < beats(0, first) / 3,
+      `${townId} round 25 is not much harder than round 1`);
+  }
 });
