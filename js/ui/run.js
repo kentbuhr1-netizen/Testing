@@ -90,7 +90,7 @@ function buyScreen() {
     cupsSmall: r.inventory.cupsSmall + o.cupsSmall,
     cupsLarge: r.inventory.cupsLarge + o.cupsLarge,
   };
-  const pourable = S.maxCupsAvailable(after, r.recipe);
+  const pourable = S.totalPourable(after, r.recipe);
   const line = (key, name, unit, step) =>
     row(name, `${cents(p[unit])} each · cooler: ${after[key]}`,
         stepper('order', key, o[key], step, 0, 9999));
@@ -163,7 +163,8 @@ function buyScreen() {
 
 function setupScreen() {
   const r = run();
-  const pourable = S.maxCupsAvailable(r.inventory, r.recipe);
+  const pourable = S.totalPourable(r.inventory, r.recipe);
+  const canOpen = S.canOpenToday(r);
   const unitCost = S.costPerCup(r.recipe, r.today.prices);
   const margin = r.price - unitCost;
 
@@ -248,7 +249,7 @@ function setupScreen() {
         ${sizeRows}
         <div class="facts" style="margin-top:12px">
           ${fact('Profit per medium', money(margin), margin > 0 ? 'good' : 'bad')}
-          ${fact('Cups ready', pourable, pourable === 0 ? 'bad' : '')}
+          ${fact('Cups ready', pourable, pourable === 0 && !canOpen ? 'bad' : '')}
         </div>
       </div>
       <div class="card">
@@ -264,9 +265,9 @@ function setupScreen() {
         ${enhancerToggles}
         <p class="muted" style="margin-top:10px">Only stocked enhancers can be offered. Customers who want one pay extra — it never affects whether the cup itself sells.</p>
       </div>
-      ${pourable === 0 ? '<p class="muted center">Nothing to pour. Buy supplies, use less per pitcher — or sit this one out.</p>' : ''}`,
+      ${!canOpen ? '<p class="muted center">Nothing to pour. Buy supplies, use less per pitcher — or sit this one out.</p>' : ''}`,
     actions: `
-      <button class="btn" data-act="open-stand">${pourable === 0 ? 'Stay Closed Today' : 'Open for Business'}</button>
+      <button class="btn" data-act="open-stand">${canOpen ? 'Open for Business' : 'Stay Closed Today'}</button>
       <button class="btn-ghost" data-act="back-to-buy">Back to Supplies</button>`,
   };
 }

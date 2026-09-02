@@ -54,6 +54,43 @@ test('an ice-free recipe does not need ice in stock', () => {
   assert.equal(cups, 10);
 });
 
+test('totalPourable counts small and large cup stock too, not just medium', () => {
+  // Regression: the setup screen used maxCupsAvailable() — medium-only — to
+  // decide whether there was anything to open with, so a player stocked
+  // entirely on small or large cups (no medium) always saw "Stay Closed
+  // Today" even with plenty to sell.
+  const recipe = { lemons: 5, sugar: 5, ice: 2 };
+  const smallOnly = { lemons: 50, sugar: 50, ice: 100, cups: 0, cupsSmall: 20, cupsLarge: 0 };
+  const largeOnly = { lemons: 50, sugar: 50, ice: 100, cups: 0, cupsSmall: 0, cupsLarge: 20 };
+  assert.equal(S.maxCupsAvailable(smallOnly, recipe), 0, 'sanity: the medium-only count is still 0');
+  assert.ok(S.totalPourable(smallOnly, recipe) > 0, 'small-cup stock should count toward what can be poured');
+  assert.ok(S.totalPourable(largeOnly, recipe) > 0, 'large-cup stock should count toward what can be poured');
+});
+
+test('canOpenToday reflects small/large cup stock and BYO, not just medium', () => {
+  const recipe = { lemons: 5, sugar: 5, ice: 2 };
+  const smallOnly = {
+    recipe,
+    byoAccepted: false,
+    inventory: { lemons: 50, sugar: 50, ice: 100, cups: 0, cupsSmall: 20, cupsLarge: 0 },
+  };
+  assert.equal(S.canOpenToday(smallOnly), true);
+
+  const noCupsButBYO = {
+    recipe,
+    byoAccepted: true,
+    inventory: { lemons: 50, sugar: 50, ice: 100, cups: 0, cupsSmall: 0, cupsLarge: 0 },
+  };
+  assert.equal(S.canOpenToday(noCupsButBYO), true, 'BYO alone should be enough to open, even with zero cup stock');
+
+  const nothingAtAll = {
+    recipe,
+    byoAccepted: false,
+    inventory: { lemons: 0, sugar: 0, ice: 0, cups: 0, cupsSmall: 0, cupsLarge: 0 },
+  };
+  assert.equal(S.canOpenToday(nothingAtAll), false);
+});
+
 test('you can never sell more than you stocked', () => {
   const st = S.newGame(7);
   st.inventory = { lemons: 5, sugar: 5, ice: 20, cups: 10 };

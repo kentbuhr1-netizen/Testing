@@ -327,13 +327,46 @@ export function costPerCup(recipe, prices) {
   return round2(perPitcher / CUPS_PER_PITCHER + recipe.ice * prices.ice + prices.cup);
 }
 
-/** Most cups you can pour with what's in the cooler right now. */
+/** Most medium cups you can pour with what's in the cooler right now. */
 export function maxCupsAvailable(inventory, recipe) {
   const byLemons = Math.floor(inventory.lemons / Math.max(1, recipe.lemons));
   const bySugar = Math.floor(inventory.sugar / Math.max(1, recipe.sugar));
   const pitchers = Math.min(byLemons, bySugar);
   const byIce = recipe.ice > 0 ? Math.floor(inventory.ice / recipe.ice) : Infinity;
   return Math.max(0, Math.min(pitchers * CUPS_PER_PITCHER, byIce, inventory.cups));
+}
+
+/**
+ * Every cup you could pour today across every size you're stocked for —
+ * medium, then small, then large sharing what's left of the liquid and ice,
+ * same greedy order simulateDay serves in. An upper bound on today's sales,
+ * used to tell whether there's anything at all worth opening for.
+ */
+export function totalPourable(inventory, recipe) {
+  let remainingServings = maxServingsFromLiquid(inventory, recipe);
+  let remainingIce = inventory.ice;
+  let total = 0;
+  for (const id of ['medium', 'small', 'large']) {
+    const size = CUP_SIZES[id];
+    const cupStock = id === 'medium' ? inventory.cups
+      : id === 'small' ? (inventory.cupsSmall || 0)
+      : (inventory.cupsLarge || 0);
+    const iceEach = Math.round(recipe.ice * size.servingMult);
+    const byServings = size.servingMult > 0 ? Math.floor(remainingServings / size.servingMult) : Infinity;
+    const byIce = iceEach > 0 ? Math.floor(remainingIce / iceEach) : Infinity;
+    const n = Math.max(0, Math.min(cupStock, byServings, byIce));
+    total += n;
+    remainingServings -= n * size.servingMult;
+    remainingIce -= n * iceEach;
+  }
+  return total;
+}
+
+/** Whether the stand has anything at all to sell today — sized cups or BYO. */
+export function canOpenToday(state) {
+  if (totalPourable(state.inventory, state.recipe) > 0) return true;
+  return Boolean(state.byoAccepted) && maxServingsFromLiquid(state.inventory, state.recipe) > 0 &&
+    (state.recipe.ice === 0 || state.inventory.ice >= state.recipe.ice);
 }
 
 /**
