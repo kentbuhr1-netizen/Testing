@@ -187,6 +187,45 @@ option first.
 If a session asks a question you cannot answer and the user is not around, do
 not let it idle in silence. Leave it blocked, and lead your report with it.
 
+## The standing remit: keep it moving, checked, tested and clean
+
+Unblocking stalled sessions is the floor, not the job. Between sweeps the code
+itself rots, and nobody is watching it — the build sessions each see their own
+branch and none of them see the repository. On every sweep, after the session
+triage:
+
+**Test what is claimed to be finished.** A session reporting `review_ready` is
+making a claim, not providing evidence. Check out the branch and run its suite.
+It is cheap, it is the only way to know, and a green branch nobody has run is
+indistinguishable from a broken one.
+
+```
+git worktree add -f <scratch>/<branch> origin/claude/<branch>
+cd <scratch>/<branch> && npm run test:all   # or `npm test` on older layouts
+```
+
+**Check the branches against each other, not just against main.** This is the
+failure the per-game sessions structurally cannot see. Each one works alone on
+its own branch, so two of them can spend a day building incompatible versions of
+the same thing and neither will ever notice. Compare layouts and file counts
+across the open branches, and treat any of these as an alarm:
+
+- the same game existing at two paths (`games/<slug>/js/sim.js` and a flat
+  `js/sim.js`)
+- one branch's module list being a superset of another's for the same game
+- a branch whose structure predates a restructure that is open in another PR
+
+**Land what is finished.** Green, pushed, and no open PR is not "done", it is
+work with nowhere to go. Report it. Do not open the PR yourself unless Kent
+asked — but never let it sit unmentioned.
+
+**Report rot, do not silently tidy it.** Superseded PRs, branches merged long
+ago, duplicate work, a stale `sync` artifact. Name them. Closing someone's PR or
+deleting a branch is outward-facing and destructive; propose it, let Kent decide.
+
+The point of doing this every hour is that divergence is cheap to fix on day one
+and expensive on day three. The sweep exists to find it on day one.
+
 ## Watch for
 
 - **A stalled session nobody owns.** The parent may have spawned a child and
