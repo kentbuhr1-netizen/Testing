@@ -66,12 +66,37 @@ Classify each session:
 | `FAILED` + limit message | Killed by the shared budget | Check the window has reset, then wake it. |
 | `FAILED` + anything else | A real error | Read the detail. Fix or escalate; don't just re-poke. |
 | `BLOCKED` / `need_input` | Waiting on a decision | See *Decisions* below. |
-| `COMPLETED` / `review_ready` | Done, needs landing | Check the branch and PR actually exist. |
+| `COMPLETED` / `review_ready` | A **claim**, not a finish | Verify it. See below — this is the one that hides work. |
 
 Before waking anything limit-killed, confirm the window really has rolled over:
 compare `rate_limit_info.resetsAt` on the dead session against a session that
 currently reads `allowed`. If the budget is still exhausted, waking anything
 just burns the poke — record it and let the next sweep take it.
+
+**`review_ready` is where work hides.** It is the status that looks finished and
+most often is not, and it does not read as stalled, so a sweep that only hunts
+for stalls walks straight past it. On 2 Sep five sessions sat idle overnight,
+every one marked `review_ready`, every one with real work outstanding — a
+missing PR, a missing bonus shop, a PR that had silently stopped merging. Six
+hours, several sweeps, nothing moved.
+
+A session is done only when **all** of these hold, each checked rather than
+taken on trust:
+
+- its branch is pushed, and
+- it has an open PR against the **right base** — a branch cut from another
+  feature branch must target that branch, not `main`, or its diff will look
+  like it deletes the repository, and
+- that PR still **merges** — `git merge-tree --write-tree origin/main
+  origin/<branch>` answers this in one command, and
+- the game carries both house modules, and
+- its suite passes **when you run it**.
+
+Any one of those failing is work, and the poke should name the specific gap.
+
+And do not take a session's word about a PR. On the same day one reported
+"PR #3 merged" when that PR was open, unmerged, and conflicting badly. A wrong
+status is worse than no status, because it stops anyone else looking.
 
 ### 2. Choose what to wake
 
