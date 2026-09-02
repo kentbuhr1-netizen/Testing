@@ -105,6 +105,37 @@ Create it once per session and reuse it. The trigger's stored prompt stays
 generic ("pick up where you left off"); everything situation-specific goes in
 `fire_trigger`'s `text`, which arrives as an extra turn after it.
 
+**A poke only reaches a warm session.**
+
+**Measured, not assumed:** firing a bound Routine at a session whose
+`connection_status` is `disconnected` does **not** provision a container for it.
+The fire is accepted, returns a `cse_...` run id, and the session does not move.
+Two fires each at Outbreak and The Round, eight minutes apart, changed neither
+`updated_at` nor `connection_status`. Session-bound Routines record no
+`last_run`, so there is no delivery receipt to check either — the only evidence
+is whether the session's own timestamp moves.
+
+The likely reading is that pokes queue and drain when the session next gets a
+container. So:
+
+- **Check `connection_status` before firing.** `connected` → a poke should land;
+  watch `updated_at` to confirm. `disconnected` → fire once so it is queued, and
+  then treat the session as *not* recoverable from here.
+- **Never fire a third time at a cold session.** Two fires with no movement is
+  the mechanism failing, not the session ignoring you. More fires just stack
+  duplicate turns for whenever it does wake.
+- **A cold session needs a human or a replacement.** Opening it once in the app
+  or on the web provisions a container, and the queued pokes drain then. Say so
+  plainly in the report and name the sessions — this is the one case where the
+  fastest fix costs the user ten seconds and costs you nothing.
+- **Do not silently spawn a replacement.** `create_session` can restart the work
+  from the branch, but it loses the old session's context, spends real money,
+  and duplicates effort if the original later wakes. That is an escalation, not
+  an unblock — ask first.
+- **Do not credit a wake you cannot attribute.** A session that comes up on its
+  own around the time you poked it is a coincidence until its timestamp moves in
+  response to a poke you actually fired.
+
 Writing a poke that works:
 
 - **Say why it stopped.** "You were cut off by a usage limit that has since
