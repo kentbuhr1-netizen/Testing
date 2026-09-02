@@ -34,7 +34,13 @@ export const TIERS = {
     mods: { strictness: 0.8 },
   },
   medium: {
-    id: 'medium', label: 'Medium', icon: '🟡', days: 7, stake: 25, parFactor: 0.62,
+    // Calibrated (see tools/calibrate-campaign-difficulty.mjs) so a decent-
+    // but-imperfect player — right on plan most days, off on the rest —
+    // wins roughly 90% of the time at a "typical" carelessness level, from
+    // ~97% when nearly careful down to ~75% when quite careless: a real but
+    // modest step down from Easy's near-100%, and clearly short of Hard's
+    // bite at the same skill level.
+    id: 'medium', label: 'Medium', icon: '🟡', days: 7, stake: 25, parFactor: 0.78,
     blurb: 'Customers notice a bad batch.',
     mods: { strictness: 1.0 },
   },
