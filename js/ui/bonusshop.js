@@ -11,6 +11,8 @@
  */
 import { store, render } from '../store.js';
 import { ensureBank } from '../bank.js';
+import { ENHANCERS } from '../sim.js';
+import { spaceLeft } from '../ops.js';
 import { money } from './kit.js';
 
 const AD_DURATION_MS = 1500;
@@ -33,6 +35,14 @@ function readyAt(id) {
   return (loadCooldowns()[id] || 0) + COOLDOWN_MS;
 }
 
+/** Adds stock to a depot without ever pushing it over capacity. */
+function addDepotStock(depot, unit, amount) {
+  const fit = Math.min(amount, spaceLeft(depot));
+  depot.stock[unit] += fit;
+}
+
+const midRunOnly = () => (store.run ? { ok: true } : { ok: false, why: 'Only useful mid-run — start one first.' });
+
 const BONUSES = [
   {
     id: 'cash',
@@ -53,7 +63,7 @@ const BONUSES = [
     icon: '🍋',
     title: 'Free Restock',
     describe: () => '+10 lemons, +10 sugar, +20 cups — straight into today’s cooler.',
-    available: () => (store.run ? { ok: true } : { ok: false, why: 'Only useful mid-run — start one first.' }),
+    available: midRunOnly,
     apply: () => {
       const r = store.run;
       r.inventory.lemons += 10;
@@ -62,14 +72,54 @@ const BONUSES = [
     },
   },
   {
+    id: 'ice',
+    icon: '🧊',
+    title: 'Free Ice',
+    describe: () => '+30 ice cubes, straight into today’s cooler.',
+    available: midRunOnly,
+    apply: () => { store.run.inventory.ice += 30; },
+  },
+  {
+    id: 'enhancers',
+    icon: '🍹',
+    title: 'Enhancer Sample',
+    describe: () => `+5 of every enhancer, free to offer at the stand.`,
+    available: midRunOnly,
+    apply: () => {
+      const inv = store.run.inventory.enhancers || (store.run.inventory.enhancers = {});
+      for (const id of Object.keys(ENHANCERS)) inv[id] = (inv[id] || 0) + 5;
+    },
+  },
+  {
     id: 'reputation',
     icon: '⭐',
     title: 'Reputation Boost',
     describe: () => 'Nudges today’s reputation up, so the street expects a bit more from you.',
-    available: () => (store.run ? { ok: true } : { ok: false, why: 'Only useful mid-run — start one first.' }),
+    available: midRunOnly,
     apply: () => {
       const r = store.run;
       r.reputation = Math.min(1, r.reputation + 0.12);
+    },
+  },
+  {
+    id: 'depot',
+    icon: '📦',
+    title: 'Depot Restock',
+    describe: () => '+100 lemons, +100 sugar, +200 cups into one of your depots.',
+    available: () => {
+      const ops = store.campaign?.ops;
+      if (!ops || Object.keys(ops.warehouses).length === 0) {
+        return { ok: false, why: 'Build a depot in Operations first.' };
+      }
+      return { ok: true };
+    },
+    apply: () => {
+      const ops = store.campaign.ops;
+      const cityId = ops.warehouses[store.ui.cityId] ? store.ui.cityId : Object.keys(ops.warehouses)[0];
+      const depot = ops.warehouses[cityId];
+      addDepotStock(depot, 'lemons', 100);
+      addDepotStock(depot, 'sugar', 100);
+      addDepotStock(depot, 'cups', 200);
     },
   },
   {
