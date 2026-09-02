@@ -1,0 +1,13 @@
+{
+  "name": "lemonade-stand",
+  "version": "1.0.0",
+  "description": "The classic lemonade stand game, built to play on a phone.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8080 --directory ../..",
+    "test": "node --test tests/*.test.mjs",
+    "icons": "node tools/make-icons.mjs"
+  },
+  "license": "MIT"
+}

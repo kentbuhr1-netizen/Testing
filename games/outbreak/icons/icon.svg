@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Outbreak">
+  <rect width="512" height="512" rx="112" fill="#0f1720"/>
+  <circle cx="256" cy="256" r="132" fill="none" stroke="#4d95ff" stroke-width="18"/>
+  <g fill="#4d95ff">
+    <circle cx="256" cy="106" r="21"/>
+    <circle cx="256" cy="406" r="21"/>
+    <circle cx="106" cy="256" r="21"/>
+    <circle cx="406" cy="256" r="21"/>
+    <circle cx="150" cy="150" r="17"/>
+    <circle cx="362" cy="150" r="17"/>
+    <circle cx="150" cy="362" r="17"/>
+    <circle cx="362" cy="362" r="17"/>
+  </g>
+  <g stroke="#4d95ff" stroke-width="14" stroke-linecap="round">
+    <line x1="256" y1="124" x2="256" y2="140"/>
+    <line x1="256" y1="372" x2="256" y2="388"/>
+    <line x1="124" y1="256" x2="140" y2="256"/>
+    <line x1="372" y1="256" x2="388" y2="256"/>
+  </g>
+  <circle cx="256" cy="256" r="62" fill="#35c98e"/>
+  <path d="M226 256h60M256 226v60" stroke="#0f1720" stroke-width="18" stroke-linecap="round"/>
+</svg>

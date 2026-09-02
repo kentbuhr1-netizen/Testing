@@ -18,6 +18,8 @@ import * as achievementsUi from './ui/achievements.js';
 import * as bonusShopUi from './ui/bonusshop.js';
 import { money, whole, bar } from './ui/kit.js';
 import { restockCost, spaceLeft, VEHICLES } from './ops.js';
+import * as Entitlements from './payments/client/entitlements.js';
+import { PAYMENTS } from './payments.config.js';
 
 const screenEl = document.getElementById('screen');
 const actionsEl = document.getElementById('actions');
@@ -266,6 +268,18 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });
+}
+
+/**
+ * Work out what has been paid for before the first paint, so a player who
+ * owns the game never sees a locked map flash past. An unconfigured build,
+ * an offline start and a dead shop server all resolve to "carry on".
+ */
+Entitlements.configure(PAYMENTS);
+try {
+  await Entitlements.init();
+} catch {
+  /* never let the shop stop the game from starting */
 }
 
 // Always open on the title screen; Continue picks the saved game back up.

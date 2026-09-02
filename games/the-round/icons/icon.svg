@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="The Round">
+  <rect width="512" height="512" rx="112" fill="#1d2b18"/>
+  <g stroke="#7bc95f" stroke-width="16" stroke-linecap="round" fill="none">
+    <path d="M96 372v-52M136 372v-74M176 372v-58M216 372v-82M256 372v-64M296 372v-88M336 372v-56M376 372v-70M416 372v-48"/>
+  </g>
+  <rect x="72" y="372" width="368" height="18" rx="9" fill="#4a8f3c"/>
+  <circle cx="256" cy="188" r="66" fill="none" stroke="#f5d547" stroke-width="18" stroke-dasharray="26 20"/>
+  <circle cx="256" cy="188" r="20" fill="#f5d547"/>
+</svg>

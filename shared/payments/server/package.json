@@ -1,0 +1,14 @@
+{
+  "name": "game-payments-server",
+  "version": "1.0.0",
+  "description": "Checkout, webhooks and signed licences for the games.",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.mjs",
+    "keygen": "node server.mjs --keygen",
+    "test": "node --test ../tests/*.test.mjs"
+  },
+  "license": "MIT"
+}

@@ -4,9 +4,17 @@ import * as S from '../sim.js';
 import { opsUnlocked } from '../campaign.js';
 import { restockCost } from '../ops.js';
 import * as E from '../employees.js';
-import { store, save, loadSave, clearSave, bestScore, loadUnlockedAchievements, checkAchievements, achievementToast } from '../store.js';
+import { store, save, render, loadSave, clearSave, bestScore, loadUnlockedAchievements, checkAchievements, achievementToast } from '../store.js';
 import { ACHIEVEMENTS } from '../achievements.js';
 import { money, whole, fact, tierPill, bar, backBar } from './kit.js';
+import * as Entitlements from '../payments/client/entitlements.js';
+import { paywallScreen, paywallActions, resetPaywall } from '../payments/client/paywall.js';
+import { PAYMENTS } from '../payments.config.js';
+
+/** Cities this build lets the player into without paying. */
+const freeCities = () => Entitlements.freeTier('lemonade').cities ?? C.CITIES.length;
+const cityPaidFor = (cityId) =>
+  Entitlements.owns('lemonade') || C.isCityFree(cityId, freeCities());
 
 /* ------------------------------------------------------------------ *
  * Title
@@ -41,6 +49,8 @@ function titleScreen() {
         ${saved ? 'New Campaign' : 'Start Campaign'}
       </button>
       <button class="btn-ghost" data-act="free-play">Free Play · 30 Days</button>
+      ${Entitlements.configured() && !Entitlements.owns('lemonade')
+        ? '<button class="btn-ghost" data-act="openShop">Unlock the Full Campaign</button>' : ''}
       <button class="btn-ghost" data-act="help">How to Play</button>`,
   };
 }
@@ -83,6 +93,16 @@ function worldScreen() {
     const claimed = C.claimedIn(campaign, city.id).length;
     const unlocked = C.isCityUnlocked(campaign, city.id);
     const done = C.cityDone(campaign, city.id);
+    if (unlocked && !cityPaidFor(city.id)) {
+      return `<button class="city" data-act="openShop" data-city="${city.id}">
+          <div class="city-flag">🔓</div>
+          <div class="city-main">
+            <div class="city-name">${city.name}</div>
+            <div class="city-sub">${city.challenge.name} — unlock to play</div>
+          </div>
+          <div class="city-meter"><span class="city-count">Buy</span></div>
+        </button>`;
+    }
     if (!unlocked) {
       return `<div class="city locked">
           <div class="city-flag">🔒</div>
@@ -255,9 +275,30 @@ export const screens = {
   world: worldScreen,
   city: cityScreen,
   corner: cornerScreen,
+  shop: shopScreen,
 };
 
+function shopScreen() {
+  return paywallScreen({ game: PAYMENTS.game, gameName: PAYMENTS.gameName });
+}
+
+const shopActions = paywallActions({
+  rerender: () => render(),
+  close: () => {
+    resetPaywall();
+    store.ui.view = store.ui.shopFrom || (store.campaign ? 'world' : 'title');
+  },
+});
+
 export const actions = {
+  ...shopActions,
+
+  openShop: () => {
+    resetPaywall();
+    store.ui.shopFrom = store.ui.view === 'shop' ? store.ui.shopFrom : store.ui.view;
+    store.ui.view = 'shop';
+  },
+
   'new-campaign': () => {
     clearSave();
     store.campaign = C.newCampaign();
