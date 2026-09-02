@@ -276,3 +276,110 @@ test('the reference router does not waste trips on lawns with nothing to cut', (
     S.commitDay(s, S.simulateDay(s));
   }
 });
+
+/* ------------------------------------------------------------------ *
+ * Taking your time, and what your name is worth
+ * ------------------------------------------------------------------ */
+
+test('taking your time costs minutes and buys a better finish', () => {
+  const s = fullDay(S.newRun(CFG));
+  const p = s.properties[0];
+  assert.ok(S.mowMinutes(p, s, true) > S.mowMinutes(p, s, false),
+    'lingering over a lawn has to cost something');
+  assert.ok(S.cutQuality(p, s, true) > S.cutQuality(p, s, false),
+    'and it has to show in the finish');
+});
+
+test('a sharp blade alone cannot satisfy the fussiest clients', () => {
+  // If it could, a discovered standard would be a fact with nothing to do
+  // about it, and the whole hidden half of the game would be decoration.
+  const s = fullDay(S.newRun(CFG));
+  const p = s.properties[0];
+  p.height = S.IDEAL_HEIGHT;
+  p.fussiness = 1.6;
+  s.sharpness = 1;
+  assert.ok(S.cutQuality(p, s, false) < S.qualityBar(p),
+    'a perfect blade should not clear the highest standard on its own');
+  assert.ok(S.cutQuality(p, s, true) >= S.qualityBar(p),
+    'and taking your time should');
+});
+
+test('the extra time is planned for, and only where you asked for it', () => {
+  const s = fullDay(S.newRun(CFG));
+  const ids = active(s).slice(0, 3).map((p) => p.id);
+  s.route = ids;
+  const quick = S.planRoute(s, ids);
+  s.care = [ids[1]];
+  const careful = S.planRoute(s, ids);
+  assert.ok(careful.minutes > quick.minutes, 'the day should get longer');
+  assert.equal(careful.legs.filter((l) => l.careful).length, 1);
+  assert.equal(careful.legs.find((l) => l.careful).id, ids[1]);
+});
+
+test('a poor finish reads worse the further short it falls', () => {
+  // A floor that saturates makes every bad cut identical, and there is then
+  // nothing in the feedback to learn from.
+  const near = fullDay(S.newRun(CFG));
+  const far = fullDay(S.newRun(CFG));
+  for (const s of [near, far]) { s.properties[0].height = S.IDEAL_HEIGHT; }
+  near.properties[0].fussiness = 1.0;
+  far.properties[0].fussiness = 1.6;
+  near.sharpness = far.sharpness = 0.5;
+  const a = workDay(near, [0]);
+  const b = workDay(far, [0]);
+  assert.ok(b.jobs[0].delta < a.jobs[0].delta,
+    `missing by more should hurt more: ${a.jobs[0].delta} vs ${b.jobs[0].delta}`);
+});
+
+test('they tell you when the extra time was wasted', () => {
+  const s = fullDay(S.newRun(CFG));
+  const p = s.properties[0];
+  p.height = S.IDEAL_HEIGHT;
+  p.fussiness = 0.6;          // easily pleased
+  s.sharpness = 1;
+  s.care = [p.id];
+  const result = workDay(s, [p.id]);
+  assert.match(result.jobs[0].note, /in and out/,
+    `they should say the time was wasted, said: "${result.jobs[0].note}"`);
+});
+
+test('a client who walks costs you your name, on every lawn', () => {
+  const s = fullDay(S.newRun(CFG));
+  const victim = active(s)[0];
+  victim.patience = 0.01;
+  victim.expectedGap = 1;
+  victim.lastCut = s.day - 40;      // long overdue, about to walk
+  const before = s.standing;
+  const result = workDay(s, []);
+  assert.equal(result.lost.length, 1, 'this test needs somebody to walk');
+  assert.ok(s.standing < before, 'losing a client should cost you standing');
+
+  // And that comes off the takings, not just the scoreboard.
+  const paid = fullDay(S.newRun(CFG));
+  const cut = active(paid)[0];
+  cut.height = 8;
+  const full = workDay(paid, [cut.id]);
+  assert.ok(Math.abs(full.jobs[0].rate - cut.rate) < 0.01,
+    'a full name should be paid the full rate');
+});
+
+test('standing never falls through the floor', () => {
+  const s = S.newRun(CFG);
+  s.standing = S.STANDING_FLOOR;
+  for (const p of s.properties) { p.patience = 0.01; p.expectedGap = 1; p.lastCut = s.day - 40; }
+  const result = S.simulateDay(fullDay(s));
+  assert.ok(result.lost.length > 1, 'this test needs a walkout');
+  assert.ok(result.next.standing >= S.STANDING_FLOOR);
+});
+
+test('ignoring what people want does not get you through the hard rounds', () => {
+  // The point of the hidden standard is that it has to cost something to
+  // ignore it. This is the measurement that says so.
+  const cfg = { seed: 4242, days: 22, mods: { fussiness: 1.15, dulling: 1.15 } };
+  const par = S.parProfit(cfg);
+  const careless = S.playPolicy(cfg,
+    { mode: 'loop', careMode: 'never', sharpenAt: 0.75, takeOffers: true,
+      rescueAt: 0.25, urgency: 0, rateWeight: 0 });
+  assert.ok(careless < par * 0.92,
+    `never taking your time got ${careless} of par ${par} — the standard is not costing anything`);
+});
