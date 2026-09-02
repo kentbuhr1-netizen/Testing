@@ -37,6 +37,8 @@ export const store = {
     wagesPaid: 0,       // employee wages paid at the end of the last settled run
     showPremium: false,      // the never-expire paywall screen, shown over whatever's current
     showAchievements: false, // the achievements list, shown over whatever's current
+    showBonusShop: false,    // the watch-an-ad bonus shop, shown over whatever's current
+    watchingAd: null,        // id of the bonus whose ad is "playing", or null
     showTutorial: false,     // the first-time welcome sequence
     tutorialStep: 0,
     lastKey: null,

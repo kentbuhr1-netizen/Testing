@@ -135,6 +135,8 @@ function buyScreen() {
           ? `<p class="muted" style="margin-top:10px">Lemons spoil after ${S.LEMON_SHELF_LIFE_DAYS} days in the cooler.
              <button class="link-btn" data-act="open-premium">Never let that happen →</button></p>`
           : ''}
+        <p class="muted" style="margin-top:10px">Short on cash?
+          <button class="link-btn" data-act="open-bonus-shop">Watch an ad for a boost →</button></p>
       </div>
       <div class="card">
         <h2>Quick stock-up</h2>

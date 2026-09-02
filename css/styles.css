@@ -223,6 +223,7 @@ button {
 .row-main { flex: 1; min-width: 0; }
 .row-name { font-weight: 700; }
 .row-sub { font-size: 13px; color: var(--ink-soft); }
+.row-note { flex: 0 0 auto; max-width: 40%; font-size: 12px; text-align: right; }
 
 .stepper {
   display: flex;

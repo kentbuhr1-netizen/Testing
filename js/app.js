@@ -15,6 +15,7 @@ import * as bankUi from './ui/bankui.js';
 import * as premiumUi from './ui/premium.js';
 import * as tutorialUi from './ui/tutorial.js';
 import * as achievementsUi from './ui/achievements.js';
+import * as bonusShopUi from './ui/bonusshop.js';
 import { money, whole, bar } from './ui/kit.js';
 import { restockCost, spaceLeft, VEHICLES } from './ops.js';
 
@@ -22,9 +23,9 @@ const screenEl = document.getElementById('screen');
 const actionsEl = document.getElementById('actions');
 const hudEl = document.getElementById('hud');
 
-const SCREENS = { ...mapUi.screens, ...opsUi.screens, ...bankUi.screens, ...premiumUi.screens, ...tutorialUi.screens, ...achievementsUi.screens };
+const SCREENS = { ...mapUi.screens, ...opsUi.screens, ...bankUi.screens, ...premiumUi.screens, ...tutorialUi.screens, ...achievementsUi.screens, ...bonusShopUi.screens };
 const RUN_SCREENS = runUi.screens;
-const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions, ...bankUi.actions, ...premiumUi.actions, ...tutorialUi.actions, ...achievementsUi.actions };
+const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions, ...bankUi.actions, ...premiumUi.actions, ...tutorialUi.actions, ...achievementsUi.actions, ...bonusShopUi.actions };
 
 /* ------------------------------------------------------------------ *
  * Render
@@ -35,6 +36,7 @@ function overlayView() {
   if (store.ui.showTutorial) return 'tutorial';
   if (store.ui.showPremium) return 'premium';
   if (store.ui.showAchievements) return 'achievements';
+  if (store.ui.showBonusShop) return 'bonusShop';
   return null;
 }
 
@@ -135,7 +137,7 @@ const LIMITS = {
   recipe: { lemons: [1, 12], sugar: [1, 12], ice: [0, 7] },
   price: { price: [0.05, 5] },
   cupPrice: { small: [0.05, 5], large: [0.05, 5], byo: [0.05, 5] },
-  order: { lemons: [0, 9999], sugar: [0, 9999], ice: [0, 9999], cups: [0, 9999] },
+  order: { lemons: [0, 9999], sugar: [0, 9999], ice: [0, 9999], cups: [0, 9999], cupsSmall: [0, 9999], cupsLarge: [0, 9999] },
   restock: { lemons: [0, 99999], sugar: [0, 99999], cups: [0, 99999] },
   truckDraft: { amount: [25, Math.max(...Object.values(VEHICLES).map((v) => v.maxAmount))] },
   bankAmount: { amount: [0, 999999] },

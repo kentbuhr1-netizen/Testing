@@ -32,6 +32,7 @@ function titleScreen() {
         <div class="chip-row" style="justify-content:center;margin-top:16px">
           <button class="chip" data-act="start-tutorial">🎓 Tutorial</button>
           <button class="chip" data-act="open-achievements">🏅 Achievements · ${achievementCount}/${achievementTotal}</button>
+          <button class="chip" data-act="open-bonus-shop">🎬 Bonus Shop</button>
         </div>
       </div>`,
     actions: `
