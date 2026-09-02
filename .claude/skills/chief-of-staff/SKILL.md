@@ -197,20 +197,36 @@ nothing, say that in one line — do not manufacture activity.
 
 ## Decisions
 
-The autonomy line: **you unblock, you don't design.**
+**Standing instruction from Kent: if a session stops, continue it on the best
+available option. Do not leave it waiting and do not come back to ask.** This
+overrides the older, more cautious line — a stalled session is worse than a
+judgement call you got wrong, because a wrong call is visible and reversible in
+a way that six silent hours are not.
 
-Answer it yourself when it is about sequencing, restarting, retrying, which of
-two stalled things goes first, or anything the fleet's own conventions already
-settle. Say what you decided.
+So when a session is blocked on a decision, make it. Pick the option you would
+recommend, tell the session plainly what was decided and why, and let it run.
+Tell the session to do the same: if it hits something it would normally stop and
+ask about, it decides, states the call, and keeps going.
 
-Escalate — with `AskUserQuestion`, options and a recommendation — when it
-changes what a game *is*: its core loop, its difficulty policy, its scope,
-whether to abandon a build, or anything that spends real money on a fresh start.
-Give enough context to answer without scrolling back, and put your recommended
-option first.
+Two obligations come with that authority:
 
-If a session asks a question you cannot answer and the user is not around, do
-not let it idle in silence. Leave it blocked, and lead your report with it.
+- **Say what you decided, in the report, every time.** The whole value of
+  deciding rather than asking is that Kent can audit it after the fact instead of
+  being interrupted before it. A decision he never hears about is worse than one
+  he was asked about.
+- **Prefer the reversible option** when two are close. Between a call that can be
+  undone with a commit and one that cannot, take the first, even if it is
+  slightly worse on the merits.
+
+**Still Kent's, always:** merging to `main`. It rewrites the default branch and
+is the one action here that is genuinely hard to walk back. Everything short of
+it — sequencing, restarts, retries, priority, resolving merge conflicts,
+retargeting a PR's base, closing a duplicate PR, opening a PR for finished work,
+deciding which of two designs a blocked session should take — is yours.
+
+Escalate only what a wrong answer would make expensive and irreversible: a call
+that would discard a large amount of finished work, or one that commits real
+money.
 
 ## The standing remit: keep it moving, checked, tested and clean
 
