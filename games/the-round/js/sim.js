@@ -99,6 +99,26 @@ export const WEATHER = {
   storm:    { id: 'storm',    label: 'Downpour',   icon: '⛈️', workable: 0.3,  growth: 1.7, wet: true },
 };
 
+/**
+ * The daylight an average day on this round is worth, before anyone plans it.
+ *
+ * The same weights `pickWeather` rolls against, resolved rather than sampled,
+ * so anything wanting a typical day — the firm's outlook, for one — takes it
+ * from the weather table itself instead of keeping a second copy of it.
+ */
+export function expectedWorkable(mods) {
+  const m = withMods(mods);
+  const weights = [
+    [WEATHER.clear, 0.30],
+    [WEATHER.overcast, 0.26],
+    [WEATHER.heat, 0.1],
+    [WEATHER.showers, 0.22 * m.wetBias],
+    [WEATHER.storm, 0.12 * m.wetBias],
+  ];
+  const total = weights.reduce((n, [, w]) => n + w, 0);
+  return WORK_MINUTES * weights.reduce((n, [w, weight]) => n + w.workable * weight, 0) / total;
+}
+
 function pickWeather(rng, mods) {
   const weights = [
     [WEATHER.clear, 0.30],
@@ -592,35 +612,36 @@ function rankFor(net, lost) {
 
 export const POLICIES = (() => {
   const out = [];
-  // Three ways of deciding where the extra time goes, because that decision is
-  // the point of the lever: never, on a finish that is visibly heading for
-  // trouble, or knowing what each client will actually accept. The gap between
-  // the last two is what the hidden standard is worth.
-  const care = ['never', 'visible', 'standard'];
+  // Four ways of deciding where the extra time goes, because that decision is
+  // the point of the lever: never; on a finish that is visibly heading for
+  // trouble; and two that know what each client will accept, differing in how
+  // far short things have to be before the minutes are worth it. The gap
+  // between those and `visible` is what the hidden standard is worth.
+  const care = [
+    { careMode: 'never', careMargin: 0 },
+    { careMode: 'visible', careMargin: 0 },
+    { careMode: 'standard', careMargin: 0.05 },
+    { careMode: 'standard', careMargin: 0.15 },
+  ];
   const sharpen = [0.45, 0.75];
 
-  for (const rescueAt of [0, 0.15]) {
-    for (const careMode of care) {
+  for (const mode of ['loop', 'nearest', 'value']) {
+    for (const c of care) {
       for (const sharpenAt of sharpen) {
-        out.push({ mode: 'loop', careMode, sharpenAt, takeOffers: true,
-                   rescueAt, urgency: 0, rateWeight: 0 });
+        out.push({
+          mode, ...c, sharpenAt, takeOffers: true, rescueAt: 0,
+          urgency: mode === 'value' ? 25 : 0,
+          rateWeight: mode === 'value' ? 1 : 0,
+        });
       }
     }
   }
-  for (const careMode of care) {
-    for (const sharpenAt of sharpen) {
-      out.push({ mode: 'nearest', careMode, sharpenAt, takeOffers: true,
-                 rescueAt: 0, urgency: 0, rateWeight: 0 });
-      out.push({ mode: 'value', careMode, sharpenAt, takeOffers: true,
-                 rescueAt: 0, urgency: 25, rateWeight: 1 });
-    }
-  }
-  // Turning work down is measurably never the answer, but the axis stays in
-  // the family so that a change to the model can say otherwise.
-  out.push({ mode: 'loop', careMode: 'standard', sharpenAt: 0.75, takeOffers: false,
-             rescueAt: 0, urgency: 0, rateWeight: 0 });
-  out.push({ mode: 'nearest', careMode: 'standard', sharpenAt: 0.75, takeOffers: false,
-             rescueAt: 0, urgency: 0, rateWeight: 0 });
+  // Two axes that are measurably never the answer, kept live in the family so
+  // that a change to the model can say otherwise: turning work down, and
+  // detouring to somebody on the brink.
+  const keen = { careMode: 'standard', careMargin: 0.15, sharpenAt: 0.75, urgency: 0, rateWeight: 0 };
+  out.push({ mode: 'loop', ...keen, takeOffers: false, rescueAt: 0 });
+  out.push({ mode: 'loop', ...keen, takeOffers: true, rescueAt: 0.15 });
   return out;
 })();
 
@@ -631,14 +652,21 @@ const VISIBLY_POOR = 0.8;
  * Should this stop get the extra time?
  *
  * `visible` uses only what is on the screen — a wet day, a blunt blade, grass
- * that got away from you. `standard` also knows what this client will accept,
+ * that got away from you. The others also know what this client will accept,
  * which is the thing the player has to infer.
+ *
+ * They differ in how far short the finish has to be heading before the minutes
+ * are worth spending. Missing a standard by a hair costs almost no patience,
+ * so lingering over it is a lawn you do not get to; the margin is what stops
+ * the bot buying insurance it does not need. Measured over 52 rounds, a margin
+ * of 0.15 is worth 6% more than taking the time whenever the finish would fall
+ * short at all.
  */
 function wantsCare(p, van, policy) {
   switch (policy.careMode) {
     case 'always': return true;
     case 'visible': return cutQuality(p, van, false) < VISIBLY_POOR;
-    case 'standard': return cutQuality(p, van, false) < qualityBar(p);
+    case 'standard': return qualityBar(p) - cutQuality(p, van, false) > policy.careMargin;
     default: return false;
   }
 }

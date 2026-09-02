@@ -104,10 +104,12 @@ of them cleared: 40% on Easy up to 93% on Impossible. A test asserts that for
 all 625.
 
 The family crosses three routers — nearest hop, best return per minute, and
-nearest-then-untangled — with three ways of deciding who gets the extra time:
-never, whenever the finish looks like heading for trouble, and knowing what each
-client will accept. Taking the time sets par on 28 of 52 sampled rounds, which
-is the measurement that says the hidden standard is doing work.
+nearest-then-untangled — with four ways of deciding who gets the extra time:
+never; whenever the finish looks like heading for trouble; and two that know
+what each client will accept, differing in how far short things have to be
+before the minutes are worth spending. Knowing the client sets par on 45 of 52
+sampled rounds, which is the measurement that says the hidden standard is
+doing work.
 
 **The weather never changes.** Retry a round and the same season comes back, so
 a round you lost is a puzzle you can learn rather than a dice roll.
@@ -127,9 +129,11 @@ Rounds you hold can be put to work:
 
 - **Yards** — one per town, holding fuel and blades.
 - **Supplies** — by the pallet, with discounts at 500 / 1,500 / 4,000 units.
-- **Crews** — stationed on any round you hold. Wages and yard upkeep are owed
-  every day, supplied or not, and a yard that runs dry leaves crews on full pay
-  doing 45% of a day's work.
+- **Crews** — stationed on any round you hold. Wages are the same everywhere and
+  takings are not, so **38% of the 625 rounds are not worth a crew** and the
+  screen shows you which before you hire. Grandview pays $48 a day a crew;
+  Cranmoor loses $40. Wages and yard upkeep are owed every day, supplied or not,
+  and a yard that runs dry leaves crews on full pay doing 45% of a day's work.
 - **Time** — the firm runs one day for every day you work a round by hand, so
   it grows exactly as fast as you play.
 
@@ -151,7 +155,7 @@ js/ops.js               yards, supplies, crews, the daily tick
 js/store.js             shared state and the save file
 js/app.js               router, HUD, input
 js/ui/                  screens: map.js, run.js, opsui.js, kit.js
-tests/                  58 tests across the day, the campaign and the firm
+tests/                  60 tests across the day, the campaign and the firm
 tools/make-icons.mjs    regenerates icons/*.png from icons/icon.svg
 ```
 
@@ -160,7 +164,7 @@ can be played and balanced from node. The same seed always replays the same
 season.
 
 ```bash
-npm test           # 58 tests
+npm test           # 60 tests
 npm run icons      # rebuild PNG icons from the SVG (needs headless Chromium)
 ```
 
@@ -197,12 +201,29 @@ design after the fact.
   this is a problem of *which* lawns rather than *what order* — which is also
   why no simple heuristic gets near par.
 
+- **Knowing a client tells you what to skip, not what to do.** The first
+  reference bot took the extra time whenever a finish would fall short at all,
+  which came to 99% of stops — so "always take your time" scored within 3% of
+  it and the per-client decision was worth almost nothing. Missing a standard
+  by a hair costs almost no patience, so the minutes are wasted. Waiting until
+  the finish is heading 0.15 short is worth **6% more**, and it is what makes
+  the hidden standard pay: guessing from the weather now trails knowing the
+  client by nine points rather than two.
+- **The firm was modelling a different game.** `roundOutlook` averages a crew's
+  day in closed form rather than simulating one, and nothing kept the two in
+  step. It assumed a 34-unit hop between stops where the game plays out at 17,
+  and took no account of weather at all. It now derives the day from `sim.js` —
+  the same mowing arithmetic, and an expected daylight resolved from the weather
+  table rather than sampled — with the mean lawn, the mean hop and the 88% of a
+  day a real route fills all measured over played rounds. Crew wages moved to
+  $82 to keep the firm buildable in the towns you own when it unlocks.
+
 Each layer of attention is worth roughly one tier, measured over 52 rounds:
 
 | how you play | Easy | Medium | Hard | Impossible |
 |---|---|---|---|---|
-| straight down the list | 12/13 | 2/13 | 0/13 | 0/13 |
-| nearest ready lawn | 13/13 | 7/13 | 1/13 | 0/13 |
-| …and sharpen the blade | 13/13 | 12/13 | 7/13 | 1/13 |
-| …and take your time when it looks bad | 13/13 | 13/13 | 13/13 | 6/13 |
+| straight down the list | 12/13 | 1/13 | 0/13 | 0/13 |
+| nearest ready lawn | 13/13 | 4/13 | 0/13 | 0/13 |
+| …and sharpen the blade | 13/13 | 12/13 | 4/13 | 1/13 |
+| …and take your time when it looks bad | 13/13 | 13/13 | 11/13 | 3/13 |
 | …and know what each client wants | 13/13 | 13/13 | 13/13 | 7/13 |

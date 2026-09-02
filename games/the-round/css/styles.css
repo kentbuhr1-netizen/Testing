@@ -457,6 +457,15 @@ body {
 
 /* ---------- The lawn list ---------- */
 
+.crew-net {
+  font-style: normal;
+  font-size: 12.5px;
+  font-weight: 700;
+  margin-left: 6px;
+}
+.crew-net.good { color: var(--good); }
+.crew-net.bad { color: var(--bad); }
+
 .lawn-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 
 /*
