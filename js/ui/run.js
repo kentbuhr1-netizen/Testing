@@ -5,7 +5,7 @@ import * as B from '../bank.js';
 import * as Emp from '../employees.js';
 import { tickOps, newOps } from '../ops.js';
 import { store, render, recordBest, isPremiumUnlocked, recordDay, recordTierWon, recordInterest, checkAchievements, achievementToast } from '../store.js';
-import { money, whole, cents, fact, stepper, row, tierPill } from './kit.js';
+import { money, whole, cents, fact, stepper, row, tierPill, backBar } from './kit.js';
 
 const zeroedEnhancers = () => Object.fromEntries(Object.keys(S.ENHANCERS).map((id) => [id, 0]));
 
@@ -410,7 +410,7 @@ function runOverScreen() {
     </div>`;
 
   if (!r.corner) {
-    recordBest(score.money);
+    recordBest(score.net);
     return {
       body: `
         <div class="rank">
@@ -476,6 +476,33 @@ function runOverScreen() {
          <button class="btn-ghost" data-act="to-city">${city.name}</button>`
       : `<button class="btn" data-act="retry-corner">Try This Corner Again</button>
          <button class="btn-ghost" data-act="to-city">Back to ${city.name}</button>`,
+  };
+}
+
+const FREE_PLAY_BLURBS = {
+  easy: 'A forgiving cushion — plenty of room to recover from a bad morning.',
+  medium: 'A steady starting stake. Mistakes cost you, but rarely the season.',
+  hard: 'A thin margin. A careless week can wipe you out.',
+  impossible: 'Barely enough to open the first day. No room for error.',
+};
+
+function freePlayPickScreen() {
+  const rows = Object.keys(S.FREE_PLAY_STAKES).map((id) => `
+    <button class="row" data-act="start-free-play" data-difficulty="${id}" style="width:100%;text-align:left;cursor:pointer">
+      <div class="row-main">
+        <div class="row-name">${tierPill(id)}</div>
+        <div class="row-sub">${FREE_PLAY_BLURBS[id]}</div>
+      </div>
+      <div class="row-note" style="font-weight:700">${money(S.FREE_PLAY_STAKES[id])}</div>
+    </button>`).join('');
+
+  return {
+    body: `
+      ${backBar('Menu', 'to-title')}
+      <h1>Free Play</h1>
+      <p class="muted">${S.TOTAL_DAYS} days, no target to clear — just see how the season goes. Pick a starting stake.</p>
+      <div class="card">${rows}</div>`,
+    actions: '',
   };
 }
 
@@ -593,6 +620,7 @@ function settleRun() {
 }
 
 export const screens = {
+  freePlayPick: freePlayPickScreen,
   forecast: forecastScreen,
   buy: buyScreen,
   setup: setupScreen,
@@ -602,7 +630,12 @@ export const screens = {
 };
 
 export const actions = {
-  'free-play': () => startRun({ days: S.TOTAL_DAYS, stake: S.STARTING_MONEY }),
+  'free-play': () => { store.ui.view = 'freePlayPick'; },
+  'start-free-play': (el) => startRun({
+    days: S.TOTAL_DAYS,
+    stake: S.FREE_PLAY_STAKES[el.dataset.difficulty] ?? S.STARTING_MONEY,
+    target: null,
+  }),
   'start-run': () => startRun(cornerRun(store.ui.cityId, store.ui.cornerIndex)),
   'retry-corner': () => startRun(cornerRun(store.run.corner.cityId, store.run.corner.index)),
   'next-after-win': () => {

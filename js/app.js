@@ -23,7 +23,11 @@ const screenEl = document.getElementById('screen');
 const actionsEl = document.getElementById('actions');
 const hudEl = document.getElementById('hud');
 
-const SCREENS = { ...mapUi.screens, ...opsUi.screens, ...bankUi.screens, ...premiumUi.screens, ...tutorialUi.screens, ...achievementsUi.screens, ...bonusShopUi.screens };
+const SCREENS = {
+  ...mapUi.screens, ...opsUi.screens, ...bankUi.screens, ...premiumUi.screens,
+  ...tutorialUi.screens, ...achievementsUi.screens, ...bonusShopUi.screens,
+  freePlayPick: runUi.screens.freePlayPick,
+};
 const RUN_SCREENS = runUi.screens;
 const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions, ...bankUi.actions, ...premiumUi.actions, ...tutorialUi.actions, ...achievementsUi.actions, ...bonusShopUi.actions };
 

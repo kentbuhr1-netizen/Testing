@@ -28,7 +28,7 @@ function titleScreen() {
         ${progress ? `<p class="muted">Season so far: <strong>${progress.corners}</strong> corners,
           <strong>${progress.cities}</strong> cit${progress.cities === 1 ? 'y' : 'ies'} taken ·
           <strong>${whole(saved.campaign.treasury)}</strong> banked</p>` : ''}
-        ${best && !progress ? `<p class="muted">Best free season: <strong>${money(best)}</strong></p>` : ''}
+        ${best && !progress ? `<p class="muted">Best free-season profit: <strong>${money(best)}</strong></p>` : ''}
         <div class="chip-row" style="justify-content:center;margin-top:16px">
           <button class="chip" data-act="start-tutorial">🎓 Tutorial</button>
           <button class="chip" data-act="open-achievements">🏅 Achievements · ${achievementCount}/${achievementTotal}</button>

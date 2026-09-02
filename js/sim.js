@@ -13,6 +13,22 @@ export const CUPS_PER_PITCHER = 10;
 export const TOTAL_DAYS = 30;      // free play season length
 export const STARTING_MONEY = 20.0;
 
+/**
+ * Free play has no profit target to clear, so its difficulty is just the
+ * size of the cash cushion you start a season with. A thinner cushion means
+ * a careless run of bad recipe or pricing calls compounds into bankruptcy
+ * sooner. Stakes are calibrated (see tools/calibrate-freeplay.mjs) so a
+ * consistently careless player goes bankrupt over a full season roughly
+ * 10% of the time on Easy, 20% on Medium, 50% on Hard and 75% on
+ * Impossible — a careful player can clear any of them.
+ */
+export const FREE_PLAY_STAKES = {
+  easy: 120,
+  medium: 70,
+  hard: 55,
+  impossible: 45,
+};
+
 // Ideal recipe for one pitcher. Straying from it costs you satisfaction.
 const IDEAL_LEMONS = 5;
 const IDEAL_SUGAR = 5;
@@ -780,17 +796,19 @@ export function finalScore(state) {
     reputation: state.reputation,
     target: state.target,
     won: state.target == null ? null : net >= state.target,
-    rank: state.bankrupt ? { title: 'Out of Business', icon: '💸' } : rankFor(state.money),
+    rank: state.bankrupt ? { title: 'Out of Business', icon: '💸' } : rankFor(net),
     bankrupt: !!state.bankrupt,
   };
 }
 
-function rankFor(money) {
-  if (money >= 350) return { title: 'Lemonade Tycoon', icon: '👑' };
-  if (money >= 220) return { title: 'Franchise Owner', icon: '🏆' };
-  if (money >= 120) return { title: 'Corner Champion', icon: '🥇' };
-  if (money >= 60) return { title: 'Steady Squeezer', icon: '🍋' };
-  if (money >= STARTING_MONEY) return { title: 'Broke Even', icon: '🙂' };
+// Thresholds are net profit, not ending cash, so the rank means the same
+// thing no matter which free-play stake you started a season with.
+function rankFor(net) {
+  if (net >= 330) return { title: 'Lemonade Tycoon', icon: '👑' };
+  if (net >= 200) return { title: 'Franchise Owner', icon: '🏆' };
+  if (net >= 100) return { title: 'Corner Champion', icon: '🥇' };
+  if (net >= 40) return { title: 'Steady Squeezer', icon: '🍋' };
+  if (net >= 0) return { title: 'Broke Even', icon: '🙂' };
   return { title: 'Sour Season', icon: '😬' };
 }
 
