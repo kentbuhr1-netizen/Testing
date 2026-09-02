@@ -47,6 +47,7 @@ function forecast() {
         ${fact('On the books', active(r).length)}
         ${fact('At risk', atRisk, atRisk ? 'bad' : 'good')}
         ${fact('Blade', pct(r.sharpness), r.sharpness < 0.4 ? 'bad' : '')}
+        ${fact('Your name', pct(r.standing), r.standing < 0.85 ? 'bad' : '')}
       </section>
 
       ${offer ? `
@@ -105,26 +106,39 @@ function routeScreen() {
       const step = r.route.indexOf(p.id);
       const leg = plan.legs.find((l) => l.id === p.id);
       const overdueBy = Math.max(0, S.daysSinceCut(p, r.day) - p.expectedGap);
+      // Past the stop that overruns, planRoute stops costing the day out — so
+      // there are no minutes to show rather than zero of them.
+      const beyondDark = step >= 0 && !leg;
       const detail = step >= 0
-        ? `${clock(leg ? leg.drive : 0)} drive · ${clock(leg ? leg.mow : 0)} mowing${leg && !leg.fits ? ' · won’t fit' : ''}`
+        ? (leg
+            ? `${clock(leg.drive)} drive · ${clock(leg.mow)} mowing${leg.fits ? '' : ' · won’t fit'}`
+            : 'the day has already run out before here')
         : `${money(p.rate)} · size ${p.size.toFixed(1)} · ${due(p) ? `${p.height.toFixed(1)}cm, ready` : `${p.height.toFixed(1)}cm, nothing to cut yet`}`;
 
+      const careful = r.care.includes(p.id);
       return `
-        <button class="lawn-row ${step >= 0 ? 'picked' : ''} ${leg && !leg.fits ? 'wont-fit' : ''}"
-                data-act="toggleStop" data-id="${p.id}">
-          <span class="lawn-step-badge">${step >= 0 ? step + 1 : (due(p) ? '·' : '')}</span>
-          <span class="lawn-main">
-            <span class="lawn-name">${p.name}${overdueBy > 0 ? ` <em>${overdueBy}d late</em>` : ''}</span>
-            <span class="lawn-sub">${detail}</span>
-          </span>
-          <span class="lawn-patience">${bar(p.patience, p.patience < 0.3 ? 'bar-bad' : '')}</span>
-        </button>`;
+        <div class="lawn-row ${step >= 0 ? 'picked' : ''} ${(leg && !leg.fits) || beyondDark ? 'wont-fit' : ''}">
+          <button class="lawn-pick" data-act="toggleStop" data-id="${p.id}">
+            <span class="lawn-step-badge">${step >= 0 ? step + 1 : (due(p) ? '·' : '')}</span>
+            <span class="lawn-main">
+              <span class="lawn-name">${p.name}${overdueBy > 0 ? ` <em>${overdueBy}d late</em>` : ''}</span>
+              <span class="lawn-sub">${detail}</span>
+            </span>
+            <span class="lawn-patience">${bar(p.patience, p.patience < 0.3 ? 'bar-bad' : '')}</span>
+          </button>
+          ${step >= 0 ? `
+            <button class="chip care ${careful ? 'on' : ''}" data-act="toggleCare" data-id="${p.id}"
+                    title="Take your time over this one">
+              ${careful ? '✓ taking your time' : 'take your time'}
+            </button>` : ''}
+        </div>`;
     }).join('');
 
   return {
     body: `
       <h1 class="title">Day ${r.day} <span class="of">the round</span></h1>
-      <p class="sub">Tap in the order you will drive it. The van starts and ends at the yard.</p>
+      <p class="sub">Tap in the order you will drive it. The van starts and ends at the yard.
+        Some of them want more than a quick once-over — you have to work out which.</p>
 
       ${roundMap(r.properties, r.route, { due })}
 
@@ -179,13 +193,17 @@ function report() {
         ${fact('Profit', money(res.profit), res.profit >= 0 ? 'good' : 'bad')}
       </section>
 
+      ${res.standing < res.standingWas ? `
+        <div class="warn">Word has got round. Your name is worth
+          ${pct(res.standing)} of a full rate now, down from ${pct(res.standingWas)}.</div>` : ''}
+
       ${res.jobs.length ? `
         <section class="card">
           <h2 class="card-title">The day's work</h2>
           ${res.jobs.map((j) => `
             <div class="row">
               <div class="row-main">
-                <div class="row-name">${j.name}</div>
+                <div class="row-name">${j.name}${j.careful ? ' <em>took your time</em>' : ''}</div>
                 <div class="row-sub">${j.note}</div>
               </div>
               <div class="row-value ${j.due ? '' : 'muted'}">${j.due ? money(j.rate) : '—'}</div>
@@ -268,12 +286,23 @@ export const actions = {
     const r = store.run;
     const id = Number(el.dataset.id);
     const at = r.route.indexOf(id);
-    if (at >= 0) r.route.splice(at, 1);
-    else r.route.push(id);
+    if (at >= 0) {
+      r.route.splice(at, 1);
+      // Dropping the stop drops the decision to linger over it.
+      r.care = r.care.filter((c) => c !== id);
+    } else r.route.push(id);
+  },
+
+  toggleCare(el) {
+    const r = store.run;
+    const id = Number(el.dataset.id);
+    const at = r.care.indexOf(id);
+    if (at >= 0) r.care.splice(at, 1);
+    else if (r.route.includes(id)) r.care.push(id);
   },
 
   toggleSharpen() { store.run.sharpenToday = !store.run.sharpenToday; },
-  clearRoute() { store.run.route = []; },
+  clearRoute() { store.run.route = []; store.run.care = []; },
 
   workDay() {
     const r = store.run;

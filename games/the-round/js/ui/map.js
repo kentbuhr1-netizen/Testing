@@ -228,13 +228,32 @@ function help() {
       </section>
 
       <section class="card">
+        <h2 class="card-title">Taking your time</h2>
+        <p>Any stop on the round can be given the extra time it needs — it costs
+        ${Math.round((S.CARE_TIME - 1) * 100)}% longer on that lawn, and it shows in the finish.
+        Fussy clients cannot be satisfied any other way: a sharp blade on a dry day is a
+        decent cut, not a perfect one. Everybody else is a waste of your afternoon.</p>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title">Your name</h2>
+        <p>A round holds more lawns than you can cut, so losing one is no loss of work —
+        it is a loss of standing. Every client who walks takes a slice off what your name
+        is worth, and that comes off every lawn you cut for the rest of the season. Please
+        people and it comes back, slowly.</p>
+      </section>
+
+      <section class="card">
         <h2 class="card-title">What is hidden</h2>
         <p>Every client has an interval they expect you at and a standard they expect —
         and <strong>neither is ever printed</strong>. You learn them from what people say
         after you have been:</p>
         <ul class="mods">
           <li><span>💬</span>“It was getting a bit shaggy.” — you left it too long.</li>
-          <li><span>💬</span>“Looks like you were in a hurry.” — your blade is going off.</li>
+          <li><span>💬</span>“Looks like you were in a hurry.” — this one wanted more than
+            a quick once-over. Take your time over it next visit.</li>
+          <li><span>💬</span>“You could have been in and out.” — and this one never would
+            have noticed. Those minutes bought you nothing.</li>
           <li><span>💬</span>“They came out to say it looks a picture.” — keep doing that.</li>
         </ul>
         <p>The patience bar beside each name is the only warning you get. At zero they

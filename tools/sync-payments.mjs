@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Copy the shared payments client into each game.
+ * Copy the shared client modules — payments and the bonus shop — into each game.
  *
  * The games are offline-first PWAs, and a service worker can only intercept
  * requests inside its own scope — so a game importing `../../shared/...`
@@ -22,6 +22,8 @@ const SOURCES = [
   ['shared/payments/client/licence.js', 'js/payments/client/licence.js'],
   ['shared/payments/client/entitlements.js', 'js/payments/client/entitlements.js'],
   ['shared/payments/client/paywall.js', 'js/payments/client/paywall.js'],
+  ['shared/bonusshop/client/core.js', 'js/bonusshop/core.js'],
+  ['shared/bonusshop/client/shell.js', 'js/bonusshop/shell.js'],
 ];
 
 const GAMES = [

@@ -459,24 +459,46 @@ body {
 
 .lawn-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 
+/*
+ * A stop is two decisions — whether to go, and whether to linger — so the row
+ * is a container with two controls rather than one big button.
+ */
 .lawn-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.lawn-row.picked { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
+.lawn-row.wont-fit { opacity: .45; }
+
+.lawn-pick {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
   min-height: var(--tap);
-  padding: 8px 12px;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  padding: 0;
+  background: none;
+  border: 0;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
-.lawn-row:active { transform: scale(.995); }
-.lawn-row.picked { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
-.lawn-row.wont-fit { opacity: .45; }
+.lawn-pick:active { transform: scale(.995); }
+
+.chip.care {
+  align-self: flex-start;
+  margin-left: 36px;
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+}
 
 .lawn-step-badge {
   flex: none;
