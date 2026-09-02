@@ -500,6 +500,18 @@ body {
   font-size: 12px;
 }
 
+/*
+ * The drawing is output; the hit circles over it are the control. Everything
+ * painted has to let taps through to them.
+ */
+.map-live { touch-action: manipulation; }
+.map .route, .map .lawn, .map .lawn-step, .map .depot { pointer-events: none; }
+.map-live .map-hit {
+  fill: transparent;
+  pointer-events: all;
+  cursor: pointer;
+}
+
 .lawn-step-badge {
   flex: none;
   width: 26px; height: 26px;

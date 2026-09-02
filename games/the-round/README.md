@@ -30,9 +30,11 @@ and **Add to Home Screen** to install it.
 1. **Forecast** — the weather decides how much daylight you actually get. A
    downpour can leave you two hours and wet grass; sometimes the right move is
    to write the day off.
-2. **The round** — tap lawns in the order you will drive them. The van starts
-   and ends at the yard, and the map shows the loop you have built. Stops that
-   will not fit before dark are greyed out.
+2. **The round** — tap lawns on the map, or in the list, in the order you will
+   drive them. The van starts and ends at the yard, and the loop you have built
+   is drawn as you build it. Every lawn you have not taken is quoted from
+   wherever the route currently leaves the van. Stops that will not fit before
+   dark are greyed out.
 3. **Work it** — and find out what people thought.
 
 ## Taking your time

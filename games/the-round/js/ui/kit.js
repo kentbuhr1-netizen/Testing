@@ -61,6 +61,18 @@ export function backBar(label, act, extra = '') {
  * on their own, which cluster is worth a trip — is not decoration. The route
  * you have built so far is drawn over the top in order.
  */
+/**
+ * The round, drawn as the loop you have built.
+ *
+ * With `interactive`, the lawns themselves are the control: the game is a
+ * routing problem, so choosing stops off a map rather than a list is the
+ * whole point. The visible dots are far too small to tap on a phone, and a
+ * generous target over each one steals its neighbours' taps in a tight round,
+ * so the whole map takes the tap and the handler picks the nearest lawn to it.
+ * The list beside the map does everything this does — it is the keyboard and
+ * screen-reader path, which is why the drawing stays out of the
+ * accessibility tree.
+ */
 export function roundMap(properties, route, options = {}) {
   const pad = 6;
   const size = MAP_SIZE + pad * 2;
@@ -73,23 +85,30 @@ export function roundMap(properties, route, options = {}) {
         .join(' ')
     : '';
 
-  const dots = properties.map((p) => {
-    if (!p.active) return '';
+  const shown = properties.filter((p) => p.active);
+  const radius = (p) => 2.2 + Math.min(3, p.size / 4);
+
+  const dots = shown.map((p) => {
     const q = at(p);
     const step = route.indexOf(p.id);
     const cls = step >= 0 ? 'on-route'
       : options.due && options.due(p) ? 'due'
       : 'idle';
     const risk = p.patience < 0.3 ? ' at-risk' : '';
-    const r = 2.2 + Math.min(3, p.size / 4);
-    return `<circle class="lawn ${cls}${risk}" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="${r.toFixed(1)}" />` +
+    return `<circle class="lawn ${cls}${risk}" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="${radius(p).toFixed(1)}" />` +
       (step >= 0 ? `<text class="lawn-step" x="${q.x.toFixed(1)}" y="${(q.y + 2.4).toFixed(1)}">${step + 1}</text>` : '');
   }).join('');
 
+  const hits = options.interactive
+    ? `<rect class="map-hit" data-act="mapPick" x="0" y="0" width="${size}" height="${size}" />`
+    : '';
+
   return `
-    <svg class="map" viewBox="0 0 ${size} ${size}" role="img" aria-label="The round">
+    <svg class="map${options.interactive ? ' map-live' : ''}" viewBox="0 0 ${size} ${size}"
+         aria-hidden="true" focusable="false">
       ${line ? `<polyline class="route" points="${line}" />` : ''}
       ${dots}
       <rect class="depot" x="${(depot.x - 3).toFixed(1)}" y="${(depot.y - 3).toFixed(1)}" width="6" height="6" rx="1.5" />
+      ${hits}
     </svg>`;
 }
