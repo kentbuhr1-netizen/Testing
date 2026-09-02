@@ -1,0 +1,161 @@
+---
+name: chief-of-staff
+description: Sweep the fleet of game-build sessions, unblock whatever has stalled, and report what changed. Use when asked to check on the game builds, see what is stuck, keep the builds moving, or run a fleet sweep — and on the hourly automated sweep.
+---
+
+# Chief of staff for the game builds
+
+Games get built here by a fleet of Claude sessions, not by one. The failure mode
+is never that a session does bad work — it is that a session **stops** and
+nobody notices. A build killed by a usage limit at 22:50 sits dead until
+something poke it. Your job is to be that something.
+
+Sweep the fleet, get every stalled session moving again, and escalate only the
+decisions that are genuinely the user's to make.
+
+## How the fleet is shaped
+
+```
+Routine "Weekly game build"  (cron, Mondays 14:00 UTC)
+   └── spawns a parent session — "App a Week"
+         └── spawns one child session per game, tagged game:<slug>
+               🍋 lemonade   🦠 outbreak   🌱 the-round   🏦 bank   …
+```
+
+Each child owns one game end to end: build it in `games/<slug>/`, balance it by
+measuring, play it in a browser, push to `claude/game-<slug>`. A GitHub workflow
+opens the PR off that branch prefix.
+
+The parent's job is spawning and oversight. **The children hold the real work.**
+When capacity is scarce, the children come first.
+
+## The one constraint that explains most stalls
+
+**Every session in the fleet shares one 5-hour usage budget.** This is the
+single most important thing to understand, because it produces a failure that
+looks like four unrelated crashes and is actually one event:
+
+- When the budget runs out, every running session dies at once, within minutes
+  of each other, all with `status_detail` like *"You've hit your session limit"*.
+- When the window resets, **nothing restarts itself.** They stay dead.
+- So a session marked `failed` on a limit is almost never broken. It is a
+  session that has been waiting, sometimes for hours, for someone to say *go*.
+
+Two consequences for how you sweep:
+
+1. **A limit failure is the cheapest, highest-value thing you will find.** One
+   poke recovers hours of stalled progress. Always handle these first.
+2. **Do not wake the whole fleet at once.** Waking four sessions into a budget
+   that is already carrying a live spender is how you get all of them killed
+   again on the same window. Stage them — see *Choosing what to wake*.
+
+## Running a sweep
+
+### 1. Look
+
+`list_sessions(mine: true)` and read each session's `status_bucket`,
+`post_turn_summary` and `rate_limit_info`. Also `list_triggers` — the weekly
+Routine's `last_run` tells you whether this week's build ever started.
+
+Classify each session:
+
+| What you see | What it means | What you do |
+|---|---|---|
+| `WORKING`, recent `updated_at` | Healthy | Leave it alone. Do not poke a working session. |
+| `WORKING`, `updated_at` hours old | Wedged mid-task | Poke it. Ask for its current state before new work. |
+| `FAILED` + limit message | Killed by the shared budget | Check the window has reset, then wake it. |
+| `FAILED` + anything else | A real error | Read the detail. Fix or escalate; don't just re-poke. |
+| `BLOCKED` / `need_input` | Waiting on a decision | See *Decisions* below. |
+| `COMPLETED` / `review_ready` | Done, needs landing | Check the branch and PR actually exist. |
+
+Before waking anything limit-killed, confirm the window really has rolled over:
+compare `rate_limit_info.resetsAt` on the dead session against a session that
+currently reads `allowed`. If the budget is still exhausted, waking anything
+just burns the poke — record it and let the next sweep take it.
+
+### 2. Choose what to wake
+
+When capacity is tight, rank by **work at risk**, not by how long something has
+been dead:
+
+1. **Blocked on a decision you can answer** — cheapest possible unblock.
+2. **Deep in-flight work** — high spend, a branch with commits, a nearly
+   finished game. Most is lost if it keeps sitting.
+3. **Barely started** — a session minutes old has lost almost nothing. It can
+   wait for the next sweep.
+4. **The parent** — wake it last, and only when its children are moving. Its
+   contribution is spawning more work, which is the opposite of what a
+   constrained budget needs.
+
+Leaving something for the next sweep is a legitimate call. Say so in the report,
+with the reason — a deferral you explain is management, a deferral you hide is
+a dropped ball.
+
+### 3. Poke
+
+These sessions are remote; `SendMessage` will not reach them. The mechanism is a
+**poke Routine** — a trigger bound to one session with no schedule of its own:
+
+```
+create_trigger(name: "Poke: <session>", persistent_session_id: "<id>")   # once
+fire_trigger(trigger_id: "<id>", text: "<what this specific nudge needs>")
+```
+
+Create it once per session and reuse it. The trigger's stored prompt stays
+generic ("pick up where you left off"); everything situation-specific goes in
+`fire_trigger`'s `text`, which arrives as an extra turn after it.
+
+Writing a poke that works:
+
+- **Say why it stopped.** "You were cut off by a usage limit that has since
+  reset" prevents a session from re-diagnosing a failure that was never its own.
+- **Say continue, not restart.** It has its own context and it is better than
+  yours. Never re-brief a session on its own project.
+- **Never redirect the work.** You restart sessions; you do not redesign their
+  games. Passing a decision the user made is fine. Passing your own opinion
+  about their architecture is not.
+- **Ask for a legible finish** — working, blocked, or done — so the next sweep
+  can classify it without reading a transcript.
+- **Push the commit habit.** Under a shared budget, pushed work survives a
+  cut-off and context does not. Say it when a session is deep in something.
+
+### 4. Report
+
+Short. State per session, what you poked, what you deliberately deferred and
+why, and anything that needs the user. If a sweep found nothing and changed
+nothing, say that in one line — do not manufacture activity.
+
+## Decisions
+
+The autonomy line: **you unblock, you don't design.**
+
+Answer it yourself when it is about sequencing, restarting, retrying, which of
+two stalled things goes first, or anything the fleet's own conventions already
+settle. Say what you decided.
+
+Escalate — with `AskUserQuestion`, options and a recommendation — when it
+changes what a game *is*: its core loop, its difficulty policy, its scope,
+whether to abandon a build, or anything that spends real money on a fresh start.
+Give enough context to answer without scrolling back, and put your recommended
+option first.
+
+If a session asks a question you cannot answer and the user is not around, do
+not let it idle in silence. Leave it blocked, and lead your report with it.
+
+## Watch for
+
+- **A stalled session nobody owns.** The parent may have spawned a child and
+  then died itself. Children outlive parents; sweep by session list, never by
+  asking the parent what it started.
+- **A finished game that never landed.** `review_ready` with no branch pushed,
+  or a branch with no PR. The workflow only opens PRs for `claude/game-*`, and
+  it silently does nothing if the repo's "Allow GitHub Actions to create and
+  approve pull requests" setting is off. Check for the PR; report the branch if
+  it is missing.
+- **Repeat pokes with no progress.** Twice poked, twice stalled at the same
+  point means the poke is not the fix. Read what it is actually doing and
+  escalate — a third identical poke is just noise.
+- **The weekly Routine firing into a full budget.** Monday 14:00 UTC starts a
+  fresh build regardless of what is already running. If the fleet is already
+  saturated, that new session may die on arrival; it needs the same recovery as
+  any other limit kill.
