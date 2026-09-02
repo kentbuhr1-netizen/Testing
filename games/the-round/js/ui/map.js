@@ -216,8 +216,9 @@ function help() {
       <section class="card">
         <h2 class="card-title">The day</h2>
         <p>You have a round of client lawns and about ${clock(S.WORK_MINUTES)} of daylight — less
-        when it rains. Tap lawns in the order you will drive them. The van starts and ends
-        at the yard, and every mile between stops is time you are not mowing.</p>
+        when it rains. Tap lawns on the map, or in the list under it, in the order you will
+        drive them. The van starts and ends at the yard, and every mile between stops is
+        time you are not mowing.</p>
       </section>
 
       <section class="card">

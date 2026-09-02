@@ -151,7 +151,7 @@ document.addEventListener('click', (e) => {
   }
   const handler = ACTIONS[act];
   if (!handler) return;
-  handler(el);
+  handler(el, e);
   render();
 });
 

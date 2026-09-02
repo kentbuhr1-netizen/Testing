@@ -92,6 +92,11 @@ function routeScreen() {
 
   // The list is ordered by what a person would scan for: due first, then the
   // ones about to walk, then everything else.
+  // Every unrouted lawn is quoted from wherever the route currently leaves the
+  // van, because that is the number the next choice actually turns on.
+  const last = r.route.length ? r.properties[r.route[r.route.length - 1]] : null;
+  const from = last || S.DEPOT;
+
   const rows = active(r)
     .slice()
     .sort((a, b) => {
@@ -113,7 +118,7 @@ function routeScreen() {
         ? (leg
             ? `${clock(leg.drive)} drive · ${clock(leg.mow)} mowing${leg.fits ? '' : ' · won’t fit'}`
             : 'the day has already run out before here')
-        : `${money(p.rate)} · size ${p.size.toFixed(1)} · ${due(p) ? `${p.height.toFixed(1)}cm, ready` : `${p.height.toFixed(1)}cm, nothing to cut yet`}`;
+        : `${money(p.rate)} · ${clock(S.travelMinutes(from, p, r.mods))} ${last ? 'on from stop ' + r.route.length : 'from the yard'} · ${due(p) ? `${p.height.toFixed(1)}cm, ready` : `${p.height.toFixed(1)}cm, nothing to cut yet`}`;
 
       const careful = r.care.includes(p.id);
       return `
@@ -137,10 +142,11 @@ function routeScreen() {
   return {
     body: `
       <h1 class="title">Day ${r.day} <span class="of">the round</span></h1>
-      <p class="sub">Tap in the order you will drive it. The van starts and ends at the yard.
-        Some of them want more than a quick once-over — you have to work out which.</p>
+      <p class="sub">Tap the map, or the list, in the order you will drive it. The van starts
+        and ends at the yard. Some of them want more than a quick once-over — you have to
+        work out which.</p>
 
-      ${roundMap(r.properties, r.route, { due })}
+      ${roundMap(r.properties, r.route, { due, interactive: true })}
 
       <section class="card">
         <div class="row">
@@ -269,6 +275,21 @@ function gameover() {
 
 export const screens = { forecast, route: routeScreen, report, gameover };
 
+/** The map is drawn with a margin, and a tap has to land near something. */
+const MAP_PAD = 6;
+const MAP_PICK_RANGE = 12;
+
+/** Add a stop to the round, or take it back off. */
+function toggleStop(id) {
+  const r = store.run;
+  const at = r.route.indexOf(id);
+  if (at >= 0) {
+    r.route.splice(at, 1);
+    // Dropping the stop drops the decision to linger over it.
+    r.care = r.care.filter((c) => c !== id);
+  } else r.route.push(id);
+}
+
 /* ------------------------------------------------------------------ *
  * Actions
  * ------------------------------------------------------------------ */
@@ -282,16 +303,35 @@ export const actions = {
   },
   declineOffer() { store.run.today.offer = null; },
 
-  toggleStop(el) {
-    const r = store.run;
-    const id = Number(el.dataset.id);
-    const at = r.route.indexOf(id);
-    if (at >= 0) {
-      r.route.splice(at, 1);
-      // Dropping the stop drops the decision to linger over it.
-      r.care = r.care.filter((c) => c !== id);
-    } else r.route.push(id);
+  toggleStop(el) { toggleStop(Number(el.dataset.id)); },
+
+  /**
+   * A tap anywhere on the map takes the lawn nearest to it.
+   *
+   * Giving every lawn its own target means the targets overlap in a tight
+   * round and one lawn quietly swallows its neighbour's taps. Measuring from
+   * the tap instead is unambiguous however close together they sit.
+   */
+  mapPick(el, event) {
+    const svg = el.ownerSVGElement;
+    if (!svg || !svg.getScreenCTM) return;
+    const point = svg.createSVGPoint();
+    point.x = event.clientX;
+    point.y = event.clientY;
+    // Through the viewBox, so this holds however the map has been scaled.
+    const local = point.matrixTransform(svg.getScreenCTM().inverse());
+    const x = local.x - MAP_PAD;
+    const y = local.y - MAP_PAD;
+
+    let best = null;
+    for (const p of store.run.properties) {
+      if (!p.active) continue;
+      const d = Math.hypot(p.x - x, p.y - y);
+      if (!best || d < best.d) best = { d, id: p.id };
+    }
+    if (best && best.d <= MAP_PICK_RANGE) toggleStop(best.id);
   },
+
 
   toggleCare(el) {
     const r = store.run;
