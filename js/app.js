@@ -5,28 +5,48 @@
  * returning { body, actions, mounted }) and `actions` (button name → handler).
  * This file owns the DOM, the HUD, input, and saving after every action.
  */
-import { store, onRender, render, save } from './store.js';
+import { store, onRender, render, save, hasTutorialBeenSeen } from './store.js';
 import * as C from './campaign.js';
 import * as S from './sim.js';
 import * as mapUi from './ui/map.js';
 import * as runUi from './ui/run.js';
 import * as opsUi from './ui/opsui.js';
+import * as bankUi from './ui/bankui.js';
+import * as premiumUi from './ui/premium.js';
+import * as tutorialUi from './ui/tutorial.js';
+import * as achievementsUi from './ui/achievements.js';
+import * as bonusShopUi from './ui/bonusshop.js';
 import { money, whole, bar } from './ui/kit.js';
-import { restockCost, spaceLeft } from './ops.js';
+import { restockCost, spaceLeft, VEHICLES } from './ops.js';
 
 const screenEl = document.getElementById('screen');
 const actionsEl = document.getElementById('actions');
 const hudEl = document.getElementById('hud');
 
-const SCREENS = { ...mapUi.screens, ...opsUi.screens };
+const SCREENS = {
+  ...mapUi.screens, ...opsUi.screens, ...bankUi.screens, ...premiumUi.screens,
+  ...tutorialUi.screens, ...achievementsUi.screens, ...bonusShopUi.screens,
+  freePlayPick: runUi.screens.freePlayPick,
+};
 const RUN_SCREENS = runUi.screens;
-const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions };
+const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions, ...bankUi.actions, ...premiumUi.actions, ...tutorialUi.actions, ...achievementsUi.actions, ...bonusShopUi.actions };
 
 /* ------------------------------------------------------------------ *
  * Render
  * ------------------------------------------------------------------ */
 
+/** Full-screen overlays take priority over whatever's underneath, in this order. */
+function overlayView() {
+  if (store.ui.showTutorial) return 'tutorial';
+  if (store.ui.showPremium) return 'premium';
+  if (store.ui.showAchievements) return 'achievements';
+  if (store.ui.showBonusShop) return 'bonusShop';
+  return null;
+}
+
 function currentScreen() {
+  const overlay = overlayView();
+  if (overlay) return SCREENS[overlay];
   if (store.ui.view === 'run' && store.run) {
     return RUN_SCREENS[store.run.phase] || RUN_SCREENS.forecast;
   }
@@ -34,7 +54,8 @@ function currentScreen() {
 }
 
 function draw() {
-  const view = store.ui.view === 'run' && store.run ? `run:${store.run.phase}` : store.ui.view;
+  const overlay = overlayView();
+  const view = overlay || (store.ui.view === 'run' && store.run ? `run:${store.run.phase}` : store.ui.view);
   const screen = currentScreen()();
 
   screenEl.innerHTML = (store.ui.notice ? `<div class="notice">${store.ui.notice}</div>` : '') + screen.body;
@@ -59,9 +80,12 @@ function draw() {
 
 function drawHud() {
   const inRun = store.ui.view === 'run' && store.run;
-  const showHud = inRun || (store.campaign && ['world', 'city', 'corner', 'ops', 'opsCity'].includes(store.ui.view));
+  const showHud = inRun || (store.campaign && ['world', 'city', 'corner', 'ops', 'opsCity', 'bank'].includes(store.ui.view));
   hudEl.hidden = !showHud;
-  if (!showHud) return;
+  if (!showHud) {
+    hudEl.innerHTML = '';
+    return;
+  }
 
   if (inRun) {
     const r = store.run;
@@ -116,19 +140,32 @@ const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 const LIMITS = {
   recipe: { lemons: [1, 12], sugar: [1, 12], ice: [0, 7] },
   price: { price: [0.05, 5] },
-  order: { lemons: [0, 9999], sugar: [0, 9999], ice: [0, 9999], cups: [0, 9999] },
+  cupPrice: { small: [0.05, 5], large: [0.05, 5], byo: [0.05, 5] },
+  order: { lemons: [0, 9999], sugar: [0, 9999], ice: [0, 9999], cups: [0, 9999], cupsSmall: [0, 9999], cupsLarge: [0, 9999] },
   restock: { lemons: [0, 99999], sugar: [0, 99999], cups: [0, 99999] },
+  truckDraft: { amount: [25, Math.max(...Object.values(VEHICLES).map((v) => v.maxAmount))] },
+  bankAmount: { amount: [0, 999999] },
+  enhancerOrder: Object.fromEntries(Object.keys(S.ENHANCERS).map((id) => [id, [0, 999]])),
 };
+
+/** Every category a shopping basket can cost money in, added together. */
+function totalOrderCost(prices, order) {
+  return Math.round((
+    S.buyCost(prices, order) +
+    S.sizedCupOrderCost(prices, order) +
+    S.enhancerOrderCost(order.enhancers)
+  ) * 100) / 100;
+}
 
 /** Apply one tap of a stepper. Returns false when it could not move. */
 function applyStep(group, field, step) {
   const [min, max] = LIMITS[group][field];
-  const r = store.run;
 
   if (group === 'order') {
+    const r = store.run;
     const next = clamp(store.ui.order[field] + step, min, max);
     const trial = { ...store.ui.order, [field]: next };
-    if (step > 0 && S.buyCost(r.today.prices, trial) > r.money) return false; // never overspend
+    if (step > 0 && totalOrderCost(r.today.prices, trial) > r.money) return false; // never overspend
     store.ui.order[field] = next;
     return true;
   }
@@ -137,11 +174,35 @@ function applyStep(group, field, step) {
     const trial = { ...store.ui.restock, [field]: next };
     return acceptRestock(trial, field, next);
   }
-  if (group === 'price') {
-    r.price = Math.round(clamp(r.price + step, min, max) * 100) / 100;
+  if (group === 'enhancerOrder') {
+    const r = store.run;
+    const next = clamp(store.ui.order.enhancers[field] + step, min, max);
+    const trial = { ...store.ui.order, enhancers: { ...store.ui.order.enhancers, [field]: next } };
+    if (step > 0 && totalOrderCost(r.today.prices, trial) > r.money) return false; // never overspend
+    store.ui.order.enhancers[field] = next;
     return true;
   }
-  r.recipe[field] = clamp(r.recipe[field] + step, min, max);
+  if (group === 'truckDraft') {
+    // The stepper's global ceiling above is a safe upper bound; the vehicle
+    // actually being edited caps it further, to its own tier's daily max.
+    const truck = store.campaign?.ops?.trucks?.find((t) => t.id === store.ui.editingTruck);
+    const tierMax = truck ? (VEHICLES[truck.tier]?.maxAmount ?? max) : max;
+    store.ui.truckDraft[field] = clamp(store.ui.truckDraft[field] + step, min, Math.min(max, tierMax));
+    return true;
+  }
+  if (group === 'bankAmount') {
+    store.ui.bankAmount = Math.round(clamp(store.ui.bankAmount + step, min, max) * 100) / 100;
+    return true;
+  }
+  if (group === 'price') {
+    store.run.price = Math.round(clamp(store.run.price + step, min, max) * 100) / 100;
+    return true;
+  }
+  if (group === 'cupPrice') {
+    store.run.cupPrices[field] = Math.round(clamp(store.run.cupPrices[field] + step, min, max) * 100) / 100;
+    return true;
+  }
+  store.run.recipe[field] = clamp(store.run.recipe[field] + step, min, max);
   return true;
 }
 
@@ -151,7 +212,7 @@ function acceptRestock(trial, field, next) {
   if (!depot) return false;
   const units = trial.lemons + trial.sugar + trial.cups;
   if (units > spaceLeft(depot)) return false;
-  if (restockCost(trial) > store.campaign.treasury) return false;
+  if (restockCost(trial, store.campaign) > store.campaign.treasury) return false;
   store.ui.restock[field] = next;
   return true;
 }
@@ -209,4 +270,5 @@ if ('serviceWorker' in navigator) {
 
 // Always open on the title screen; Continue picks the saved game back up.
 store.ui.view = 'title';
+if (!hasTutorialBeenSeen()) store.ui.showTutorial = true;
 render();

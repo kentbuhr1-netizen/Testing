@@ -30,6 +30,10 @@
 
 * { box-sizing: border-box; }
 
+/* An element's own `display` (e.g. .hud, .actions) would otherwise outrank
+   the browser's default [hidden] rule and stay visible. */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   height: 100%;
@@ -219,6 +223,7 @@ button {
 .row-main { flex: 1; min-width: 0; }
 .row-name { font-weight: 700; }
 .row-sub { font-size: 13px; color: var(--ink-soft); }
+.row-note { flex: 0 0 auto; max-width: 40%; font-size: 12px; text-align: right; }
 
 .stepper {
   display: flex;
@@ -505,6 +510,8 @@ h1 .of { font-size: 15px; font-weight: 600; color: var(--ink-soft); }
 .warn-card { border-color: color-mix(in srgb, var(--danger) 35%, var(--line)); }
 .warn-dot { font-size: 13px; }
 .ops-report { border-color: color-mix(in srgb, var(--leaf) 35%, var(--line)); }
+.good { color: var(--leaf); }
+.bad { color: var(--danger); }
 
 .challenge h2 { color: var(--ink); font-size: 16px; letter-spacing: 0; text-transform: none; }
 
@@ -515,3 +522,79 @@ h1 .of { font-size: 15px; font-weight: 600; color: var(--ink-soft); }
 }
 
 .subtotal { border: 0; padding-top: 4px; margin-top: 0; font-size: 14px; font-weight: 600; }
+
+/* ---- inline text links (a stepping-stone into a bigger screen) ---- */
+
+.link-btn {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lemon-deep);
+  font-weight: 700;
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.link-btn:active { opacity: 0.7; }
+
+@media (prefers-color-scheme: dark) {
+  .link-btn { color: var(--lemon); }
+}
+
+/* ---- the one paywall in the game ---- */
+
+.paywall {
+  text-align: center;
+  border-color: color-mix(in srgb, var(--lemon-deep) 40%, var(--line));
+  background: color-mix(in srgb, var(--lemon) 10%, var(--bg-2));
+}
+.paywall-price {
+  font-size: 34px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+.paywall-price small {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.paywall p { text-align: left; }
+
+/* ---- locked list rows (achievements, and anywhere else that fits) ---- */
+
+.row.locked { opacity: .5; }
+.row.locked .row-name { color: var(--ink-soft); }
+
+/* ---- tutorial slides ---- */
+
+.tut-slide {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+  padding: 24px 12px;
+}
+.tut-icon { font-size: 72px; line-height: 1; margin-bottom: 8px; }
+.tut-slide h1 { font-size: 24px; margin: 0; }
+.tut-slide p { max-width: 34ch; color: var(--ink-soft); font-size: 16px; line-height: 1.5; }
+
+.tut-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+.tut-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--line);
+}
+.tut-dot.on { background: var(--lemon-deep); width: 22px; }
