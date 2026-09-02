@@ -3,7 +3,9 @@ import * as C from '../campaign.js';
 import * as S from '../sim.js';
 import { opsUnlocked } from '../campaign.js';
 import { restockCost } from '../ops.js';
-import { store, save, render, loadSave, clearSave, bestScore } from '../store.js';
+import * as E from '../employees.js';
+import { store, save, render, loadSave, clearSave, bestScore, loadUnlockedAchievements, checkAchievements, achievementToast } from '../store.js';
+import { ACHIEVEMENTS } from '../achievements.js';
 import { money, whole, fact, tierPill, bar, backBar } from './kit.js';
 import * as Entitlements from '../payments/client/entitlements.js';
 import { paywallScreen, paywallActions, resetPaywall } from '../payments/client/paywall.js';
@@ -22,6 +24,8 @@ function titleScreen() {
   const saved = loadSave();
   const progress = saved ? C.campaignProgress(saved.campaign) : null;
   const best = bestScore();
+  const achievementCount = Object.keys(loadUnlockedAchievements()).length;
+  const achievementTotal = Object.keys(ACHIEVEMENTS).length;
   return {
     body: `
       <div class="title-art">🍋</div>
@@ -32,7 +36,12 @@ function titleScreen() {
         ${progress ? `<p class="muted">Season so far: <strong>${progress.corners}</strong> corners,
           <strong>${progress.cities}</strong> cit${progress.cities === 1 ? 'y' : 'ies'} taken ·
           <strong>${whole(saved.campaign.treasury)}</strong> banked</p>` : ''}
-        ${best && !progress ? `<p class="muted">Best free season: <strong>${money(best)}</strong></p>` : ''}
+        ${best && !progress ? `<p class="muted">Best free-season profit: <strong>${money(best)}</strong></p>` : ''}
+        <div class="chip-row" style="justify-content:center;margin-top:16px">
+          <button class="chip" data-act="start-tutorial">🎓 Tutorial</button>
+          <button class="chip" data-act="open-achievements">🏅 Achievements · ${achievementCount}/${achievementTotal}</button>
+          <button class="chip" data-act="open-bonus-shop">🎬 Bonus Shop</button>
+        </div>
       </div>`,
     actions: `
       ${saved ? '<button class="btn" data-act="continue">Continue</button>' : ''}
@@ -125,6 +134,7 @@ function worldScreen() {
       ${opsUnlocked(campaign)
         ? '<button class="btn" data-act="open-ops">🏭 Operations</button>'
         : `<div class="locked-note">🏭 Operations unlock after ${C.CITIES_FOR_OPS} cities (${C.completedCities(campaign).length}/${C.CITIES_FOR_OPS})</div>`}
+      <button class="btn-ghost" data-act="open-bank">🏦 Bank${campaign.bank?.balance > 0 ? ` · ${whole(campaign.bank.balance)}` : ''}</button>
       <button class="btn-ghost" data-act="to-title">Menu</button>`,
   };
 }
@@ -139,8 +149,12 @@ function opsReportCard(report) {
         <strong class="${report.net >= 0 ? 'good' : 'bad'}">${money(report.net)}</strong>
         into the treasury from ${report.cups} cups.</p>
       ${units > 0
-        ? `<p class="muted">It drew ${units} units out of your depots — about ${money(restockCost(used))} to replace.</p>`
+        ? `<p class="muted">It drew ${units} units out of your depots — about ${money(restockCost(used, store.campaign))} to replace.</p>`
         : ''}
+      ${report.produced && (report.produced.lemons + report.produced.sugar + report.produced.cups) > 0
+        ? `<p class="muted">Farms and the factory pressed ${report.produced.lemons + report.produced.sugar + report.produced.cups} units straight into the depots, for free.</p>`
+        : ''}
+      ${report.trucked > 0 ? `<p class="muted">Trucks hauled ${report.trucked} units between depots.</p>` : ''}
       ${report.dry.length ? `<p class="warn">⚠️ Ran short in ${report.dry.map((id) => C.getCity(id).name).join(', ')}.</p>` : ''}
     </div>`;
 }
@@ -226,11 +240,29 @@ function cornerScreen() {
         <ul class="notes">
           ${notes.map((n) => `<li>${n.icon} ${n.text}</li>`).join('') || '<li>An ordinary corner. No excuses.</li>'}
         </ul>
-      </div>`,
+      </div>
+      ${E.hasMA(campaign) ? acquireCard(campaign, cityId, cornerIndex) : ''}`,
     actions: `
       <button class="btn" data-act="start-run">Set Up Here</button>
       <button class="btn-ghost" data-act="to-city">Pick Another Corner</button>`,
   };
+}
+
+/** M&A: skip playing this corner and just buy it, at a stiff premium. */
+function acquireCard(campaign, cityId, cornerIndex) {
+  const cost = C.acquisitionCost(campaign, cityId, cornerIndex);
+  return `
+    <div class="card">
+      <h2>🤝 M&amp;A</h2>
+      <p class="muted">Your specialist can buy this corner outright instead of you playing it —
+        at three times the profit target, since a shortcut is not a bargain.</p>
+      <div class="chip-row" style="margin-top:10px">
+        <button class="chip" data-act="acquire-corner" data-city="${cityId}" data-index="${cornerIndex}"
+          ${campaign.treasury < cost ? 'disabled' : ''}>
+          Buy It Out · ${money(cost)}
+        </button>
+      </div>
+    </div>`;
 }
 
 /* ------------------------------------------------------------------ *
@@ -289,9 +321,7 @@ export const actions = {
   'to-world': () => { store.ui.view = 'world'; },
   'to-city': () => { store.ui.view = 'city'; },
   'open-city': (el) => {
-    const cityId = el.dataset.city;
-    if (!cityPaidFor(cityId)) return actions.openShop();
-    store.ui.cityId = cityId;
+    store.ui.cityId = el.dataset.city;
     store.ui.view = 'city';
     store.ui.opsReport = null;
   },
@@ -304,5 +334,15 @@ export const actions = {
     if (next == null) return;
     store.ui.cornerIndex = next;
     store.ui.view = 'corner';
+  },
+  'acquire-corner': (el) => {
+    const cityId = el.dataset.city;
+    const index = Number(el.dataset.index);
+    const result = C.acquireCorner(store.campaign, cityId, index);
+    if (!result.ok) { store.ui.notice = result.why; return; }
+    store.ui.claimResult = result;
+    const toast = achievementToast(checkAchievements({ acquiredCorner: true }));
+    store.ui.notice = toast || `🤝 ${C.getCity(cityId).name} corner acquired.`;
+    store.ui.view = 'city';
   },
 };
