@@ -112,7 +112,12 @@ Districts you hold can be put to work:
 - **Procurement** — doses by the million, with discounts at 200k / 500k / 1M.
 - **Teams** — stationed on any district you hold. Wages and lab upkeep are owed
   every week, supplied or not, and a laboratory that runs dry leaves your teams
-  standing on full pay at 40% effectiveness.
+  standing on full pay at 40% effectiveness. **What a team is worth is measured,
+  like everything else**: the district's own do-nothing run is played against a
+  routine standing response, and the gap is what the team can capture. Roughly
+  half the districts in the campaign do not lose enough people for a team to
+  cover its own wages, and the screen says so before you hire one — deciding
+  where they are worth stationing is the whole of the agency.
 - **Time** — the agency runs one week for every week you work a district by
   hand, so it earns exactly as fast as you play.
 
@@ -127,7 +132,7 @@ js/ops.js               laboratories, procurement, teams, the weekly tick
 js/store.js             shared state and the save file
 js/app.js               router, HUD, input
 js/ui/                  screens: map.js, run.js, opsui.js, kit.js
-tests/                  46 tests across the model, the campaign and the agency
+tests/                  48 tests across the model, the campaign and the agency
 tools/make-icons.mjs    regenerates icons/*.png from icons/icon.svg
 ```
 
@@ -136,7 +141,7 @@ can be played and balanced from node. The same seed always replays the same
 outbreak.
 
 ```bash
-npm test           # 46 tests
+npm test           # 48 tests
 npm run icons      # rebuild PNG icons from the SVG (needs headless Chromium)
 ```
 

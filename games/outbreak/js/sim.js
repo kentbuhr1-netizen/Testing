@@ -542,7 +542,6 @@ export function livesSaved(state) {
 export function finalScore(state) {
   const saved = livesSaved(state);
   const peak = state.history.reduce((a, h) => Math.max(a, h.peakCare), 0);
-  const infected = state.pop - state.s - state.r * 0; // survivors who were never exposed
   const everInfected = state.d + state.r + state.i + state.e;
   return {
     deaths: Math.round(state.d),

@@ -91,6 +91,9 @@ function opsRegion() {
         <div class="row-main">
           <div class="row-name">${d.name}</div>
           <div class="row-sub">${lives(o.saved)} lives/wk · ${money(o.wage + o.beds)}/wk · ${lives(o.doses)} doses</div>
+          <div class="row-sub">${money(o.grant)}/wk in grants · <span class="${
+            o.grant >= o.wage + o.beds ? 'good' : 'bad'}">${o.grant >= o.wage + o.beds ? '+' : '−'}${
+            money(Math.abs(o.grant - o.wage - o.beds))}/wk net</span></div>
         </div>
         ${staffed
           ? `<button class="chip danger" data-act="standDown" data-index="${i}">Stand down</button>`

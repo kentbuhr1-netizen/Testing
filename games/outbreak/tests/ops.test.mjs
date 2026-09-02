@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as O from '../js/ops.js';
 import * as C from '../js/campaign.js';
+import * as S from '../js/sim.js';
 
 const REGION = 'wellington';
 
@@ -144,4 +145,47 @@ test('beds are never stockpiled — teams pay for theirs locally, every week', (
   assert.ok(outlook.doses > 0);
   const lab = { capacity: O.LAB_BASE_CAPACITY, doses: 0 };
   assert.equal(Object.keys(lab).includes('beds'), false, 'a laboratory should not stock beds');
+});
+
+/**
+ * The agency has to obey the same rule the rest of the game does: what a thing
+ * is worth is measured, not asserted. A team used to be worth a flat share of
+ * a district's population, which meant a team standing over a mild flu in a
+ * young city was worth as much as one standing over Cascade in an old one, and
+ * every team everywhere paid for itself.
+ */
+test('what a team is worth is measured from the district it stands over', () => {
+  const sampled = [];
+  for (const region of C.REGIONS) {
+    for (let i = 0; i < C.DISTRICTS_PER_REGION; i += 6) {
+      const o = O.districtOutlook(region.id, i);
+      const config = C.runConfigFor(region.id, i);
+      const dyingPerWeek = S.baselineDeaths(config) / config.weeks;
+
+      assert.ok(o.saved >= 0, `${region.id}:${i} saved ${o.saved}`);
+      assert.ok(o.saved <= dyingPerWeek + 1e-9,
+        `${region.id}:${i} saves ${o.saved} of ${dyingPerWeek} dying — a team cannot save more than die`);
+      assert.ok(o.savedDry < o.saved || o.saved === 0,
+        `${region.id}:${i} an unsupplied team should achieve less`);
+      sampled.push(o.saved / o.pop);
+    }
+  }
+
+  // Per head, districts must differ substantially — a figure driven by
+  // population alone would barely move.
+  const lo = Math.min(...sampled);
+  const hi = Math.max(...sampled);
+  assert.ok(hi > lo * 10, `per-head worth barely varies: ${lo} to ${hi}`);
+});
+
+test('not every district is worth stationing a team on', () => {
+  let worthIt = 0, notWorthIt = 0;
+  for (const region of C.REGIONS) {
+    for (let i = 0; i < C.DISTRICTS_PER_REGION; i += 3) {
+      const o = O.districtOutlook(region.id, i);
+      if (o.grant > o.wage + o.beds) worthIt += 1; else notWorthIt += 1;
+    }
+  }
+  assert.ok(worthIt > 0, 'no district anywhere pays for a team');
+  assert.ok(notWorthIt > 0, 'every district pays for a team — stationing is not a decision');
 });
