@@ -189,3 +189,15 @@ test('not every district is worth stationing a team on', () => {
   assert.ok(worthIt > 0, 'no district anywhere pays for a team');
   assert.ok(notWorthIt > 0, 'every district pays for a team — stationing is not a decision');
 });
+
+test('a standing team may never close things', () => {
+  assert.ok(O.TEAM_POLICIES.length > 0, 'a team has nothing it is allowed to do');
+  for (const policy of O.TEAM_POLICIES) {
+    assert.equal(policy.distLevel, 0,
+      'closing things is a political act, and not a standing team\u2019s to take');
+  }
+  // And the family it is drawn from must still contain policies that do close
+  // things, or the filter is silently selecting everything.
+  assert.ok(S.POLICIES.some((p) => p.distLevel > 0), 'nothing in the family closes anything');
+  assert.ok(O.TEAM_POLICIES.length < S.POLICIES.length, 'teams inherited the whole family');
+});

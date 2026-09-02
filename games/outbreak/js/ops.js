@@ -14,7 +14,7 @@
 import {
   REGIONS, getRegion, heldIn, runConfigFor, GRANT_PER_LIFE,
 } from './campaign.js';
-import { withMods, baselineDeaths, playPolicy, BASE_POP, REF_POP } from './sim.js';
+import { withMods, baselineDeaths, playPolicy, POLICIES, BASE_POP, REF_POP } from './sim.js';
 
 export const LAB_COST = 150;                 // $M to build a regional laboratory
 export const LAB_BASE_CAPACITY = 400_000;    // doses it can hold
@@ -25,17 +25,20 @@ export const TEAM_WAGE = 0.9;                // per stationed team per week
 export const LAB_UPKEEP = 0.4;               // per laboratory per week
 
 /**
- * The policy a standing team runs: vaccinate, keep some wards open, trace what
- * the labs can carry, and close nothing. Closing things is a political act and
- * not a team's to take — which is also why the agency can never do what an
- * attentive hand can.
+ * What a standing team may do: anything in the reference family that does not
+ * close things. Closing things is a political act and not a team's to take,
+ * which is the one hard limit on the agency — and the reason it can never do
+ * what an attentive hand can.
+ *
+ * A team runs the best of these for the district it stands on, rather than one
+ * fixed mix. A single mix would have been another guessed constant, and a
+ * measurably bad one: the obvious choice captured only 79% of what was
+ * available on average and as little as 39% in the import-heavy districts,
+ * penalising them for a doctrine that simply did not suit them.
  */
-export const TEAM_POLICY = {
-  distLevel: 0, distFrom: 0, vax: 3, beds: 3, bedsEarly: true,
-  traceOn: true, traceFirst: true,
-};
+export const TEAM_POLICIES = POLICIES.filter((p) => p.distLevel === 0);
 
-/** How much of that policy's worth a standing team actually captures. */
+/** How much of that a standing team actually captures. */
 export const TEAM_EFFECT = 0.6;
 /** What a team achieves once the lab behind it runs dry. */
 export const UNSUPPLIED_EFFECT = 0.4;
@@ -109,13 +112,14 @@ export function districtOutlook(regionId, districtIndex) {
   const pop = Math.round(BASE_POP * mods.popScale);
   const scale = pop / REF_POP;
 
-  // What a routine standing response is worth here, per week: the gap between
-  // the district's own do-nothing run and the same district under the team's
-  // policy. Measuring the *achievable* saving rather than the raw death toll
-  // is what keeps a catastrophic district from paying out catastrophically —
-  // a team is worth what it can actually prevent, which saturates.
+  // What a standing response is worth here, per week: the gap between the
+  // district's own do-nothing run and the best a team is allowed to do on it.
+  // Measuring the *achievable* saving rather than the raw death toll is what
+  // keeps a catastrophic district from paying out catastrophically — a team is
+  // worth what it can actually prevent, which saturates.
   const unmanaged = baselineDeaths(config);
-  const achievable = Math.max(0, unmanaged - playPolicy(config, TEAM_POLICY)) / config.weeks;
+  const managed = Math.min(...TEAM_POLICIES.map((p) => playPolicy(config, p)));
+  const achievable = Math.max(0, unmanaged - managed) / config.weeks;
   const saved = achievable * TEAM_EFFECT;
 
   const out = Object.freeze({
