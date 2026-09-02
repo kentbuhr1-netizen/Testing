@@ -270,6 +270,12 @@ cleared $235.69 against a target of $127. The same harness playing on
 keywords alone — "clean books, good word" — cleared $86.54 and lost. Banked
 the book, reloaded the page, and the career resumed with it held.
 
+Reloading **part-way through a week's queue** — the thing a phone actually
+does to you — comes back to the same applicant, with the same terms, the same
+four readings, the same place in the queue and the same balance sheet. The
+only thing that does not survive is the "you just approved so-and-so" line,
+which is view state and should not.
+
 Then the network: a branch opened, cash shipped with the stepper, a manager
 hired, a book played, and the daily tick confirmed — 26 loans over 14 days,
 the vault down from $5,000 to $3,628, standing climbing to 100%. No console
