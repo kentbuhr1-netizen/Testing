@@ -226,6 +226,30 @@ deleting a branch is outward-facing and destructive; propose it, let Kent decide
 The point of doing this every hour is that divergence is cheap to fix on day one
 and expensive on day three. The sweep exists to find it on day one.
 
+## House standards every game must meet
+
+Two things are shared across the series and must not be reimplemented per game.
+Each lives in `shared/`, and `tools/sync-payments.mjs` **copies** both into every
+game — never imported across directories, because a service worker only
+intercepts its own scope, so a cross-directory import works on a desktop and
+fails on a plane. `--check` fails the build when a copy drifts.
+
+- **`shared/payments`** — the paywall. A product and a `FREE_TIER` entry in the
+  catalog, `payments.config.js` blank (blank means no paywall and a complete
+  game — deliberate), entitlements read before first paint.
+- **`shared/bonusshop`** — small boosts unlocked by a simulated rewarded ad.
+  Every game has one. The shell is shared; a game supplies only its own bonus
+  list and a unique `storageKey`.
+
+On a sweep, check a finished or nearly-finished game for both, and check that
+the bonus list is the game's own rather than another game's copied over. A game
+whose bonuses would let four ads beat playing well is unbalanced — say so.
+
+**Neither is covered by the node tests.** The shared cores are tested; the
+per-game screen wiring is not. A shop that throws when opened passes every
+suite. So drive it in a browser: open the shop, claim a bonus, watch for
+console errors.
+
 ## Watch for
 
 - **A stalled session nobody owns.** The parent may have spawned a child and
