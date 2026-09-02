@@ -8,6 +8,7 @@ self-contained project sharing the same spine.
 | 🍋 | [`games/lemonade`](games/lemonade) | **Lemonade Stand** — read the weather, mix the pitcher, set your price |
 | 🦠 | [`games/outbreak`](games/outbreak) | **Outbreak** — contain an epidemic with four levers that fight each other |
 | 🌱 | [`games/the-round`](games/the-round) | **The Round** — plan a grass-cutting round against the daylight |
+| 📒 | [`games/the-ledger`](games/the-ledger) | **The Ledger** — say yes or no to one borrower at a time, and find out months later |
 
 Each game is completely independent: its own `package.json`, tests, icons,
 service worker and PWA scope. Nothing in one game imports anything from
@@ -19,7 +20,8 @@ another, so any of them can be lifted out and hosted on its own.
 npm start        # serves everything on http://localhost:8080
 ```
 
-Then open `/games/lemonade/`, `/games/outbreak/` or `/games/the-round/` — or
+Then open `/games/lemonade/`, `/games/outbreak/`, `/games/the-round/` or
+`/games/the-ledger/` — or
 just `/` for the index. On a phone, **Add to Home Screen** installs the one you
 are looking at; each has its own icon and runs offline.
 
@@ -39,7 +41,7 @@ what make them good:
   40% on Easy up to 93% on Impossible. Every game has a test that walks all 625
   and asserts no level asks for more than it can give.
 - **Something meaningful is hidden** and inferred from qualitative feedback
-  rather than read off a number: the recipe, the pathogen, the client.
+  rather than read off a number: the recipe, the pathogen, the client, the borrower.
 - **An operations layer** unlocks partway through and ticks in step with the
   turns you play by hand — and in each game there is one thing that cannot be
   stockpiled, which is what stops the empire replacing the game.
