@@ -1,5 +1,5 @@
 /* Offline shell: the game is static, so cache it and serve from cache first. */
-const CACHE = 'lemonade-v10';
+const CACHE = 'lemonade-v11';
 const ASSETS = [
   './',
   './index.html',
@@ -21,6 +21,8 @@ const ASSETS = [
   './js/ui/tutorial.js',
   './js/ui/achievements.js',
   './js/ui/bonusshop.js',
+  './js/bonusshop/core.js',
+  './js/bonusshop/shell.js',
   './js/payments.config.js',
   './js/payments/catalog.js',
   './js/payments/client/licence.js',
