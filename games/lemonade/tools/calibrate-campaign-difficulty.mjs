@@ -23,8 +23,7 @@
 import * as C from '../js/campaign.js';
 import * as S from '../js/sim.js';
 import { playSkilled } from './skilled-persona.mjs';
-
-const round2 = (n) => Math.round(n * 100) / 100;
+import { round2 } from './reckless-persona.mjs';
 
 // par doesn't depend on parFactor or the trial's own randomness — cache it per corner.
 const parCache = new Map();

@@ -7,8 +7,8 @@
  * four campaign difficulty tiers — parFactor's actual job.
  */
 import * as S from '../js/sim.js';
+import { round2 } from './reckless-persona.mjs';
 
-const round2 = (n) => Math.round(n * 100) / 100;
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 
 /** `sloppiness` is the chance any given day drifts from the reference plan. */
