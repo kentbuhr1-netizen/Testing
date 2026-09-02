@@ -559,3 +559,45 @@ body {
   font-size: 12.5px;
   color: var(--ink-soft);
 }
+
+/* ---------- The bonus shop (shared shell markup) ---------- */
+
+.rank { text-align: center; padding: 22px 8px 16px; }
+.rank-icon { font-size: 52px; line-height: 1; display: block; }
+.rank-title { margin-top: 6px; font-size: 26px; font-weight: 700; letter-spacing: -.02em; }
+
+.center { text-align: center; }
+.row-note { font-size: 12.5px; text-align: right; max-width: 46%; }
+
+.progress {
+  width: 100%;
+  height: 10px;
+  margin-top: 10px;
+  border-radius: 99px;
+  background: var(--line);
+  overflow: hidden;
+}
+.progress i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+}
+
+/* A reading you paid attention for, rather than one the file gave you. */
+.file-remark.bought {
+  border-left-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  font-style: normal;
+}
+
+/* The queue line and the way into the bonus shop, side by side. */
+.desk-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.desk-head .queue { margin-bottom: 0; flex: 1; min-width: 0; }
+.desk-head .chip { min-height: 32px; padding: 0 12px; }

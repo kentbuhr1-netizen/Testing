@@ -21,6 +21,8 @@ export const store = {
     opsReport: null,    // what the network did while you were out
     lastKey: null,
     notice: null,
+    showBonusShop: false,
+    watchingAd: null,
   },
 };
 

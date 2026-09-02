@@ -382,6 +382,50 @@ export function withdrawalForecast(state) {
   return { middle: round2(-drift), low: round2(-drift - swing), high: round2(-drift + swing) };
 }
 
+/**
+ * Exactly what the town will do with its money this week.
+ *
+ * Confidence and deposits only move when the week is settled, and the noise
+ * and the frights were rolled from the seed before the run began — so this is
+ * knowable now, and `settleWeek` uses this very function rather than a second
+ * copy of the arithmetic. It is deliberately *not* shown: what the player
+ * normally gets is `withdrawalForecast`, which is a range.
+ */
+export function projectedFlow(state) {
+  const script = state.script[state.week] || { noise: 0, fright: false, frightSize: 0, frightNote: null };
+  let drift = state.deposits * (state.confidence - CALM) * FLOW_SENSITIVITY;
+  // The inflow tapers off as the deposit book approaches what the district holds.
+  if (drift > 0) drift *= clamp(1 - state.deposits / state.depositCap, 0, 1);
+  let flow = drift + state.deposits * script.noise;
+  if (script.fright) flow -= state.deposits * script.frightSize;
+  return { flow: round2(flow), fright: script.fright ? script.frightNote : null };
+}
+
+/** A fifth reading on an applicant, which the game never gives away for free. */
+export const OPINIONS = [
+  'Asked around, and nobody would put their name to them.',
+  'One or two people looked uncomfortable when asked.',
+  'Nothing much either way. They are not talked about.',
+  'Spoken of as good for it, by people who would know.',
+  'Everyone asked said the same thing: they pay.',
+];
+
+/**
+ * Buy a second opinion on the file at the desk.
+ *
+ * Drawn from the run's own seed and cached on the application, so claiming it
+ * twice — or reloading the page — cannot reroll it into a better answer. It is
+ * another noisy read, not the truth: it can be wrong like the other four.
+ */
+export function secondOpinion(state, app) {
+  if (!app) return null;
+  if (app.extraReading != null) return app.extraReading;
+  const rng = mulberry32((state.seed ^ ((app.id + 1) * 2654435761)) >>> 0);
+  const sigma = 0.2 * state.mods.noise;
+  app.extraReading = bucket(clamp(app.quality + gauss(rng) * sigma, 0, 0.999), OPINIONS.length);
+  return app.extraReading;
+}
+
 /* ------------------------------------------------------------------ *
  * The desk — one file, one answer, no going back
  * ------------------------------------------------------------------ */
@@ -431,6 +475,26 @@ export function decide(state, approve) {
   state.at += 1;
   if (state.at >= deskQueue(state).length) state.phase = 'settle';
   return outcome;
+}
+
+/**
+ * Send the applicant at the desk to the back of today's queue.
+ *
+ * The one thing the core loop never lets you do is look before you leap, so
+ * this is the only place it bends — for one file, once, and only while there
+ * is somebody behind them to see first. They still have to be answered before
+ * the week can be settled.
+ */
+export function deferFile(state) {
+  if (state.phase !== 'desk') return false;
+  const queue = deskQueue(state);
+  const app = queue[state.at];
+  if (!app || app.deferred) return false;
+  if (state.at >= queue.length - 1) return false;   // nobody behind them anyway
+  app.deferred = true;
+  queue.splice(state.at, 1);
+  queue.push(app);
+  return true;
 }
 
 /** Turn away everything still waiting. A perfectly ordinary week. */
@@ -485,17 +549,9 @@ export function settleWeek(state) {
   }
 
   // --- what the town does with its money
-  // Confidence pulls money in, but the town only has so much of it: the
-  // inflow tapers off as the deposit book approaches what the district holds.
-  let drift = state.deposits * (state.confidence - CALM) * FLOW_SENSITIVITY;
-  if (drift > 0) drift *= clamp(1 - state.deposits / state.depositCap, 0, 1);
-  let flow = drift + state.deposits * script.noise;
-  let fright = null;
-  if (script.fright) {
-    flow -= state.deposits * script.frightSize;
-    fright = script.frightNote;
-  }
-  flow = round2(flow);
+  const projected = projectedFlow(state);
+  const flow = projected.flow;
+  const fright = projected.fright;
 
   let deposits = state.deposits;
   let paidOut = 0;

@@ -19,6 +19,7 @@ import { money, whole, pct, rate, weeks, fact, bar, balanceSheet, queueDots } fr
 function morning() {
   const r = store.run;
   const forecast = S.withdrawalForecast(r);
+  const known = r.revealed?.week === r.week ? r.revealed : null;
   const due = S.repaymentsDue(r);
   const live = S.liveLoans(r).length;
   const last = r.history[r.history.length - 1];
@@ -39,10 +40,16 @@ function morning() {
       </section>
 
       <section class="card">
-        <h2 class="card-title">What the town may want back</h2>
-        <p>${forecast.middle > 0
-          ? `On this week's confidence, expect about <strong>${money(forecast.middle)}</strong> withdrawn — but it could be anywhere from ${money(Math.max(0, forecast.low))} to ${money(forecast.high)}, and a fright would be worse.`
-          : `Deposits should hold or grow this week. A fright would still change that.`}</p>
+        <h2 class="card-title">${known ? 'What the town will want back' : 'What the town may want back'}</h2>
+        ${known ? `
+          <p>The clearing house has it exactly: <strong>${known.flow < 0
+            ? `${money(-known.flow)} going out` : `${money(known.flow)} coming in`}</strong> this week.</p>
+          ${known.fright ? `<p class="bad">${known.fright}</p>` : ''}
+        ` : `
+          <p>${forecast.middle > 0
+            ? `On this week's confidence, expect about <strong>${money(forecast.middle)}</strong> withdrawn — but it could be anywhere from ${money(Math.max(0, forecast.low))} to ${money(forecast.high)}, and a fright would be worse.`
+            : `Deposits should hold or grow this week. A fright would still change that.`}</p>
+        `}
         <p class="muted small">Withdrawals come at the end of the week, after you have lent.
         You cannot call a loan back in.</p>
       </section>
@@ -58,7 +65,8 @@ function morning() {
         </section>`}
     `,
     actions: `<button class="btn primary" data-act="openDesk">${
-      S.deskQueue(r).length ? `See the first of ${S.deskQueue(r).length}` : 'Nobody called this week'}</button>`,
+      S.deskQueue(r).length ? `See the first of ${S.deskQueue(r).length}` : 'Nobody called this week'}</button>
+      <button class="btn ghost" data-act="open-bonus-shop">🎬 Bonus Shop</button>`,
   };
 }
 
@@ -75,12 +83,17 @@ function desk() {
   const affordable = S.canWrite(r, app);
   const after = r.cash - app.amount;
   const forecast = S.withdrawalForecast(r);
+  const known = r.revealed?.week === r.week ? r.revealed : null;
+  const needed = known ? Math.max(0, -known.flow) : forecast.high;
   const last = store.ui.lastDecision;
 
   return {
     body: `
       <h1 class="title">Week ${r.week} <span class="of">at the desk</span></h1>
-      ${queueDots(queue.length, r.at)}
+      <div class="desk-head">
+        ${queueDots(queue.length, r.at)}
+        <button class="chip" data-act="open-bonus-shop">🎬</button>
+      </div>
 
       ${last ? `<div class="notice">${last}</div>` : ''}
 
@@ -110,6 +123,8 @@ function desk() {
           <div class="file-line"><span>💰</span><span>${money(S.interestOf(app))} a week in interest,
             then ${whole(app.amount)} back at the end</span></div>
           <p class="file-remark">${S.REMARKS[app.signals.remark]}</p>
+          ${app.extraReading != null
+            ? `<p class="file-remark bought">${S.OPINIONS[app.extraReading]}</p>` : ''}
         </div>
       </div>
 
@@ -121,10 +136,12 @@ function desk() {
               ? `${money(r.cash)} now, ${money(after)} if you write this`
               : `${money(r.cash)} — not enough for this one`}</div>
           </div>
-          <div class="row-value ${affordable && after < forecast.high ? 'bad' : ''}">${money(r.cash)}</div>
+          <div class="row-value ${affordable && after < needed ? 'bad' : ''}">${money(r.cash)}</div>
         </div>
-        ${affordable && after < forecast.high ? `
-          <p class="muted small">Writing this would leave you short of a bad week's withdrawals.</p>` : ''}
+        ${affordable && after < needed ? `
+          <p class="muted small">${known
+            ? `Writing this would leave you short of the ${money(needed)} the clearing house says is going out.`
+            : `Writing this would leave you short of a bad week's withdrawals.`}</p>` : ''}
       </section>
     `,
     actions: `

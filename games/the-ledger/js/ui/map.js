@@ -39,6 +39,7 @@ function title() {
       <button class="btn" data-act="freePlay">Free book</button>
       ${Entitlements.configured() && !Entitlements.owns('the-ledger')
         ? `<button class="btn ghost" data-act="openShop">Unlock the full campaign</button>` : ''}
+      <button class="btn ghost" data-act="open-bonus-shop">🎬 Bonus Shop</button>
       <button class="btn ghost" data-act="openHelp">How to play</button>`,
   };
 }
@@ -94,6 +95,7 @@ function world() {
       ${store.ui.opsReport ? networkFlash(store.ui.opsReport) : ''}
       <div class="tiles">${rows}</div>
       ${gated ? `<button class="btn wide primary" data-act="openShop">Unlock all ${C.TOWNS.length} towns</button>` : ''}
+      <button class="btn ghost wide" data-act="open-bonus-shop">🎬 Bonus Shop</button>
       <button class="btn ghost wide" data-act="openHelp">How to play</button>
       <button class="btn ghost wide danger" data-act="wipeSave">Delete this career</button>
     `,

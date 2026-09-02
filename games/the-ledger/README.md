@@ -134,6 +134,28 @@ back.
 A network that over-extends can be wound back in: dismiss the managers, then
 close the branch. The vault comes home. The standing does not.
 
+## The bonus shop
+
+Every game in the series has one — a few small boosts, each unlocked by
+watching a short ad rather than paying. The shell is
+[`shared/bonusshop`](../../shared/bonusshop); all that lives here is the list.
+
+**Not one of the four grants a penny of score, and that is the whole point.**
+This is a game about judging what you cannot see, so a bonus that handed over
+capital would let a player buy a book instead of reading it. That is not a
+worry in the abstract — it was measured. A $25 top-up claimed eight times
+would have won **29% of all 625 books outright**, three of them on Impossible,
+without a single good decision. So the shop sells help *playing*:
+
+| | | |
+|---|---|---|
+| ⏳ | **Sleep On It** | Send whoever is at the desk to the back of today's queue and see the rest first. The one place the core loop bends — for one file, once, and only while somebody is still behind them. |
+| 🔍 | **A Second Opinion** | A fifth reading on the applicant in front of you. Drawn from the run's own seed and cached on the file, so asking twice or reloading cannot reroll it into a better answer — and like the other four readings, it can be wrong. |
+| 📅 | **Word From The Clearing House** | Exactly what the town will withdraw this week, before you lend it. Knowable because confidence and deposits only move at settlement and the frights were rolled from the seed; `settleWeek` uses the very same function, so the two cannot drift apart. |
+| 🏦 | **A Correspondent's Deposit** | $400 placed with you by another bank. It lands on *both* sides of the sheet, so it buys liquidity — the thing this game is actually short of — and changes your capital by nothing at all. It still costs you the interest and the extra call risk. |
+
+A test applies all four effects at once and asserts capital has not moved.
+
 ## Project layout
 
 ```
@@ -144,8 +166,9 @@ js/campaign.js          towns, books, tiers, targets, progression
 js/ops.js               branches, vaults, managers, the daily tick
 js/store.js             shared state and the save file
 js/app.js               router, HUD, input
-js/ui/                  screens: map.js, run.js, opsui.js, kit.js
-tests/                  72 tests across the model, the campaign and the network
+js/ui/                  screens: map.js, run.js, opsui.js, bonusshop.js, kit.js
+tests/                  90 tests across the model, the campaign, the network
+                        and the bonus shop
 tools/make-icons.mjs    regenerates icons/*.png from icons/icon.svg
 ```
 
@@ -154,7 +177,7 @@ can be played and balanced from node. The same seed always replays the same
 book.
 
 ```bash
-npm test           # 72 tests
+npm test           # 90 tests
 npm run icons      # rebuild PNG icons from the SVG (needs headless Chromium)
 ```
 

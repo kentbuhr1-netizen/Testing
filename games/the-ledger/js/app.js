@@ -11,6 +11,7 @@ import * as S from './sim.js';
 import * as mapUi from './ui/map.js';
 import * as runUi from './ui/run.js';
 import * as opsUi from './ui/opsui.js';
+import * as bonusShopUi from './ui/bonusshop.js';
 import { money, whole, pct, bar } from './ui/kit.js';
 import { carriageCost, spaceLeft } from './ops.js';
 import * as Entitlements from './payments/client/entitlements.js';
@@ -20,15 +21,19 @@ const screenEl = document.getElementById('screen');
 const actionsEl = document.getElementById('actions');
 const hudEl = document.getElementById('hud');
 
-const SCREENS = { ...mapUi.screens, ...opsUi.screens };
+const SCREENS = { ...mapUi.screens, ...opsUi.screens, ...bonusShopUi.screens };
 const RUN_SCREENS = runUi.screens;
-const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions };
+const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions, ...bonusShopUi.actions };
 
 /* ------------------------------------------------------------------ *
  * Render
  * ------------------------------------------------------------------ */
 
+/** The bonus shop is a full-screen overlay over whatever is underneath. */
+const overlayView = () => (store.ui.showBonusShop ? 'bonusShop' : null);
+
 function currentScreen() {
+  if (overlayView()) return SCREENS[overlayView()];
   if (store.ui.view === 'run' && store.run) {
     // A settled week waiting to be read sits in front of the next morning.
     if (store.ui.pending) return RUN_SCREENS.report;
@@ -38,6 +43,7 @@ function currentScreen() {
 }
 
 function screenKey() {
+  if (overlayView()) return `overlay:${overlayView()}:${store.ui.watchingAd || ''}`;
   if (store.ui.view === 'run' && store.run) {
     if (store.ui.pending) return 'run:report';
     // Each file is its own screen, so the entrance animation replays per applicant.
@@ -72,9 +78,9 @@ function draw() {
 }
 
 function drawHud() {
-  const inRun = store.ui.view === 'run' && store.run;
+  const inRun = !overlayView() && store.ui.view === 'run' && store.run;
   const showHud = inRun ||
-    (store.campaign && ['world', 'town', 'book', 'ops', 'opsTown'].includes(store.ui.view));
+    (!overlayView() && store.campaign && ['world', 'town', 'book', 'ops', 'opsTown'].includes(store.ui.view));
   hudEl.hidden = !showHud;
   if (!showHud) return;
 
