@@ -133,12 +133,22 @@ money, and duplicates work if the original wakes. Ask first.
 reset yet, and waking it just burns the poke and re-kills it on arrival. Compare
 its `resetsAt` against the clock, not against a hunch.
 
-This is not hypothetical. On 2 Sep a sweep woke sessions into a window that was
-already carrying a heavy spender, and within seven minutes Lemonade, Bank, The
-Round and the parent had all been limit-killed together — Bank losing a run that
-had just produced a real branch. The fleet was in a worse state after the sweep
-than before it. Waking things is not free; the budget is the scarce resource,
-not your attention.
+This is not hypothetical. On 2 Sep the budget was exhausted a second time at
+about 02:18, and Lemonade, Bank, The Round and the parent were all limit-killed
+within minutes of each other. Bank lost a run that had just produced a branch it
+never got to push.
+
+Be precise about the cause, because it is the whole lesson. The dominant spender
+was Lemonade, which had been running continuously and burned roughly $4 in the
+ten minutes before the kill. Bank and the parent woke without being poked. The
+sweep's own two fires contributed almost nothing — one never woke at all, the
+other came up after the kill had already happened. So this was not a sweep that
+broke the fleet; it was a sweep that **could not see how little headroom was
+left** and would happily have woken more sessions into it.
+
+That is the failure to avoid: the window resetting is not the same as there
+being capacity. Check what is already running and how hard it is spending before
+you add to it.
 
 Writing a poke that works:
 
