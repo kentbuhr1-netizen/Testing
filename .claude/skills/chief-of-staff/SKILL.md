@@ -105,36 +105,40 @@ Create it once per session and reuse it. The trigger's stored prompt stays
 generic ("pick up where you left off"); everything situation-specific goes in
 `fire_trigger`'s `text`, which arrives as an extra turn after it.
 
-**A poke only reaches a warm session.**
+**A poke is slow and unreliable, and you often cannot prove it landed.**
 
-**Measured, not assumed:** firing a bound Routine at a session whose
-`connection_status` is `disconnected` does **not** provision a container for it.
-The fire is accepted, returns a `cse_...` run id, and the session does not move.
-Two fires each at Outbreak and The Round, eight minutes apart, changed neither
-`updated_at` nor `connection_status`. Session-bound Routines record no
-`last_run`, so there is no delivery receipt to check either — the only evidence
-is whether the session's own timestamp moves.
+Observed on 2 Sep, with the confounds stated honestly:
 
-The likely reading is that pokes queue and drain when the session next gets a
-container. So:
+- Firing at a `disconnected` session returns a `cse_...` run id immediately and
+  the session does *not* move for minutes. Outbreak was fired at twice, eight
+  minutes apart, and never woke at all. The Round was fired at twice and came up
+  about five minutes after the second — so a fire *can* reach a cold session,
+  slowly, but it is not dependable.
+- Bound Routines record no `last_run`, so a fire returning successfully is not
+  evidence of delivery. The target's own `updated_at` is the only evidence.
+- **Attribution is genuinely hard.** Kent was opening and renaming sessions in
+  the app during the same window, which also wakes them. Two of the three wakes
+  that day are just as easily explained by that as by any poke. Never score a
+  wake as your own unless nothing else could have caused it.
 
-- **Check `connection_status` before firing.** `connected` → a poke should land;
-  watch `updated_at` to confirm. `disconnected` → fire once so it is queued, and
-  then treat the session as *not* recoverable from here.
-- **Never fire a third time at a cold session.** Two fires with no movement is
-  the mechanism failing, not the session ignoring you. More fires just stack
-  duplicate turns for whenever it does wake.
-- **A cold session needs a human or a replacement.** Opening it once in the app
-  or on the web provisions a container, and the queued pokes drain then. Say so
-  plainly in the report and name the sessions — this is the one case where the
-  fastest fix costs the user ten seconds and costs you nothing.
-- **Do not silently spawn a replacement.** `create_session` can restart the work
-  from the branch, but it loses the old session's context, spends real money,
-  and duplicates effort if the original later wakes. That is an escalation, not
-  an unblock — ask first.
-- **Do not credit a wake you cannot attribute.** A session that comes up on its
-  own around the time you poked it is a coincidence until its timestamp moves in
-  response to a poke you actually fired.
+So: fire once, wait a few minutes, check `updated_at`. If nothing moved after a
+second try, stop — a third fire only stacks duplicate turns for whenever it does
+come up. Report the session as needing Kent to open it, which is the one fix
+that reliably works and costs him seconds. Spawning a replacement with
+`create_session` is an escalation, not an unblock: it loses context, spends real
+money, and duplicates work if the original wakes. Ask first.
+
+**Never poke a session the budget has already rejected.** Check
+`rate_limit_info.status` before firing: `rejected` means its window has not
+reset yet, and waking it just burns the poke and re-kills it on arrival. Compare
+its `resetsAt` against the clock, not against a hunch.
+
+This is not hypothetical. On 2 Sep a sweep woke sessions into a window that was
+already carrying a heavy spender, and within seven minutes Lemonade, Bank, The
+Round and the parent had all been limit-killed together — Bank losing a run that
+had just produced a real branch. The fleet was in a worse state after the sweep
+than before it. Waking things is not free; the budget is the scarce resource,
+not your attention.
 
 Writing a poke that works:
 
