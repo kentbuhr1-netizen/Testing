@@ -39,7 +39,12 @@ day at a time inside each week, so the curves behave:
 | 🔬 **Test & trace** | Strong early, worthless once the labs are swamped. The reach figure tells you when it has stopped working. |
 | 🚧 **Distancing** | The only lever that costs no budget — and the most expensive one you have. It starves the tax base that pays for the other three, and it burns public patience, which is the only thing that makes it work at all. |
 | 💉 **Vaccination** | Takes weeks to land. Decisive if you start it early, worthless if you start it late. |
-| 🏥 **Hospital beds** | Changes nothing about the spread and everything about the dying. Beds open a week *after* you fund them. |
+| 🏥 **Hospital beds** | Changes nothing about the spread and everything about the dying. Beds open a week *after* you fund them — and every ward you open has to be staffed every week for the rest of the outbreak. Build early and the standing bill crowds out everything else by the peak; build late and the beds arrive after the wave. |
+
+Beds are the other trap. Opening a ward is a one-off charge; *staffing* it is
+forever, so a hospital programme is a question of timing rather than a purchase.
+Let the standing bill outrun the budget and wards close — the game says which,
+and how many, rather than quietly stranding you.
 
 Compliance is the hinge. Close everything and it drains in a fortnight, at
 which point your closures are symbolic and your budget is gone. Rising deaths
@@ -66,12 +71,20 @@ doing nothing will say so:
 head start as you climb.
 
 **Targets are measured, not guessed.** Before a district is offered, a family
-of 48 reference policies (`parSaved` in `js/sim.js`) each plays that exact
+of 315 reference policies (`parSaved` in `js/sim.js`) each plays that exact
 district — its pathogen, its density, its hospitals — and the target is a share
 of what the best of them saved: 40% on Easy up to 93% on Impossible. A
 mosquito-borne outbreak in a district with no laboratories therefore asks for
 less than a traceable flu in a rich one, and no district can ask for more than
 it can actually give. A test asserts that for all 625.
+
+That family has to *contain* the best simple play available, or par comes out
+low and every target derived from it comes out soft. A test plays the policies
+a real player reaches for on their first afternoon — everything at maximum,
+vaccines and beds forever, close everything — and fails if any of them beats
+the family that sets the bar. It is the test that caught the last balance bug
+here, when funding beds from week one and ignoring the other three levers
+scored 180% of par.
 
 **You are scored on lives saved** — the gap between the deaths a do-nothing
 response produces and the deaths you produce. The do-nothing run is simulated
@@ -114,7 +127,7 @@ js/ops.js               laboratories, procurement, teams, the weekly tick
 js/store.js             shared state and the save file
 js/app.js               router, HUD, input
 js/ui/                  screens: map.js, run.js, opsui.js, kit.js
-tests/                  42 tests across the model, the campaign and the agency
+tests/                  46 tests across the model, the campaign and the agency
 tools/make-icons.mjs    regenerates icons/*.png from icons/icon.svg
 ```
 
@@ -123,7 +136,7 @@ can be played and balanced from node. The same seed always replays the same
 outbreak.
 
 ```bash
-npm test           # 42 tests
+npm test           # 46 tests
 npm run icons      # rebuild PNG icons from the SVG (needs headless Chromium)
 ```
 
@@ -140,5 +153,6 @@ This is a game, not an epidemiological tool. It is an SEIR model with a handful
 of policy levers bolted on, tuned until the decisions were interesting. The
 mechanisms it does take seriously are the ones that make those decisions hard:
 tracing that collapses under caseload, immunity that arrives on a delay, wards
-whose overflow is what actually kills people, and public patience as a
-consumable resource. Do not plan a public health response with it.
+whose overflow is what actually kills people, hospital capacity as a standing
+commitment rather than a purchase, and public patience as a consumable
+resource. Do not plan a public health response with it.

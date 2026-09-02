@@ -131,7 +131,7 @@ function applyStep(group, field, step) {
     const next = clamp(r.levels[field] + step, 0, S.MAX_LEVEL);
     const trial = { ...r.levels, [field]: next };
     // Never let the player commit money the district does not have.
-    if (step > 0 && S.weeklySpend(trial, r.pop) > r.funds) return false;
+    if (step > 0 && S.weeklySpend(trial, r.pop, r.builtBeds) > r.funds) return false;
     r.levels[field] = next;
     return true;
   }

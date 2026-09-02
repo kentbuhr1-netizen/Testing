@@ -115,6 +115,40 @@ test('beds open the week after they are funded, and overflow kills', () => {
   assert.ok(a.overflow > 0 && b.overflow === 0);
 });
 
+test('a ward costs money to staff for as long as it stands', () => {
+  const state = S.newRun(CFG);
+  const first = S.weeklySpend({ ...S.NO_LEVELS, beds: 3 }, state.pop, state.builtBeds);
+  play(state, { beds: 3 });
+  assert.equal(state.builtBeds, 0, 'nothing is open to staff in the week you fund it');
+
+  play(state, { beds: 3 });
+  assert.ok(state.builtBeds > 0, 'the first tranche never opened');
+  const later = S.weeklySpend({ ...S.NO_LEVELS, beds: 3 }, state.pop, state.builtBeds);
+  assert.ok(later > first, 'the same programme should cost more once wards are standing');
+
+  // Stopping the programme still leaves a bill for what is already open.
+  const standing = S.weeklySpend(S.NO_LEVELS, state.pop, state.builtBeds);
+  assert.ok(standing > 0, 'open wards should cost something even with the lever at zero');
+  assert.equal(standing, S.bedUpkeep(state.builtBeds));
+});
+
+test('wards you cannot staff close instead of running up a debt', () => {
+  const state = S.newRun(CFG);
+  for (let i = 0; i < 3; i++) play(state, { beds: 5 });
+  assert.ok(state.builtBeds > 0, 'test needs some wards standing');
+
+  // Strip the budget to nothing and stop funding: upkeep alone is now unpayable.
+  const open = state.builtBeds;
+  state.funds = 0;
+  state.baseFunds = 0;
+  const result = play(state, { beds: 0 });
+
+  assert.ok(state.funds >= 0, 'the player should never be left in debt');
+  assert.ok(result.bedsClosed > 0, 'beds should have closed');
+  assert.ok(state.builtBeds < open, 'the standing stock should have shrunk');
+  assert.ok(result.notes.some((n) => /beds closed/.test(n)), 'the closure went unexplained');
+});
+
 test('patience drains under closure and recovers when things reopen', () => {
   const state = S.newRun(CFG);
   const start = state.compliance;
@@ -210,4 +244,64 @@ test('a programme that outgrows a shrinking budget is scaled back, not stranded'
   // With nothing in the bank, everything that costs money goes.
   const broke = S.affordLevels(greedy, 0, state.pop);
   assert.deepEqual(broke, { trace: 0, distance: 5, vaccine: 0, beds: 0 });
+});
+
+/**
+ * The guard on par itself.
+ *
+ * `parSaved` is only a fair bar if the reference family actually contains the
+ * best simple play available. When it does not, par comes out low, every
+ * target derived from it comes out soft, and the most obvious strategy in the
+ * game clears the hardest tier. This test is what catches that: it plays a
+ * handful of policies a real player would reach for on their first afternoon,
+ * and asserts none of them does better than the family that sets the bar.
+ */
+const HEURISTICS = {
+  'everything at maximum': () => ({ trace: 5, distance: 5, vaccine: 5, beds: 5 }),
+  'vaccinate and nothing else': () => ({ trace: 0, distance: 0, vaccine: 5, beds: 0 }),
+  'beds and nothing else': () => ({ trace: 0, distance: 0, vaccine: 0, beds: 5 }),
+  'vaccines and beds, forever': () => ({ trace: 0, distance: 0, vaccine: 5, beds: 5 }),
+  'close everything, forever': () => ({ trace: 0, distance: 5, vaccine: 0, beds: 0 }),
+  'a light permanent closure': () => ({ trace: 0, distance: 2, vaccine: 5, beds: 3 }),
+  'hammer it early, coast later': (s) => s.week <= 4
+    ? { trace: 5, distance: 5, vaccine: 5, beds: 0 }
+    : { trace: 0, distance: 0, vaccine: 5, beds: 5 },
+};
+
+function playHeuristic(config, pick) {
+  const state = S.newRun(config);
+  state.baselineDeaths = 0;
+  while (state.phase !== 'gameover') {
+    state.levels = S.affordLevels(pick(state), state.funds, state.pop, state.builtBeds);
+    S.commitWeek(state, S.simulateWeek(state));
+  }
+  return state.d;
+}
+
+test('no simple heuristic beats the reference family that sets par', () => {
+  for (const pathogenId of ['marrow', 'quietcarrier', 'greylung', 'ashfall', 'vector', 'cascade']) {
+    const cfg = { ...CFG, pathogenId };
+    const baseline = S.baselineDeaths(cfg);
+    const par = S.parSaved(cfg);
+    for (const [name, pick] of Object.entries(HEURISTICS)) {
+      const saved = Math.max(0, baseline - playHeuristic(cfg, pick));
+      assert.ok(saved <= par + 1,
+        `${pathogenId}: "${name}" saved ${Math.round(saved)} against a par of ${Math.round(par)}`);
+    }
+  }
+});
+
+test('naive play does not come close to par', () => {
+  // The three a player reaches for before they have understood anything.
+  const naive = ['everything at maximum', 'close everything, forever', 'vaccinate and nothing else'];
+  for (const pathogenId of ['marrow', 'greylung', 'cascade']) {
+    const cfg = { ...CFG, pathogenId };
+    const baseline = S.baselineDeaths(cfg);
+    const par = S.parSaved(cfg);
+    for (const name of naive) {
+      const saved = Math.max(0, baseline - playHeuristic(cfg, HEURISTICS[name]));
+      assert.ok(saved < par * 0.9,
+        `${pathogenId}: naive "${name}" saved ${Math.round(saved)} of a par of ${Math.round(par)}`);
+    }
+  }
 });
