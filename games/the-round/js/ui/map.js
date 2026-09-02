@@ -192,7 +192,7 @@ function round() {
       </section>
 
       <section class="card">
-        <p class="muted small">The target is ${Math.round(tier.parFactor * 100)}% of what the best reference
+        <p class="muted small">The target is ${Math.round(C.parFactorFor(index) * 100)}% of what the best reference
         router clears on this exact round — not a number someone guessed. The weather never
         changes, so a round you lose is a puzzle you can learn.</p>
       </section>

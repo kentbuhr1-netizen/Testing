@@ -89,6 +89,11 @@ function routeScreen() {
   const plan = S.planRoute(r, r.route);
   const over = plan.minutes > r.today.workable;
   const spent = Math.min(plan.minutes, r.today.workable);
+  // Leaving the day half-worked is the single thing that decides a season:
+  // across a hundred simulated players, those who filled it held 13 rounds
+  // against 2, and three quarters of losing seasons left a third of the day
+  // unworked. It was only ever shown as a bar nobody read.
+  const spare = r.today.workable - plan.minutes;
 
   // The list is ordered by what a person would scan for: due first, then the
   // ones about to walk, then everything else.
@@ -152,7 +157,7 @@ function routeScreen() {
         <div class="row">
           <div class="row-main">
             <div class="row-name">${clock(spent)} of ${clock(r.today.workable)}</div>
-            <div class="row-sub">${plan.doable.length} lawn${plan.doable.length === 1 ? '' : 's'} · ${clock(plan.drive)} of it driving</div>
+            <div class="row-sub">${plan.doable.length} lawn${plan.doable.length === 1 ? '' : 's'} · ${clock(plan.drive)} of it driving${!over && spare > IDLE_MINUTES ? ` · <strong>${clock(spare)} spare</strong>` : ''}</div>
           </div>
           <div class="row-meter">${bar(plan.minutes / r.today.workable, over ? 'bar-bad' : '')}</div>
         </div>
@@ -169,6 +174,8 @@ function routeScreen() {
 
       ${over ? `<div class="warn">The last stops will not fit before dark. They are greyed out — the day stops there.</div>` : ''}
       ${r.route.length === 0 ? `<div class="notice">Nothing planned. A day with no work still burns a day.</div>` : ''}
+      ${!over && r.route.length > 0 && spare > IDLE_MINUTES
+        ? `<div class="notice idle">${clock(spare)} of daylight still unused. You cannot bank it.</div>` : ''}
 
       <section class="lawn-list">${rows}</section>
       ${r.route.length ? `<button class="btn ghost wide" data-act="clearRoute">Clear the route</button>` : ''}
@@ -277,6 +284,8 @@ export const screens = { forecast, route: routeScreen, report, gameover };
 
 /** The map is drawn with a margin, and a tap has to land near something. */
 const MAP_PAD = 6;
+/** Enough spare daylight to be worth another lawn, so worth saying out loud. */
+const IDLE_MINUTES = 40;
 const MAP_PICK_RANGE = 12;
 
 /** Add a stop to the round, or take it back off. */

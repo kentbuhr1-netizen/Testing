@@ -28,26 +28,42 @@ export const TOWNS_FOR_OPS = 5;   // the yard unlocks once this many towns are d
 
 export const TIERS = {
   easy: {
-    id: 'easy', label: 'Easy', icon: '🟢', days: 14, stake: 60, parFactor: 0.4,
+    id: 'easy', label: 'Easy', icon: '🟢', days: 14, stake: 60, parFrom: 0.34, parTo: 0.50,
     blurb: 'Forgiving clients and a short season. Room to learn the round.',
     mods: { fussiness: 0.85 },
   },
   medium: {
-    id: 'medium', label: 'Medium', icon: '🟡', days: 18, stake: 55, parFactor: 0.62,
+    id: 'medium', label: 'Medium', icon: '🟡', days: 18, stake: 55, parFrom: 0.52, parTo: 0.68,
     blurb: 'A fair round. Every wasted mile is a lawn you did not get to.',
     mods: {},
   },
   hard: {
-    id: 'hard', label: 'Hard', icon: '🟠', days: 22, stake: 50, parFactor: 0.8,
+    id: 'hard', label: 'Hard', icon: '🟠', days: 22, stake: 50, parFrom: 0.70, parTo: 0.84,
     blurb: 'Sharp eyes on the finish, and the blade goes off fast.',
     mods: { fussiness: 1.15, dulling: 1.15 },
   },
   impossible: {
-    id: 'impossible', label: 'Impossible', icon: '🔴', days: 26, stake: 45, parFactor: 0.93,
+    id: 'impossible', label: 'Impossible', icon: '🔴', days: 26, stake: 45, parFrom: 0.86, parTo: 0.95,
     blurb: 'Every mile planned, every blade sharp, or you will be dropped.',
     mods: { fussiness: 1.35, dulling: 1.3, travel: 1.1 },
   },
 };
+
+/**
+ * What share of par a round asks for.
+ *
+ * A flat share per tier put a wall at each boundary: simulated play cleared
+ * Easy rounds at 151% of target and the very next round at 96%, and 61 of 100
+ * players gave up on a Medium round. Each tier now ramps from its first round
+ * to its last, so the ask climbs by a point or two a round across the whole
+ * town instead of standing still and then jumping.
+ */
+export function parFactorFor(roundIndex) {
+  const tier = TIERS[TIER_LAYOUT[roundIndex]];
+  const inTier = TIER_LAYOUT.slice(0, roundIndex).filter((t) => t === tier.id).length;
+  const of = TIER_LAYOUT.filter((t) => t === tier.id).length;
+  return of < 2 ? tier.parTo : tier.parFrom + (tier.parTo - tier.parFrom) * (inTier / (of - 1));
+}
 
 /** Which tier each of a town's 25 neighbourhoods belongs to. */
 export const TIER_LAYOUT = [
@@ -252,9 +268,8 @@ export function targetFor(campaign, townId, roundIndex) {
   const key = `${townId}:${roundIndex}`;
   if (campaign?.targets?.[key] != null) return campaign.targets[key];
   const config = runConfigFor(townId, roundIndex);
-  const tier = TIERS[roundsFor(townId)[roundIndex].tier];
   const par = parProfit(config);
-  const target = Math.max(10, Math.round(par * tier.parFactor));
+  const target = Math.max(10, Math.round(par * parFactorFor(roundIndex)));
   if (campaign) {
     campaign.targets = campaign.targets || {};
     campaign.targets[key] = target;

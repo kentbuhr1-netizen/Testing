@@ -24,7 +24,7 @@ test('the tier ramp is 7 / 7 / 7 / 4 and gets harder throughout', () => {
   assert.deepEqual(counts, { easy: 7, medium: 7, hard: 7, impossible: 4 });
   const order = ['easy', 'medium', 'hard', 'impossible'];
   for (let i = 1; i < order.length; i++) {
-    assert.ok(C.TIERS[order[i]].parFactor > C.TIERS[order[i - 1]].parFactor, order[i]);
+    assert.ok(C.TIERS[order[i]].parFrom > C.TIERS[order[i - 1]].parFrom, order[i]);
     assert.ok(C.TIERS[order[i]].stake <= C.TIERS[order[i - 1]].stake, order[i]);
   }
 });
@@ -142,4 +142,20 @@ test('no round asks for more than it can give', { timeout: 180_000 }, () => {
     }
   }
   assert.equal(checked, 625);
+});
+
+test('the ask climbs round by round, with no step at a tier boundary', () => {
+  // A flat share per tier put a wall at each boundary: simulated play cleared
+  // Easy at 151% of target and the very next round at 96%.
+  const factors = [];
+  for (let i = 0; i < C.ROUNDS_PER_TOWN; i++) factors.push(C.parFactorFor(i));
+
+  for (let i = 1; i < factors.length; i++) {
+    assert.ok(factors[i] > factors[i - 1],
+      `round ${i + 1} asks ${factors[i]} against ${factors[i - 1]} the round before`);
+    assert.ok(factors[i] - factors[i - 1] < 0.06,
+      `round ${i + 1} jumps ${(factors[i] - factors[i - 1]).toFixed(3)} in one step`);
+  }
+  assert.ok(factors[0] < 0.4, 'the first round of a town should be an on-ramp');
+  assert.ok(factors[factors.length - 1] > 0.9, 'the last should be near what par manages');
 });

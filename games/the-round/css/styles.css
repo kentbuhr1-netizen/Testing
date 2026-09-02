@@ -457,6 +457,12 @@ body {
 
 /* ---------- The lawn list ---------- */
 
+.notice.idle {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  color: var(--ink);
+  font-weight: 600;
+}
+
 .crew-net {
   font-style: normal;
   font-size: 12.5px;
