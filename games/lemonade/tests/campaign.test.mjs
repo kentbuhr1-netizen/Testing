@@ -66,6 +66,16 @@ test('targets rise with the tier', () => {
   assert.ok(impossible > easy * 2, `${impossible} vs ${easy}`);
 });
 
+test('parFactor strictly increases tier by tier', () => {
+  // Regression guard for tools/calibrate-campaign-difficulty.mjs: a decent-
+  // but-imperfect player's win rate should step down smoothly tier to
+  // tier, not collapse two tiers into the same difficulty (or invert them).
+  const factors = ['easy', 'medium', 'hard', 'impossible'].map((id) => C.TIERS[id].parFactor);
+  for (let i = 1; i < factors.length; i++) {
+    assert.ok(factors[i] > factors[i - 1], `${factors[i - 1]} -> ${factors[i]} does not strictly increase`);
+  }
+});
+
 test('a target never moves once it has been seen', () => {
   const campaign = C.newCampaign();
   const first = C.targetFor(campaign, 'rome', 3);
