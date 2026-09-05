@@ -103,7 +103,7 @@ export function newOps() {
 }
 
 /** Fills in fields a save made before buildings/trucks/vehicle tiers existed won't have. */
-function ensureOpsShape(ops) {
+export function ensureOpsShape(ops) {
   if (!ops) return ops;
   if (!ops.buildings) ops.buildings = {};
   if (!ops.trucks) ops.trucks = [];
@@ -505,7 +505,15 @@ export function tickOps(campaign, days) {
     for (const cityData of CITIES) {
       const cityId = cityData.id;
       const staffed = staffedIn(ops, cityId);
-      if (staffed.length === 0) continue;
+      if (staffed.length === 0) {
+        // Nobody trading here, but a depot is paid for whether it sells or not.
+        if (hasWarehouse(ops, cityId)) {
+          const upkeep = effectiveWarehouseUpkeep(campaign);
+          campaign.treasury = round2(campaign.treasury - upkeep);
+          summary.costs += upkeep;
+        }
+        continue;
+      }
       const w = ops.warehouses[cityId];
       const rng = mulberry32(ops.day * 7717 + cityId.length * 131);
       let cityFreeIce = freeIce[cityId] || 0;

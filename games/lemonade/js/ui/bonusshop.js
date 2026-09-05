@@ -9,7 +9,7 @@
 import { store, render } from '../store.js';
 import { createBonusShop } from '../bonusshop/shell.js';
 import { ensureBank } from '../bank.js';
-import { ENHANCERS } from '../sim.js';
+import { ENHANCERS, receiveLemons } from '../sim.js';
 import { spaceLeft } from '../ops.js';
 import { money } from './kit.js';
 
@@ -44,7 +44,7 @@ const BONUSES = [
     available: midRunOnly,
     apply: () => {
       const r = store.run;
-      r.inventory.lemons += 10;
+      receiveLemons(r, 10);          // dated like any other lemons, so they spoil like any other
       r.inventory.sugar += 10;
       r.inventory.cups += 20;
     },

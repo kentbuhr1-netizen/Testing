@@ -508,6 +508,15 @@ export function sizedCupOrderCost(prices, order) {
 }
 
 /** Enhancer stock has a fixed wholesale price — no daily jitter, no bulk break. */
+/** Every category a shopping basket can cost money in, added together. */
+export function totalOrderCost(prices, order) {
+  return Math.round((
+    buyCost(prices, order) +
+    sizedCupOrderCost(prices, order) +
+    enhancerOrderCost(order.enhancers || {})
+  ) * 100) / 100;
+}
+
 export function enhancerOrderCost(order) {
   return round2(
     Object.entries(order || {}).reduce((sum, [id, qty]) => sum + (ENHANCERS[id]?.unitCost || 0) * (qty || 0), 0)
@@ -716,7 +725,8 @@ export function simulateDay(state) {
 /** Apply a simulated day to the state and move the calendar forward. */
 export function commitDay(state, result) {
   const days = state.days ?? TOTAL_DAYS;
-  state.money = round2(state.money + result.revenue - (result.rent || 0));
+  // The processor's cut is paid out of the till, not only shown on the report.
+  state.money = round2(state.money + result.revenue - (result.rent || 0) - (result.cardProcessingCost || 0));
   consumeLemons(state, result.used.lemons);
   state.inventory.sugar -= result.used.sugar;
   state.inventory.cups -= result.used.cups;

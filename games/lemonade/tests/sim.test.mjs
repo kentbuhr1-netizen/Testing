@@ -609,3 +609,25 @@ test('every corner in the campaign is still winnable with cup sizes in the sim',
   // every one of the 625 calibrated targets must be exactly what it was.
   assert.equal(S.parProfit({ seed: 999, days: 7, stake: 25 }) > 0, true);
 });
+
+test('the card processing cost leaves the till, not just the report', () => {
+  const state = S.newRun({ seed: 3 });
+  state.acceptCards = true;
+  state.money = 100;
+  S.receiveOrder(state, { lemons: 40, sugar: 40, ice: 200, cups: 120, cupsSmall: 0, cupsLarge: 0, enhancers: {} });
+  const before = state.money;
+  const result = S.simulateDay(state);
+  S.commitDay(state, result);
+  const expected = Math.round((before + result.revenue - (result.rent || 0) - result.cardProcessingCost) * 100) / 100;
+  assert.equal(state.money, expected);
+  if (result.cardProcessingCost > 0) assert.ok(state.money < before + result.revenue - (result.rent || 0));
+});
+
+test('totalOrderCost prices the whole basket, including sized cups and enhancers', () => {
+  const state = S.newRun({ seed: 5 });
+  const p = state.today.prices;
+  const order = { lemons: 10, sugar: 10, ice: 30, cups: 20, cupsSmall: 5, cupsLarge: 5, enhancers: Object.fromEntries(Object.keys(S.ENHANCERS).map((id) => [id, 3])) };
+  const total = S.totalOrderCost(p, order);
+  assert.ok(total > S.buyCost(p, order), 'more than the base basket alone');
+  assert.equal(total, Math.round((S.buyCost(p, order) + S.sizedCupOrderCost(p, order) + S.enhancerOrderCost(order.enhancers)) * 100) / 100);
+});
