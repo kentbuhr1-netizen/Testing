@@ -167,7 +167,7 @@ js/ops.js               branches, vaults, managers, the daily tick
 js/store.js             shared state and the save file
 js/app.js               router, HUD, input
 js/ui/                  screens: map.js, run.js, opsui.js, bonusshop.js, kit.js
-tests/                  90 tests across the model, the campaign, the network
+tests/                  94 tests across the model, the campaign, the network
                         and the bonus shop
 tools/make-icons.mjs    regenerates icons/*.png from icons/icon.svg
 ```
@@ -177,7 +177,7 @@ can be played and balanced from node. The same seed always replays the same
 book.
 
 ```bash
-npm test           # 90 tests
+npm test           # 94 tests
 npm run icons      # rebuild PNG icons from the SVG (needs headless Chromium)
 ```
 
@@ -196,36 +196,51 @@ design four times.
 No book has a par at or below zero, which is what makes the target invariant
 hold everywhere.
 
-**No naive strategy comes close.** Every one of these is a member of the
-reference family, so none of them *can* beat par; the question is how far
-short they fall. Averaged over all 625 books, as a share of par:
+**No naive strategy comes close on average.** Every one of these is a
+member of the reference family, so none of them *can* beat par; the question
+is how far short they fall. Averaged over all 625 books, as a share of par:
 
 | Strategy | Share of par |
 |---|---|
 | Approve everything | **−40%** |
 | Decline everything | **−49%** |
-| Approve only the safest-looking | **0% to +8%** |
-| Threshold on the rate | **−54% to −55%** |
+| Approve only the safest-looking | **−0% to +6%** |
+| Threshold on the rate | **−52% to −57%** |
 
 All four lose money or barely break even, against an Easy target of 40% of
-par. Put in cash on one representative set of books: reading the file clears
-**$326**, taking only the safest-looking names clears **$39**, chasing the
-highest rates loses **$88**, approving everybody loses **$77**, and approving
-nobody loses **$199**.
+par. Put in cash, averaged over the same 625 books: reading the file clears
+**$555**, taking only the safest-looking names clears **$110** at its best
+bar and nothing at all at its worst, chasing the highest rates loses **$101
+to $117**, approving everybody loses **$68**, and approving nobody loses
+**$191**.
 
 That last one matters as much as the first. Depositors are paid interest and
 the branch costs money to keep open, so **doing nothing is the second-worst
 strategy in the game**. There is no safe option; there is only judgement.
 
+That table is a mean, and it is worth saying what a mean hides. Book by book,
+the *best* of the four blunt rules does clear the target on **279 of the 625**
+— 85 Easy, 82 Medium, 74 Hard, 38 Impossible. Those are not books where
+thinking fails; they are books where a blunt rule happens to land near the
+right answer, and the target is a share of par rather than a share of what a
+careless player would manage. Averaged out, judgement wins by a distance. On
+any one book, sometimes the coarse bar is close enough.
+
 The optimum is an interior one, which is how you know the family brackets it
-rather than running out at its own edge:
+rather than running out at its own edge. Sweeping the acceptance bar with the
+other three knobs held fixed, averaged over all 625 books:
 
 | Acceptance bar | Approves | Loans a book | Profit |
 |---|---|---|---|
-| 0 (everything positive) | 37% | 46 | $234 |
-| 0.05 | **29%** | **36** | **$361** |
-| 0.12 | 9% | 12 | $102 |
-| 0.16 | 4% | 5 | −$56 |
+| 0 (everything positive) | 30% | 41 | $223 |
+| 0.02 | 27% | 39 | $262 |
+| 0.035 | 25% | 36 | $274 |
+| 0.05 | **22%** | **32** | **$275** |
+| 0.08 | 16% | 24 | $246 |
+| 0.12 | 9% | 15 | $145 |
+
+It climbs, tops out around 0.035–0.05, and falls away again. Being choosier
+than that costs more in loans not written than it saves in defaults avoided.
 
 ### Four things the measuring changed
 
@@ -253,7 +268,7 @@ file was worth nothing on half of them. The cause was that a default cost the
 whole principal regardless of term while the interest scaled with it, so short
 loans were strictly bad and the bots hoarded. Making default a **weekly hazard**
 — so a longer loan has proportionally longer to go wrong — made term
-EV-neutral, pushed acceptance from 8% to 29%, and put 36 loans in a book
+EV-neutral, pushed acceptance from 8% to 22%, and put 32 loans in a book
 instead of 6. Naive-tops-the-family fell to 17%.
 
 **One knob was secretly two.** `noise` scaled both how unreadable the files
