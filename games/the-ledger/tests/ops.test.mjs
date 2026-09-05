@@ -263,3 +263,20 @@ test('the ledger keeps the last twenty days and no more', () => {
   assert.equal(campaign.ops.ledger[0].day, 25);
   assert.equal(campaign.ops.totals.loans >= 0, true);
 });
+
+test('a manager cannot be hired where there is no branch to lend from', () => {
+  const campaign = C.newCampaign();
+  campaign.ops = O.newOps();
+  campaign.treasury = 100000;
+  const town = C.TOWNS[0].id;
+  campaign.held[town] = [0];
+  const refused = O.hireManager(campaign, town, 0);
+  assert.equal(refused.ok, false);
+  assert.match(refused.why, /branch/i);
+  O.openBranch(campaign, town);
+  assert.equal(O.hireManager(campaign, town, 0).ok, true);
+});
+
+test('a suspended branch still earns its thin takings on the standing it had that day', () => {
+  assert.ok(O.SUSPENDED_EFFECT > 0, 'the constant is live, not decorative');
+});

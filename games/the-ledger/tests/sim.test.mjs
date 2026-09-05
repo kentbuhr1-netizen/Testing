@@ -251,9 +251,9 @@ test('there is nothing in the game that buys confidence back', () => {
   const modest = S.settleWeek(poor);
 
   assert.ok(gain.confidenceAfter - gain.confidenceBefore <= S.TRUST_REBUILD);
-  assert.ok(Math.abs((gain.confidenceAfter - gain.confidenceBefore) -
-    (modest.confidenceAfter - modest.confidenceBefore)) < 0.011,
-    'a fortune should not buy trust any faster than a shilling');
+  assert.equal(gain.confidenceAfter - gain.confidenceBefore,
+    modest.confidenceAfter - modest.confidenceBefore,
+    'a fortune should not buy trust one point faster than a shilling — exactly');
 });
 
 test('a run on the bank closes it', () => {
@@ -370,4 +370,25 @@ test('a whole book plays out to an ending', () => {
   assert.equal(state.phase, 'gameover');
   assert.ok(state.history.length >= 1);
   for (const week of state.history) assert.ok(week.notes.length >= 1);
+});
+
+test('approving a file the cash cannot cover counts as turning it away', () => {
+  const state = S.newRun({ seed: 9, weeks: 6 });
+  S.openDesk(state);
+  state.cash = 1;
+  const before = state.declined;
+  const out = S.decide(state, true);
+  assert.equal(out.approved, false);
+  assert.equal(state.declined, before + 1);
+});
+
+test('the safe can be overdrawn, and the week says so instead of hiding it', () => {
+  const state = S.newRun({ seed: 12, weeks: 6 });
+  state.script = state.script.map((w) => ({ ...w, noise: 0, fright: false }));
+  S.openDesk(state); S.closeDesk(state);
+  state.cash = 0.5;
+  state.deposits = 0;
+  const report = S.settleWeek(state);
+  assert.ok(report.overdrawn > 0, 'overhead was still charged, and the week says by how much');
+  assert.equal(S.reserveRatio({ cash: -4, deposits: 100 }), 0, 'a negative safe reads as no reserves, not less than none');
 });

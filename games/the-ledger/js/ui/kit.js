@@ -62,9 +62,9 @@ export function balanceSheet(cash, book, deposits, capital, forecast) {
   const cover = forecast && forecast.high > 0 ? cash / forecast.high : null;
   return `
     <div class="sheet">
-      <div class="sheet-row"><span class="sheet-label">Cash in the safe</span><span>${money(cash)}</span></div>
+      <div class="sheet-row"><span class="sheet-label">${cash < 0 ? 'Overdrawn' : 'Cash in the safe'}</span><span class="${cash < 0 ? 'bad' : ''}">${money(cash)}</span></div>
       <div class="sheet-row"><span class="sheet-label">Out on loan</span><span>${money(book)}</span></div>
-      <div class="sheet-row"><span class="sheet-label">Owed to depositors</span><span>−${money(deposits).replace('$', '$')}</span></div>
+      <div class="sheet-row"><span class="sheet-label">Owed to depositors</span><span>−${money(deposits)}</span></div>
       <div class="sheet-row total"><span class="sheet-label">Capital</span>
         <span class="${capital >= 0 ? '' : 'bad'}">${money(capital)}</span></div>
       ${forecast ? `

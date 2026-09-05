@@ -13,7 +13,7 @@
  * second branch, never a bigger shipment, is the only way to lend more. The
  * same rule that shapes the core game shapes the firm.
  */
-import { TOWNS, getTown, booksFor, heldIn, TIERS, mergeMods } from './campaign.js';
+import { TOWNS, getTown, booksFor, heldIn, TIERS, mergeMods, runConfigFor } from './campaign.js';
 import { withMods, riskFor, RATE_BASE, RATE_SPAN, RISK_WEDGE } from './sim.js';
 
 export const BRANCH_COST = 450;             // to open a branch in a town
@@ -80,8 +80,7 @@ const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
  */
 export function bookOutlook(townId, bookIndex) {
   const book = booksFor(townId)[bookIndex];
-  const townMods = getTown(townId).challenge.mods;
-  const mods = withMods(mergeMods(TIERS[book.tier].mods, townMods, book.mods));
+  const mods = withMods(runConfigFor(townId, bookIndex).mods);
 
   const meanAmount = 210 * mods.loanSize;
   const meanTerm = 7.5 * mods.term;
@@ -204,6 +203,9 @@ export function hireManager(campaign, townId, bookIndex) {
     return { ok: false, why: 'You do not hold that book.' };
   }
   if (isStaffed(ops, townId, bookIndex)) return { ok: false, why: 'Already has a manager.' };
+  // A manager lends out of a branch. Without one there is no vault to lend
+  // from, and the network would count the town as run dry every single day.
+  if (!hasBranch(ops, townId)) return { ok: false, why: 'Open a branch here first.' };
   if (campaign.treasury < MANAGER_HIRE_COST) return { ok: false, why: 'Not enough in the bank.' };
   campaign.treasury = round2(campaign.treasury - MANAGER_HIRE_COST);
   const list = ops.managers[townId] || (ops.managers[townId] = []);
@@ -258,13 +260,15 @@ export function runNetworkDays(campaign, days) {
           // A branch that cannot fund its lending has to turn people away,
           // and in this business that is the end of its standing. No amount
           // of money buys it back — only days of not doing it again.
+          // The day's thin takings are earned on the standing the branch
+          // walked in with; it walks out with none.
+          summary.loans += o.loans * (SUSPENDED_EFFECT / MANAGER_EFFECT);
+          summary.takings += o.marginSuspended * (branch ? branch.standing : 0);
           if (branch) {
             branch.suspended = true;
             branch.standing = 0;
           }
           dry.add(town.id);
-          summary.loans += o.loans * (SUSPENDED_EFFECT / MANAGER_EFFECT);
-          summary.takings += o.marginSuspended * (branch ? branch.standing : 0);
         }
         summary.costs += o.wage;      // owed either way
       }

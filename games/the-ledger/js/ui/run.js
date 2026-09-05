@@ -200,7 +200,7 @@ function report() {
           <div class="row-main">
             <div class="row-name">Interest to depositors and the week's costs</div>
           </div>
-          <div class="row-value bad">−${money(res.interest + res.overhead).replace('$', '$')}</div>
+          <div class="row-value bad">−${money(res.interest + res.overhead)}</div>
         </div>
       </section>
 
@@ -213,7 +213,7 @@ function report() {
                 <div class="row-name">${d.name}</div>
                 <div class="row-sub">Written ${weeks(d.weeks)} ago · security found ${money(d.recovered)}</div>
               </div>
-              <div class="row-value bad">−${money(d.outstanding - d.recovered).replace('$', '$')}</div>
+              <div class="row-value bad">−${money(d.outstanding - d.recovered)}</div>
             </div>`).join('')}
         </section>` : ''}
 

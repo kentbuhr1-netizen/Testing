@@ -357,7 +357,7 @@ export function capital(state) {
 }
 
 /** The reserve everybody can see: cash against deposits. */
-export const reserveRatio = (state) => state.cash / Math.max(1, state.deposits);
+export const reserveRatio = (state) => Math.max(0, state.cash) / Math.max(1, state.deposits);
 
 /** This week's desk, and the file in front of you. */
 export const deskQueue = (state) => state.applications[state.week - 1] || [];
@@ -449,6 +449,7 @@ export function decide(state, approve) {
   if (approve) {
     if (!canWrite(state, app)) {
       outcome.why = 'There is not that much cash in the building.';
+      state.declined += 1;     // the applicant was turned away, whatever the intent
     } else {
       state.cash = round2(state.cash - app.amount);
       state.loans.push({
@@ -572,6 +573,10 @@ export function settleWeek(state) {
   deposits = round2(deposits + interest);
   const overhead = round2(OVERHEAD * mods.overhead);
   cash = round2(cash - overhead);
+  // The safe can go below zero here: every penny went out to depositors and
+  // the week's costs are still owed. Nothing forgives it — the overdraft
+  // sits on the sheet until lending income covers it.
+  const overdrawn = cash < 0 ? round2(-cash) : 0;
 
   // --- confidence: lost in an afternoon, rebuilt over months
   let confidence = state.confidence;
@@ -580,18 +585,23 @@ export function settleWeek(state) {
     const share = shortfall / Math.max(1, shortfall + paidOut);
     confidence -= (0.22 + 0.55 * share) * mods.skittish;
     trustNote = 'You could not pay everyone who asked. That gets about within the hour.';
+  } else if (overdrawn > 0) {
+    trustNote = 'The week’s costs emptied the safe and then some. You are overdrawn.';
   } else {
     confidence += TRUST_REBUILD * (1 - confidence) / mods.skittish;
   }
   const ratio = cash / Math.max(1, deposits);
   if (defaults.length) confidence -= 0.017 * defaults.length * mods.skittish;
+  // Running the safe thin costs confidence. Running it fat buys none back —
+  // that is the one promise the README makes about this number, and a test
+  // holds it to the exact figure.
   if (ratio < 0.12) confidence -= 0.03 * mods.skittish;
-  else if (ratio > 0.3) confidence += 0.006;
   confidence = clamp(confidence, 0, 1);
 
   const next = { cash, deposits, confidence, loans };
   const report = {
     week: state.week,
+    overdrawn,
     written: deskQueue(state).filter((a) => loans.some((l) => l.id === a.id)).length,
     seen: deskQueue(state).length,
     collected: round2(collected),

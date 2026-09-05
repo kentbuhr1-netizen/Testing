@@ -85,7 +85,7 @@ made safe simply by getting rich.
 🔴 Impossible ×4 — less capital, worse paper and a jumpier town as you climb.
 
 **Targets are measured, not guessed.** Before a book is offered, a family of
-49 reference underwriters (`parProfit` in `js/sim.js`) each plays that exact
+57 reference underwriters (`parProfit` in `js/sim.js`) each plays that exact
 book — its applicants, its rates, its frights — and the target is a share of
 what the best of them cleared: 40% on Easy up to 93% on Impossible. A test
 asserts that for all 625.

@@ -86,8 +86,10 @@ function opsTown() {
         </div>
         ${staffed
           ? `<button class="chip danger" data-act="dismissManager" data-index="${i}">Dismiss</button>`
-          : `<button class="chip" data-act="hireManager" data-index="${i}"
-                     ${campaign.treasury < O.MANAGER_HIRE_COST ? 'disabled' : ''}>${whole(O.MANAGER_HIRE_COST)}</button>`}
+          : O.hasBranch(campaign.ops, store.ui.townId)
+            ? `<button class="chip" data-act="hireManager" data-index="${i}"
+                     ${campaign.treasury < O.MANAGER_HIRE_COST ? 'disabled' : ''}>${whole(O.MANAGER_HIRE_COST)}</button>`
+            : `<span class="muted row-note">Needs a branch</span>`}
       </div>`;
   }).join('');
 

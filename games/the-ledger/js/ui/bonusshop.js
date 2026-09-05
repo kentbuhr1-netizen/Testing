@@ -65,6 +65,12 @@ const BONUSES = [
       const r = store.run;
       r.cash = round2(r.cash + CORRESPONDENT);
       r.deposits = round2(r.deposits + CORRESPONDENT);
+      // A reveal bought earlier this week priced the old deposits; the
+      // clearing house scales with them, so refresh rather than mislead.
+      if (r.revealed?.week === r.week) {
+        const { flow, fright } = S.projectedFlow(r);
+        r.revealed = { week: r.week, flow, fright };
+      }
     },
   },
   {
