@@ -12,6 +12,8 @@
  * balancing 625 numbers by hand.
  */
 import { parProfit, mulberry32 } from './sim.js';
+import { newBank } from './bank.js';
+import { newStaff, hasMA } from './employees.js';
 
 export const CORNERS_PER_CITY = 25;
 /**
@@ -32,7 +34,13 @@ export const TIERS = {
     mods: { strictness: 0.8 },
   },
   medium: {
-    id: 'medium', label: 'Medium', icon: '🟡', days: 7, stake: 25, parFactor: 0.62,
+    // Calibrated (see tools/calibrate-campaign-difficulty.mjs) so a decent-
+    // but-imperfect player — right on plan most days, off on the rest —
+    // wins roughly 90% of the time at a "typical" carelessness level, from
+    // ~97% when nearly careful down to ~75% when quite careless: a real but
+    // modest step down from Easy's near-100%, and clearly short of Hard's
+    // bite at the same skill level.
+    id: 'medium', label: 'Medium', icon: '🟡', days: 7, stake: 25, parFactor: 0.78,
     blurb: 'Customers notice a bad batch.',
     mods: { strictness: 1.0 },
   },
@@ -307,6 +315,8 @@ export function newCampaign() {
     claimed: {},   // cityId → array of claimed corner indexes
     targets: {},   // "cityId:index" → the bar, cached once shown
     ops: null,     // built by ops.js once five cities are done
+    bank: newBank(),
+    employees: newStaff(),
     stats: { runsPlayed: 0, runsWon: 0, cupsSold: 0 },
   };
 }
@@ -365,6 +375,26 @@ export function claimCorner(campaign, cityId, i, profit) {
 }
 
 export const opsUnlocked = (campaign) => completedCities(campaign).length >= CITIES_FOR_OPS;
+
+/* ------------------------------------------------------------------ *
+ * M&A — buying a corner instead of playing it
+ * ------------------------------------------------------------------ */
+
+/** A stiff premium over playing it yourself — this is a shortcut, not a bargain. */
+export function acquisitionCost(campaign, cityId, cornerIndex) {
+  return Math.round(targetFor(campaign, cityId, cornerIndex) * 3 * 100) / 100;
+}
+
+/** Claims a corner outright for cash, via the M&A specialist. No operating profit — you didn't earn it, you bought it. */
+export function acquireCorner(campaign, cityId, cornerIndex) {
+  if (!hasMA(campaign)) return { ok: false, why: 'Hire an M&A Specialist first.' };
+  if (!isCornerUnlocked(campaign, cityId, cornerIndex)) return { ok: false, why: 'That corner is not open yet.' };
+  if (isClaimed(campaign, cityId, cornerIndex)) return { ok: false, why: 'Already yours.' };
+  const cost = acquisitionCost(campaign, cityId, cornerIndex);
+  if (campaign.treasury < cost) return { ok: false, why: 'Not enough in the treasury.' };
+  campaign.treasury = Math.round((campaign.treasury - cost) * 100) / 100;
+  return { ok: true, ...claimCorner(campaign, cityId, cornerIndex, 0) };
+}
 
 export function campaignProgress(campaign) {
   const claimed = CITIES.reduce((n, c) => n + claimedIn(campaign, c.id).length, 0);

@@ -1,0 +1,4328 @@
+<title>Lemonade Stand</title>
+<style>
+/* Lemonade Stand — mobile-first, thumb-friendly, no framework. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #fff8e6;
+  --bg-2: #ffffff;
+  --ink: #2b2417;
+  --ink-soft: #6d6250;
+  --line: #e6d9b8;
+  --lemon: #f7c948;
+  --lemon-deep: #e0a800;
+  --leaf: #4a9d54;
+  --sky: #64b5e8;
+  --danger: #d8503c;
+  --shadow: 0 2px 0 rgba(0, 0, 0, .06), 0 8px 24px rgba(120, 90, 20, .1);
+  --radius: 18px;
+  --tap: 48px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #191510;
+    --bg-2: #241e17;
+    --ink: #f5ecd9;
+    --ink-soft: #b3a58c;
+    --line: #3a3126;
+    --shadow: 0 2px 0 rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .35);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #191510;
+  --bg-2: #241e17;
+  --ink: #f5ecd9;
+  --ink-soft: #b3a58c;
+  --line: #3a3126;
+  --shadow: 0 2px 0 rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .35);
+}
+
+* { box-sizing: border-box; }
+
+/* An element's own `display` (e.g. .hud, .actions) would otherwise outrank
+   the browser's default [hidden] rule and stay visible. */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.45 ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, -apple-system, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+}
+
+/* ---------- HUD ---------- */
+
+.hud {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 16px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+
+.hud-item { display: flex; flex-direction: column; gap: 2px; }
+.hud-rep { margin-left: auto; align-items: flex-end; }
+.hud-label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+.hud-value { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.meter {
+  display: block;
+  width: 84px;
+  height: 10px;
+  border-radius: 99px;
+  background: var(--line);
+  overflow: hidden;
+}
+.meter i {
+  display: block;
+  height: 100%;
+  width: 50%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--lemon-deep), var(--lemon));
+  transition: width .5s ease;
+}
+
+/* ---------- Layout ---------- */
+
+.screen {
+  flex: 1;
+  padding: 16px 16px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: rise .28s ease both;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+.actions {
+  position: sticky;
+  bottom: 0;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--bg) 65%, transparent);
+  display: grid;
+  gap: 8px;
+}
+
+.card {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+
+.card h2 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -.01em; }
+p { margin: 0 0 10px; }
+p:last-child { margin-bottom: 0; }
+.muted { color: var(--ink-soft); font-size: 14px; }
+.center { text-align: center; }
+
+/* ---------- Buttons ---------- */
+
+button {
+  font: inherit;
+  color: inherit;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.btn {
+  min-height: 54px;
+  width: 100%;
+  border-radius: 16px;
+  background: linear-gradient(180deg, var(--lemon), var(--lemon-deep));
+  color: #33270a;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: .01em;
+  box-shadow: 0 3px 0 #b98a00, var(--shadow);
+  transition: transform .06s ease, box-shadow .06s ease;
+}
+.btn:active { transform: translateY(3px); box-shadow: 0 0 0 #b98a00, var(--shadow); }
+.btn[disabled] { opacity: .5; box-shadow: none; }
+
+.btn-ghost {
+  min-height: 48px;
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  font-weight: 600;
+  color: var(--ink-soft);
+  box-shadow: none;
+}
+
+.chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  font-size: 14px;
+  font-weight: 600;
+}
+.chip:active { background: var(--lemon); }
+
+/* ---------- Weather ---------- */
+
+.weather {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.weather-icon { font-size: 52px; line-height: 1; }
+.weather-main { flex: 1; }
+.weather-temp { font-size: 34px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.weather-label { color: var(--ink-soft); font-weight: 600; }
+
+.headline {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--sky) 16%, var(--bg-2));
+  border: 1px solid color-mix(in srgb, var(--sky) 35%, var(--line));
+  font-size: 15px;
+}
+
+/* ---------- Steppers ---------- */
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.row:last-child { border-bottom: 0; padding-bottom: 0; }
+.row-main { flex: 1; min-width: 0; }
+.row-name { font-weight: 700; }
+.row-sub { font-size: 13px; color: var(--ink-soft); }
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 4px;
+}
+.stepper button {
+  width: var(--tap);
+  height: 40px;
+  border-radius: 10px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+}
+.stepper button:active { background: var(--lemon); }
+.stepper button[disabled] { opacity: .35; }
+.stepper output {
+  min-width: 52px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 2px dashed var(--line);
+  font-size: 17px;
+  font-weight: 700;
+}
+.total .over { color: var(--danger); }
+
+/* ---------- Facts / report ---------- */
+
+.facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.fact {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+.fact-label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-soft); }
+.fact-value { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.fact-value.good { color: var(--leaf); }
+.fact-value.bad { color: var(--danger); }
+
+.notes { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.notes li {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--lemon);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 14px;
+}
+
+/* ---------- Open-for-business animation ---------- */
+
+.stand { text-align: center; padding: 8px 0 4px; }
+.stand-count { font-size: 64px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.stand-count small { display: block; font-size: 14px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+.queue { font-size: 30px; min-height: 44px; letter-spacing: 2px; word-break: break-all; }
+.queue span { display: inline-block; animation: pop .4s ease both; }
+@keyframes pop {
+  from { opacity: 0; transform: scale(.4) translateY(6px); }
+  60% { transform: scale(1.15); }
+}
+.till { font-size: 22px; font-weight: 800; color: var(--leaf); font-variant-numeric: tabular-nums; }
+
+.progress {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--line);
+  overflow: hidden;
+  margin-top: 12px;
+}
+.progress i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--lemon-deep);
+}
+
+/* ---------- Season chart ---------- */
+
+/* Daily profit, drawn above and below a zero line. */
+.chart {
+  display: flex;
+  gap: 3px;
+  height: 96px;
+  margin-top: 16px;
+}
+.chart-col { flex: 1; display: flex; flex-direction: column; }
+.chart-pos { flex: 1; display: flex; align-items: flex-end; }
+.chart-neg { flex: 1; display: flex; align-items: flex-start; border-top: 1px solid var(--line); }
+.chart i { width: 100%; display: block; }
+.chart-pos i { background: var(--leaf); border-radius: 3px 3px 0 0; }
+.chart-neg i { background: var(--danger); border-radius: 0 0 3px 3px; }
+
+.rank { text-align: center; padding: 6px 0 2px; }
+.rank-icon { font-size: 56px; line-height: 1; }
+.rank-title { font-size: 24px; font-weight: 800; margin-top: 4px; }
+
+.title-art { font-size: 72px; text-align: center; line-height: 1; margin: 8px 0 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* ================================================================
+   Campaign: map, cities, corners, operations
+   ================================================================ */
+
+.head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.head-row h1 { margin: 0; }
+
+.treasury {
+  text-align: right;
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.treasury small {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+h1 .of { font-size: 15px; font-weight: 600; color: var(--ink-soft); }
+
+.crumb {
+  align-self: flex-start;
+  min-height: 40px;
+  padding: 0 14px 0 8px;
+  margin-bottom: -4px;
+  border-radius: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.crumb:active { background: var(--line); }
+
+/* ---- lists of places ---- */
+
+.city-list, .corner-list { display: grid; gap: 8px; }
+
+.city, .corner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg-2);
+  box-shadow: var(--shadow);
+}
+.city:active, .corner.open:active { transform: translateY(1px); background: var(--lemon); }
+.city.locked, .corner.locked { opacity: .5; box-shadow: none; background: transparent; }
+.city.done { border-color: var(--leaf); }
+
+.city-flag { font-size: 30px; line-height: 1; }
+.city-main, .corner-main { flex: 1; min-width: 0; }
+.city-name, .corner-name {
+  font-weight: 700;
+  font-size: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.city-count, .corner-target {
+  text-align: right;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.city-count small, .corner-target small {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.corner-no {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  font-weight: 800;
+  font-size: 14px;
+}
+.corner.claimed { background: color-mix(in srgb, var(--leaf) 12%, var(--bg-2)); border-color: color-mix(in srgb, var(--leaf) 35%, var(--line)); }
+.corner.claimed .corner-no { background: var(--leaf); color: #fff; border-color: var(--leaf); }
+.tick { color: var(--leaf); }
+
+/* ---- difficulty pills ---- */
+
+.pill {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  border: 1px solid transparent;
+}
+.pill-easy { background: color-mix(in srgb, var(--leaf) 18%, transparent); color: var(--leaf); border-color: color-mix(in srgb, var(--leaf) 35%, transparent); }
+.pill-medium { background: color-mix(in srgb, var(--lemon-deep) 20%, transparent); color: var(--lemon-deep); border-color: color-mix(in srgb, var(--lemon-deep) 40%, transparent); }
+.pill-hard { background: color-mix(in srgb, #e08c3c 22%, transparent); color: #c9711f; border-color: color-mix(in srgb, #e08c3c 40%, transparent); }
+.pill-impossible { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pill-hard { color: #f0a75c; }
+  :root:not([data-theme="light"]) .pill-medium { color: var(--lemon); }
+}
+:root[data-theme="dark"] .pill-hard { color: #f0a75c; }
+:root[data-theme="dark"] .pill-medium { color: var(--lemon); }
+
+/* ---- meters ---- */
+
+.bar {
+  display: block;
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 99px;
+  background: var(--line);
+  overflow: hidden;
+}
+.bar i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--lemon-deep), var(--lemon));
+  transition: width .4s ease;
+}
+.bar-win i { background: linear-gradient(90deg, #3f8f4a, var(--leaf)); }
+.bar-warn i { background: linear-gradient(90deg, #c2452f, var(--danger)); }
+
+.hud-goal { flex: 0 1 130px; min-width: 96px; margin-left: auto; align-items: stretch; }
+.hud-goal .bar { margin-top: 4px; }
+
+/* ---- notices ---- */
+
+.notice, .locked-note, .warn, .warn-card {
+  border-radius: 14px;
+  font-size: 14px;
+}
+.notice {
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--danger) 12%, var(--bg-2));
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line));
+}
+.locked-note {
+  padding: 12px 14px;
+  text-align: center;
+  color: var(--ink-soft);
+  background: var(--bg-2);
+  border: 1px dashed var(--line);
+}
+.warn { color: var(--danger); }
+.warn-card { border-color: color-mix(in srgb, var(--danger) 35%, var(--line)); }
+.warn-dot { font-size: 13px; }
+.ops-report { border-color: color-mix(in srgb, var(--leaf) 35%, var(--line)); }
+.good { color: var(--leaf); }
+.bad { color: var(--danger); }
+
+.challenge h2 { color: var(--ink); font-size: 16px; letter-spacing: 0; text-transform: none; }
+
+.chip-on {
+  background: var(--leaf);
+  border-color: var(--leaf);
+  color: #fff;
+}
+
+.subtotal { border: 0; padding-top: 4px; margin-top: 0; font-size: 14px; font-weight: 600; }
+
+/* ---- inline text links (a stepping-stone into a bigger screen) ---- */
+
+.link-btn {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lemon-deep);
+  font-weight: 700;
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.link-btn:active { opacity: 0.7; }
+
+@media (prefers-color-scheme: dark) {
+  .link-btn { color: var(--lemon); }
+}
+
+/* ---- the one paywall in the game ---- */
+
+.paywall {
+  text-align: center;
+  border-color: color-mix(in srgb, var(--lemon-deep) 40%, var(--line));
+  background: color-mix(in srgb, var(--lemon) 10%, var(--bg-2));
+}
+.paywall-price {
+  font-size: 34px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+.paywall-price small {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.paywall p { text-align: left; }
+
+/* ---- locked list rows (achievements, and anywhere else that fits) ---- */
+
+.row.locked { opacity: .5; }
+.row.locked .row-name { color: var(--ink-soft); }
+
+/* ---- tutorial slides ---- */
+
+.tut-slide {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+  padding: 24px 12px;
+}
+.tut-icon { font-size: 72px; line-height: 1; margin-bottom: 8px; }
+.tut-slide h1 { font-size: 24px; margin: 0; }
+.tut-slide p { max-width: 34ch; color: var(--ink-soft); font-size: 16px; line-height: 1.5; }
+
+.tut-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+.tut-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--line);
+}
+.tut-dot.on { background: var(--lemon-deep); width: 22px; }
+
+/* Reserve room so the fixed preview bar never covers the game's own
+   sticky action buttons or the tail end of an unpadded screen. */
+.screen { padding-bottom: 60px; }
+.actions { padding-bottom: calc(60px + env(safe-area-inset-bottom)); }
+.preview-banner {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  letter-spacing: .03em;
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(6px);
+  padding: 7px 12px max(7px, env(safe-area-inset-bottom)) 14px;
+  border-top: 1px solid var(--line);
+}
+.preview-banner > span { flex: 0 0 auto; }
+#preview-ops-jump {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #33270a;
+  background: linear-gradient(180deg, var(--lemon), var(--lemon-deep));
+  border: 1px solid color-mix(in srgb, var(--lemon-deep) 60%, transparent);
+}
+#preview-ops-jump:active { transform: translateY(1px); }
+</style>
+<div id="app" class="app">
+  <header id="hud" class="hud" hidden></header>
+  <main id="screen" class="screen" aria-live="polite"></main>
+  <footer id="actions" class="actions" hidden></footer>
+</div>
+<div class="preview-banner"><span>Prototype preview</span></div>
+<script>
+(function () {
+  const __modules = {};
+  window.__modules = __modules; // preview-only: lets the demo shortcut reach every module
+
+/* ---- js/sim.js ---- */
+__modules["sim"] = (function () {
+/**
+ * Lemonade Stand — day simulation.
+ *
+ * A "run" is one stretch of days on one street corner: some working capital,
+ * a profit target, and a set of modifiers that make the corner what it is.
+ * Free play is just a run with no target and no modifiers.
+ *
+ * Everything here is pure: give it a state object and it gives numbers back.
+ * No DOM, no storage. campaign.js decides which runs exist; app.js draws them.
+ */
+
+const CUPS_PER_PITCHER = 10;
+const TOTAL_DAYS = 30;      // free play season length
+const STARTING_MONEY = 20.0;
+
+// Ideal recipe for one pitcher. Straying from it costs you satisfaction.
+const IDEAL_LEMONS = 5;
+const IDEAL_SUGAR = 5;
+
+/** Deterministic PRNG so a day can be replayed (and unit tested). */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function rng() {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+const round2 = (n) => Math.round(n * 100) / 100;
+
+/** Every knob a corner, city or difficulty can turn. */
+const NO_MODS = {
+  traffic: 1,        // how many people walk past
+  willingness: 1,    // how much they'll pay
+  tempShift: 0,      // °F added to every forecast
+  hotBias: 1,        // weight on hot weather
+  wetBias: 1,        // weight on rain and storms
+  eventChance: 1,    // how often the street throws a surprise
+  strictness: 1,     // >1 means fussier palates
+  iceExtra: 0,       // extra ice per cup expected (it melts fast here)
+  rent: 0,           // charged every day, sold out or not
+  repSwing: 1,       // how fast word gets around
+  lemonPrice: 1,
+  sugarPrice: 1,
+  icePrice: 1,
+  cupPrice: 1,
+};
+
+function withMods(mods) {
+  return { ...NO_MODS, ...(mods || {}) };
+}
+
+/* ------------------------------------------------------------------ *
+ * Lemons spoil
+ *
+ * Lemons are tracked as dated batches, not just a running total, so a
+ * cooler full of them can go bad. Everything else (sugar, cups, ice-per-day)
+ * keeps indefinitely — only the fruit itself is perishable.
+ * ------------------------------------------------------------------ */
+
+const LEMON_SHELF_LIFE_DAYS = 7;
+
+/** Add lemons to the cooler, dated so they can spoil on schedule. */
+function receiveLemons(state, qty) {
+  if (qty <= 0) return;
+  state.inventory.lemons += qty;
+  const batches = state.inventory.lemonBatches || (state.inventory.lemonBatches = []);
+  batches.push({ day: state.day, qty });
+}
+
+/**
+ * A full shopping order: lemons go through receiveLemons so they can spoil
+ * on schedule, an `enhancers` sub-order tops up enhancer stock, and the rest
+ * (sugar, ice, cups) adds straight in.
+ */
+function receiveOrder(state, order) {
+  for (const key of Object.keys(order)) {
+    if (key === 'lemons') {
+      receiveLemons(state, order.lemons || 0);
+    } else if (key === 'enhancers') {
+      for (const [id, qty] of Object.entries(order.enhancers || {})) {
+        state.inventory.enhancers[id] = (state.inventory.enhancers[id] || 0) + (qty || 0);
+      }
+    } else {
+      state.inventory[key] = (state.inventory[key] || 0) + (order[key] || 0);
+    }
+  }
+}
+
+/** Use the oldest lemons first, so the freshest batch is the one left to spoil last. */
+function consumeLemons(state, qty) {
+  let remaining = qty;
+  const batches = state.inventory.lemonBatches || [];
+  while (remaining > 0 && batches.length) {
+    const take = Math.min(remaining, batches[0].qty);
+    batches[0].qty -= take;
+    remaining -= take;
+    if (batches[0].qty <= 0) batches.shift();
+  }
+  state.inventory.lemons = Math.max(0, state.inventory.lemons - qty);
+}
+
+/**
+ * Discard any batch older than the shelf life, as of the current day. A
+ * never-expire unlock skips this entirely — the one thing real money buys.
+ */
+function spoilLemons(state) {
+  if (state.premium?.neverExpireLemons) return 0;
+  const batches = state.inventory.lemonBatches || [];
+  let spoiled = 0;
+  const fresh = [];
+  for (const b of batches) {
+    if (state.day - b.day >= LEMON_SHELF_LIFE_DAYS) spoiled += b.qty;
+    else fresh.push(b);
+  }
+  state.inventory.lemonBatches = fresh;
+  if (spoiled > 0) state.inventory.lemons = Math.max(0, state.inventory.lemons - spoiled);
+  return spoiled;
+}
+
+/** How many days the oldest lemon in the cooler has left before it spoils. */
+function daysUntilLemonsSpoil(state) {
+  const batches = state.inventory.lemonBatches || [];
+  if (!batches.length) return null;
+  const age = state.day - batches[0].day;
+  return Math.max(0, LEMON_SHELF_LIFE_DAYS - age);
+}
+
+/* ------------------------------------------------------------------ *
+ * Enhancers — optional add-ins customers can pay extra for
+ * ------------------------------------------------------------------ */
+
+const ENHANCERS = {
+  strawberry: { id: 'strawberry', label: 'Strawberry Splash', icon: '🍓', addPrice: 0.35, unitCost: 0.16, appeal: 1.0 },
+  mango:      { id: 'mango',      label: 'Mango Twist',       icon: '🥭', addPrice: 0.4,  unitCost: 0.2,  appeal: 0.9 },
+  mint:       { id: 'mint',       label: 'Mint Cooler',       icon: '🌿', addPrice: 0.3,  unitCost: 0.12, appeal: 1.0, coolant: true },
+  caffeine:   { id: 'caffeine',   label: 'Caffeine Kick',     icon: '☕', addPrice: 0.55, unitCost: 0.24, appeal: 0.75 },
+};
+
+const emptyEnhancerInventory = () =>
+  Object.fromEntries(Object.keys(ENHANCERS).map((id) => [id, 0]));
+const allEnhancersOff = () =>
+  Object.fromEntries(Object.keys(ENHANCERS).map((id) => [id, false]));
+
+/** How likely a customer who is already buying is to add this enhancer too. */
+function enhancerUptake(enh, heat) {
+  let chance = 0.55 * enh.appeal - 0.4 * enh.addPrice;
+  if (enh.coolant) chance *= 1 + heat * 0.35; // a cool add-on sells better when it's hot
+  return clamp(chance, 0, 0.9);
+}
+
+const WEATHER = {
+  scorcher:  { id: 'scorcher',  label: 'Scorcher',      icon: '🔥', traffic: 1.35, tempRange: [92, 104], hot: true },
+  sunny:     { id: 'sunny',     label: 'Sunny',         icon: '☀️', traffic: 1.15, tempRange: [76, 92], hot: true },
+  fair:      { id: 'fair',      label: 'Fair',          icon: '🌤️', traffic: 1.0,  tempRange: [68, 82] },
+  cloudy:    { id: 'cloudy',    label: 'Cloudy',        icon: '☁️', traffic: 0.82, tempRange: [60, 74] },
+  drizzle:   { id: 'drizzle',   label: 'Drizzle',       icon: '🌦️', traffic: 0.5,  tempRange: [55, 70], wet: true },
+  storm:     { id: 'storm',     label: 'Thunderstorms', icon: '⛈️', traffic: 0.22, tempRange: [52, 68], wet: true },
+};
+
+// Rough seasonal drift: the run warms up as its days pass.
+function pickWeather(rng, day, days, mods) {
+  const warmth = day / Math.max(1, days); // 0 → 1
+  const weights = [
+    [WEATHER.scorcher, (0.04 + 0.22 * warmth) * mods.hotBias],
+    [WEATHER.sunny,    (0.24 + 0.12 * warmth) * mods.hotBias],
+    [WEATHER.fair,     0.28],
+    [WEATHER.cloudy,   0.22 - 0.08 * warmth],
+    [WEATHER.drizzle,  (0.14 - 0.06 * warmth) * mods.wetBias],
+    [WEATHER.storm,    (0.08 - 0.04 * warmth) * mods.wetBias],
+  ].filter(([, w]) => w > 0);
+  const total = weights.reduce((s, [, w]) => s + w, 0);
+  let roll = rng() * total;
+  for (const [w, weight] of weights) {
+    roll -= weight;
+    if (roll <= 0) return w;
+  }
+  return WEATHER.fair;
+}
+
+function pickTemp(rng, weather, mods) {
+  const [lo, hi] = weather.tempRange;
+  return Math.round(lo + rng() * (hi - lo) + mods.tempShift);
+}
+
+const EVENTS = [
+  { id: 'fair',      text: 'A street fair is setting up down the block!', traffic: 1.7,  chance: 0.06 },
+  { id: 'parade',    text: 'The summer parade marches right past you.',   traffic: 1.55, chance: 0.05 },
+  { id: 'heatwave',  text: 'Heat advisory — everyone is desperate for something cold.', traffic: 1.4, chance: 0.06 },
+  { id: 'roadwork',  text: 'Road crews closed the street. Hardly anyone walks by.', traffic: 0.45, chance: 0.06 },
+  { id: 'rival',     text: 'A kid opened a rival stand on the next corner.', traffic: 0.65, chance: 0.07 },
+  { id: 'icetruck',  text: 'The ice truck broke down — ice cost double today.', traffic: 1.0, chance: 0.05, icePrice: 2.0 },
+  { id: 'lemonglut', text: 'A lemon truck spilled its load. Lemons are cheap!', traffic: 1.0, chance: 0.05, lemonPrice: 0.55 },
+  { id: 'schooltrip',text: 'A school bus unloaded a field trip nearby.',    traffic: 1.35, chance: 0.05 },
+];
+
+function pickEvent(rng, mods) {
+  for (const ev of EVENTS) {
+    if (rng() < ev.chance * mods.eventChance) return ev;
+  }
+  return null;
+}
+
+/** Supply prices wobble a little day to day, then events adjust them. */
+function rollPrices(rng, event, mods) {
+  const jitter = (base, spread) => round2(base * (1 - spread + rng() * spread * 2));
+  const prices = {
+    lemon: jitter(0.38 * mods.lemonPrice, 0.25),  // each
+    sugar: jitter(0.3 * mods.sugarPrice, 0.2),    // one cup of sugar
+    ice: jitter(0.05 * mods.icePrice, 0.3),       // one cube
+    cup: jitter(0.09 * mods.cupPrice, 0.15),      // one paper cup
+  };
+  if (event?.lemonPrice) prices.lemon = round2(prices.lemon * event.lemonPrice);
+  if (event?.icePrice) prices.ice = round2(prices.ice * event.icePrice);
+  return prices;
+}
+
+/** How much ice a customer expects per cup at this temperature. */
+function idealIcePerCup(temp, mods = NO_MODS) {
+  return clamp(Math.round((temp - 52) / 12) + (mods.iceExtra || 0), 0, 7);
+}
+
+/** Bell curve around a target: 1.0 when perfect, tailing off as you drift. */
+function scoreAgainst(value, ideal, tolerance) {
+  const dev = (value - ideal) / tolerance;
+  return Math.exp(-dev * dev);
+}
+
+/**
+ * How good the lemonade tastes, 0..1, given the recipe and the weather.
+ * Weak or sour drinks and warm cups on a hot day all land here.
+ */
+function recipeQuality(recipe, temp, mods = NO_MODS) {
+  const t = (base) => base / mods.strictness;
+  const lemonScore = scoreAgainst(recipe.lemons, IDEAL_LEMONS, t(2.6));
+  const sugarScore = scoreAgainst(recipe.sugar, IDEAL_SUGAR, t(2.6));
+  const iceScore = scoreAgainst(recipe.ice, idealIcePerCup(temp, mods), t(1.9));
+  return clamp(0.4 * lemonScore + 0.32 * sugarScore + 0.28 * iceScore, 0, 1);
+}
+
+/** Cost of the ingredients in a single cup, at today's prices. */
+function costPerCup(recipe, prices) {
+  const perPitcher = recipe.lemons * prices.lemon + recipe.sugar * prices.sugar;
+  return round2(perPitcher / CUPS_PER_PITCHER + recipe.ice * prices.ice + prices.cup);
+}
+
+/** Most cups you can pour with what's in the cooler right now. */
+function maxCupsAvailable(inventory, recipe) {
+  const byLemons = Math.floor(inventory.lemons / Math.max(1, recipe.lemons));
+  const bySugar = Math.floor(inventory.sugar / Math.max(1, recipe.sugar));
+  const pitchers = Math.min(byLemons, bySugar);
+  const byIce = recipe.ice > 0 ? Math.floor(inventory.ice / recipe.ice) : Infinity;
+  return Math.max(0, Math.min(pitchers * CUPS_PER_PITCHER, byIce, inventory.cups));
+}
+
+/**
+ * What the crowd grumbled about today. Deliberately qualitative — the player
+ * dials in the recipe from these hints rather than reading a target number.
+ */
+function customerNotes(recipe, temp, result, mods = NO_MODS) {
+  const gripes = [];
+  const iceIdeal = idealIcePerCup(temp, mods);
+  const push = (weight, text) => gripes.push({ weight, text });
+
+  if (recipe.lemons <= IDEAL_LEMONS - 2) push(IDEAL_LEMONS - recipe.lemons, 'Tastes like lemon-flavoured water.');
+  if (recipe.lemons >= IDEAL_LEMONS + 2) push(recipe.lemons - IDEAL_LEMONS, 'Way too sour — my mouth is puckering.');
+  if (recipe.sugar <= IDEAL_SUGAR - 2) push(IDEAL_SUGAR - recipe.sugar, 'Not sweet enough for me.');
+  if (recipe.sugar >= IDEAL_SUGAR + 2) push(recipe.sugar - IDEAL_SUGAR, 'Syrupy. My teeth hurt.');
+  if (recipe.ice <= iceIdeal - 1) push((iceIdeal - recipe.ice) * 1.5, temp >= 85 ? 'This is warm on a day like today!' : 'Could use a bit more ice.');
+  if (recipe.ice >= iceIdeal + 2) push(recipe.ice - iceIdeal, 'Mostly ice cubes. Where is the lemonade?');
+
+  gripes.sort((a, b) => b.weight - a.weight);
+  const notes = gripes.slice(0, 2).map((g) => g.text);
+
+  if (result) {
+    if (result.stock === 0) {
+      return ['You had nothing to pour, so the stand stayed shut.'];
+    }
+    if (result.potential > 0 && result.interested / result.potential < 0.35 && result.price > 0.75) {
+      notes.push('Plenty of people looked, then balked at the price.');
+    }
+    if (result.lostToStockout > 0) {
+      notes.push(`You sold out — ${result.lostToStockout} customer${result.lostToStockout === 1 ? '' : 's'} left empty-handed.`);
+    }
+  }
+  if (notes.length === 0) notes.push('Best lemonade on the block!');
+  return notes;
+}
+
+/**
+ * Start a run. `days` and `stake` set the shape of it; `target` is the profit
+ * you have to clear to claim the corner (null for free play).
+ */
+function newRun({
+  seed = Math.floor(Math.random() * 1e9),
+  days = TOTAL_DAYS,
+  stake = STARTING_MONEY,
+  target = null,
+  mods = null,
+  corner = null,
+  premium = null,
+} = {}) {
+  const state = {
+    seed,
+    day: 1,
+    days,
+    stake,
+    target,
+    corner,               // { cityId, index, name } when played from the campaign
+    mods: withMods(mods),
+    premium: { neverExpireLemons: false, ...(premium || {}) },
+    money: stake,
+    reputation: 0.5,
+    inventory: { lemons: 0, sugar: 0, ice: 0, cups: 0, lemonBatches: [], enhancers: emptyEnhancerInventory() },
+    enhancersOffered: allEnhancersOff(),
+    recipe: { lemons: 5, sugar: 5, ice: 2 },
+    price: 0.5,
+    history: [],
+    today: null,
+    phase: 'forecast',
+  };
+  state.today = rollDay(state);
+  return state;
+}
+
+/** Free play: the original thirty-day season with nothing stacked against you. */
+function newGame(seed = Math.floor(Math.random() * 1e9)) {
+  return newRun({ seed });
+}
+
+/** Weather, headlines and supply prices for the day about to start. */
+function rollDay(state) {
+  const mods = withMods(state.mods);
+  const rng = mulberry32(state.seed + state.day * 7919);
+  const weather = pickWeather(rng, state.day, state.days ?? TOTAL_DAYS, mods);
+  const temp = pickTemp(rng, weather, mods);
+  const event = pickEvent(rng, mods);
+  return {
+    weather: weather.id,
+    temp,
+    event: event ? { id: event.id, text: event.text } : null,
+    prices: rollPrices(rng, event, mods),
+    trafficMod: (event?.traffic ?? 1) * weather.traffic * mods.traffic,
+  };
+}
+
+function buyCost(prices, order) {
+  return round2(
+    order.lemons * prices.lemon +
+    order.sugar * prices.sugar +
+    order.ice * prices.ice +
+    order.cups * prices.cup
+  );
+}
+
+/** Enhancer stock has a fixed wholesale price — no daily jitter, no bulk break. */
+function enhancerOrderCost(order) {
+  return round2(
+    Object.entries(order || {}).reduce((sum, [id, qty]) => sum + (ENHANCERS[id]?.unitCost || 0) * (qty || 0), 0)
+  );
+}
+
+/**
+ * Run the day. Walks every potential customer past the stand and asks
+ * whether they'd pay your price for what you're pouring.
+ */
+function simulateDay(state) {
+  const today = state.today;
+  const mods = withMods(state.mods);
+  const rng = mulberry32(state.seed + state.day * 104729 + 17);
+  const quality = recipeQuality(state.recipe, today.temp, mods);
+
+  // Thirst climbs steeply once it gets hot.
+  const heat = clamp((today.temp - 48) / 46, 0, 1);
+  const thirst = 0.35 + 1.25 * heat * heat;
+  const repFactor = 0.45 + 1.1 * state.reputation;
+  const potential = Math.max(
+    0,
+    Math.round(22 * thirst * today.trafficMod * repFactor * (0.88 + rng() * 0.24))
+  );
+
+  const stock = maxCupsAvailable(state.inventory, state.recipe);
+
+  // What a passer-by would pay: better lemonade and hotter days raise it.
+  const baseWillingness = (0.1 + 1.35 * quality + 0.7 * heat) * mods.willingness;
+
+  let interested = 0;
+  for (let i = 0; i < potential; i++) {
+    // Spread of budgets across the crowd — some splurge, some are stingy.
+    const personal = baseWillingness * (0.6 + rng() * 0.8);
+    if (state.price <= personal) interested++;
+  }
+
+  const sold = Math.min(interested, stock);
+  const lostToStockout = Math.max(0, interested - stock);
+  const pitchersMade = Math.ceil(sold / CUPS_PER_PITCHER);
+
+  // Enhancers are an independent upsell: every cup sold is offered whichever
+  // ones are switched on and still in stock, and each customer decides for
+  // themself — it never affects whether the base cup gets bought at all.
+  const enhancerSales = {};
+  let enhancerRevenue = 0;
+  let enhancerCost = 0;
+  for (const id of Object.keys(ENHANCERS)) {
+    if (!state.enhancersOffered?.[id]) continue;
+    let stockLeft = state.inventory.enhancers?.[id] || 0;
+    if (stockLeft <= 0) continue;
+    const enh = ENHANCERS[id];
+    const uptake = enhancerUptake(enh, heat);
+    let used = 0;
+    for (let i = 0; i < sold && stockLeft > 0; i++) {
+      if (rng() < uptake) {
+        used++;
+        stockLeft--;
+      }
+    }
+    if (used > 0) {
+      enhancerSales[id] = { cups: used, revenue: round2(used * enh.addPrice), cost: round2(used * enh.unitCost) };
+      enhancerRevenue += used * enh.addPrice;
+      enhancerCost += used * enh.unitCost;
+    }
+  }
+
+  const used = {
+    lemons: pitchersMade * state.recipe.lemons,
+    sugar: pitchersMade * state.recipe.sugar,
+    ice: sold * state.recipe.ice,
+    cups: sold,
+    enhancers: Object.fromEntries(Object.entries(enhancerSales).map(([id, s]) => [id, s.cups])),
+  };
+  const revenue = round2(sold * state.price + enhancerRevenue);
+  const cogs = round2(
+    pitchersMade * (state.recipe.lemons * today.prices.lemon + state.recipe.sugar * today.prices.sugar) +
+    used.ice * today.prices.ice +
+    used.cups * today.prices.cup +
+    enhancerCost
+  );
+
+  // Reputation follows the drink first, then how you priced it. Word only
+  // spreads through cups actually sold, and the last stretch to a perfect
+  // reputation is the hardest to earn.
+  const valueForMoney = clamp(baseWillingness - state.price, -1, 1);
+  let repDelta;
+  if (sold === 0) {
+    repDelta = stock === 0 ? -0.01 : -0.02; // shut, or nobody bit at that price
+  } else {
+    repDelta = clamp(
+      0.09 * (quality - 0.55) * 2 + 0.03 * valueForMoney - (lostToStockout > potential * 0.25 ? 0.03 : 0),
+      -0.09,
+      0.09
+    );
+    if (repDelta > 0) repDelta *= 1.6 * (1 - state.reputation);
+  }
+  repDelta *= mods.repSwing;
+
+  const result = {
+    day: state.day,
+    weather: today.weather,
+    temp: today.temp,
+    event: today.event,
+    potential,
+    interested,
+    sold,
+    lostToStockout,
+    stock,
+    quality,
+    price: state.price,
+    revenue,
+    rent: round2(mods.rent),
+    cogs,
+    profit: round2(revenue - cogs - mods.rent),
+    used,
+    enhancers: enhancerSales,
+    enhancerRevenue: round2(enhancerRevenue),
+    repDelta,
+  };
+  result.notes = customerNotes(state.recipe, today.temp, result, mods);
+  return result;
+}
+
+/** Apply a simulated day to the state and move the calendar forward. */
+function commitDay(state, result) {
+  const days = state.days ?? TOTAL_DAYS;
+  state.money = round2(state.money + result.revenue - (result.rent || 0));
+  consumeLemons(state, result.used.lemons);
+  state.inventory.sugar -= result.used.sugar;
+  state.inventory.cups -= result.used.cups;
+  for (const [id, qty] of Object.entries(result.used.enhancers || {})) {
+    state.inventory.enhancers[id] = Math.max(0, (state.inventory.enhancers[id] || 0) - qty);
+  }
+  result.melted = Math.max(0, state.inventory.ice - result.used.ice);
+  state.inventory.ice = 0; // whatever is left melts overnight
+  state.reputation = clamp(state.reputation + result.repDelta, 0.05, 1);
+  state.history.push(result);
+  state.day += 1;
+  result.spoiledLemons = spoilLemons(state); // checked as of the day that's about to start
+  if (state.day > days) {
+    state.phase = 'gameover';
+  } else if (isBankrupt(state)) {
+    state.bankrupt = true;
+    state.phase = 'gameover';
+  } else {
+    state.today = rollDay(state);
+    state.phase = 'forecast';
+  }
+  return state;
+}
+
+/**
+ * Nothing left to pour and not enough cash for the cheapest possible pitcher
+ * (one lemon, one spoon of sugar, one paper cup) at today's prices.
+ */
+function isBankrupt(state) {
+  if (maxCupsAvailable(state.inventory, state.recipe) > 0) return false;
+  const p = state.today.prices;
+  const cheapestCup = p.lemon + p.sugar + p.cup;
+  return state.money < cheapestCup;
+}
+
+function finalScore(state) {
+  const totals = state.history.reduce(
+    (acc, d) => {
+      acc.revenue += d.revenue;
+      acc.profit += d.profit;
+      acc.sold += d.sold;
+      acc.enhancerCups += Object.values(d.used?.enhancers || {}).reduce((a, b) => a + b, 0);
+      acc.enhancerRevenue += d.enhancerRevenue || 0;
+      return acc;
+    },
+    { revenue: 0, profit: 0, sold: 0, enhancerCups: 0, enhancerRevenue: 0 }
+  );
+  const best = state.history.reduce((a, b) => (b.profit > (a?.profit ?? -Infinity) ? b : a), null);
+  const net = round2(state.money - state.stake);
+  return {
+    money: round2(state.money),
+    net,
+    revenue: round2(totals.revenue),
+    profit: round2(totals.profit),
+    cupsSold: totals.sold,
+    enhancerCups: totals.enhancerCups,
+    enhancerRevenue: round2(totals.enhancerRevenue),
+    bestDay: best,
+    reputation: state.reputation,
+    target: state.target,
+    won: state.target == null ? null : net >= state.target,
+    rank: state.bankrupt ? { title: 'Out of Business', icon: '💸' } : rankFor(state.money),
+    bankrupt: !!state.bankrupt,
+  };
+}
+
+function rankFor(money) {
+  if (money >= 350) return { title: 'Lemonade Tycoon', icon: '👑' };
+  if (money >= 220) return { title: 'Franchise Owner', icon: '🏆' };
+  if (money >= 120) return { title: 'Corner Champion', icon: '🥇' };
+  if (money >= 60) return { title: 'Steady Squeezer', icon: '🍋' };
+  if (money >= STARTING_MONEY) return { title: 'Broke Even', icon: '🙂' };
+  return { title: 'Sour Season', icon: '😬' };
+}
+
+/* ------------------------------------------------------------------ *
+ * Reference play
+ *
+ * A near-optimal bot used to set each corner's target ("par"). Because the
+ * bot plays the corner's own weather, prices and modifiers, a target derived
+ * from its result is calibrated to that corner automatically — a rainy city
+ * with fussy customers gets an honestly lower bar than a tourist trap.
+ * ------------------------------------------------------------------ */
+
+/** What the crowd will pay on average today, for a given drink quality. */
+function willingnessToday(state, quality) {
+  const mods = withMods(state.mods);
+  const heat = clamp((state.today.temp - 48) / 46, 0, 1);
+  return (0.1 + 1.35 * quality + 0.7 * heat) * mods.willingness;
+}
+
+/**
+ * Revenue-maximising price. Budgets are spread uniformly over 0.6–1.4× the
+ * average, so the take is p·(1.4 − p/w)/0.8 and the peak sits at 0.7·w.
+ */
+function bestPrice(state, quality) {
+  return Math.max(0.05, Math.round(0.7 * willingnessToday(state, quality) * 20) / 20);
+}
+
+/** Share of passers-by who would buy at `price` today. */
+function demandShare(state, quality, price) {
+  const w = willingnessToday(state, quality);
+  return clamp((1.4 - price / w) / 0.8, 0, 1);
+}
+
+/** Roughly how many people will walk past today. */
+function expectedTraffic(state) {
+  const heat = clamp((state.today.temp - 48) / 46, 0, 1);
+  const thirst = 0.35 + 1.25 * heat * heat;
+  return 22 * thirst * state.today.trafficMod * (0.45 + 1.1 * state.reputation);
+}
+
+/** How the reference bot would play today: ideal recipe, best price, stock to match. */
+function referencePlan(state) {
+  const mods = withMods(state.mods);
+  const recipe = { lemons: IDEAL_LEMONS, sugar: IDEAL_SUGAR, ice: idealIcePerCup(state.today.temp, mods) };
+  const quality = recipeQuality(recipe, state.today.temp, mods);
+  const price = bestPrice(state, quality);
+  const expected = expectedTraffic(state) * demandShare(state, quality, price);
+  return { recipe, price, cups: Math.max(0, Math.round(expected * 1.05)) };
+}
+
+/** Buy what's missing to pour `cups` cups, trimmed to what the money covers. */
+function affordableOrder(state, recipe, cups) {
+  const prices = state.today.prices;
+  const need = (have, want) => Math.max(0, want - have);
+  const orderFor = (n) => {
+    const pitchers = Math.ceil(n / CUPS_PER_PITCHER);
+    return {
+      lemons: need(state.inventory.lemons, pitchers * recipe.lemons),
+      sugar: need(state.inventory.sugar, pitchers * recipe.sugar),
+      ice: need(state.inventory.ice, n * recipe.ice),
+      cups: need(state.inventory.cups, n),
+    };
+  };
+  if (buyCost(prices, orderFor(cups)) <= state.money) return orderFor(cups);
+  let lo = 0;
+  let hi = cups;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (buyCost(prices, orderFor(mid)) <= state.money) lo = mid;
+    else hi = mid - 1;
+  }
+  return orderFor(lo);
+}
+
+/**
+ * Play a whole run with the reference bot and report the profit it cleared.
+ * This is what corner targets are measured against.
+ */
+function parProfit(config) {
+  const state = newRun({ ...config, target: null });
+  while (state.phase !== 'gameover') {
+    const plan = referencePlan(state);
+    state.recipe = plan.recipe;
+    state.price = plan.price;
+    const order = affordableOrder(state, plan.recipe, plan.cups);
+    state.money = round2(state.money - buyCost(state.today.prices, order));
+    receiveOrder(state, order);
+    commitDay(state, simulateDay(state));
+  }
+  return round2(state.money - state.stake);
+}
+
+  return { mulberry32, withMods, receiveLemons, receiveOrder, daysUntilLemonsSpoil, idealIcePerCup, recipeQuality, costPerCup, maxCupsAvailable, customerNotes, newRun, newGame, rollDay, buyCost, enhancerOrderCost, simulateDay, commitDay, isBankrupt, finalScore, willingnessToday, bestPrice, demandShare, expectedTraffic, referencePlan, affordableOrder, parProfit, CUPS_PER_PITCHER, TOTAL_DAYS, STARTING_MONEY, NO_MODS, LEMON_SHELF_LIFE_DAYS, ENHANCERS, WEATHER, EVENTS };
+})();
+
+/* ---- js/campaign.js ---- */
+__modules["campaign"] = (function () {
+/**
+ * Lemonade Stand — the campaign.
+ *
+ * 25 cities across the US and Europe, 25 street corners each. Corners inside a
+ * city ramp through four difficulty tiers; cities themselves each bend the
+ * rules in one distinctive way. Claim all 25 corners and the city is yours.
+ *
+ * Targets are not hand-written. Every corner's bar is derived from `parProfit`
+ * — what a near-optimal player clears on that exact corner, with that city's
+ * weather and prices — scaled by the tier. A drizzly city with fussy customers
+ * therefore gets an honestly lower bar than a tourist trap, without anyone
+ * balancing 625 numbers by hand.
+ */
+const { parProfit, mulberry32 } = __modules["sim"];
+
+const CORNERS_PER_CITY = 25;
+/**
+ * How much of a city you must claim before it counts as taken. Set to all 25
+ * corners; lower it to shorten the campaign without touching anything else.
+ */
+const CORNERS_TO_TAKE_CITY = CORNERS_PER_CITY;
+const CITIES_FOR_OPS = 5; // supply chain unlocks once this many cities are done
+
+/* ------------------------------------------------------------------ *
+ * Difficulty
+ * ------------------------------------------------------------------ */
+
+const TIERS = {
+  easy: {
+    id: 'easy', label: 'Easy', icon: '🟢', days: 6, stake: 30, parFactor: 0.4,
+    blurb: 'A gentle corner. Room to experiment.',
+    mods: { strictness: 0.8 },
+  },
+  medium: {
+    id: 'medium', label: 'Medium', icon: '🟡', days: 7, stake: 25, parFactor: 0.78,
+    blurb: 'Customers notice a bad batch.',
+    mods: { strictness: 1.0 },
+  },
+  hard: {
+    id: 'hard', label: 'Hard', icon: '🟠', days: 8, stake: 22, parFactor: 0.8,
+    blurb: 'Thin capital, sharp palates, no slack.',
+    mods: { strictness: 1.25, traffic: 0.95 },
+  },
+  impossible: {
+    id: 'impossible', label: 'Impossible', icon: '🔴', days: 10, stake: 22, parFactor: 0.93,
+    blurb: 'Near-perfect play, or nothing.',
+    mods: { strictness: 1.5, traffic: 0.9, rent: 0.5 },
+  },
+};
+
+/** Which tier each of a city's 25 corners belongs to. */
+const TIER_LAYOUT = [
+  ...Array(7).fill('easy'),
+  ...Array(7).fill('medium'),
+  ...Array(7).fill('hard'),
+  ...Array(4).fill('impossible'),
+];
+
+/* ------------------------------------------------------------------ *
+ * Cities
+ * ------------------------------------------------------------------ */
+
+const city = (id, name, region, flag, challenge, streets, places) =>
+  ({ id, name, region, flag, challenge, streets, places });
+
+/**
+ * Ordered easiest-feeling to harshest. `mods` are merged over the tier's own,
+ * so a city bends every corner in it the same way.
+ */
+const CITIES = [
+  city('nyc', 'New York', 'US', '🗽',
+    { name: 'Sidewalk Rush', blurb: 'Rivers of people — and a corner rent that bites whether you sell or not.',
+      mods: { traffic: 1.5, rent: 2, lemonPrice: 1.15, sugarPrice: 1.15, cupPrice: 1.15 } },
+    ['Canal', 'Mott', 'Bleecker', 'Lexington', 'Delancey', 'Broome'],
+    ['Union Square', 'Bryant Park Gate', 'Grand Central Steps', 'Coney Boardwalk', 'High Line Stair']),
+  city('austin', 'Austin', 'US', '🎸',
+    { name: 'Live Music Crowds', blurb: 'Something is always happening downtown, and it is always warm.',
+      mods: { eventChance: 1.8, tempShift: 7, traffic: 1.15 } },
+    ['Rainey', 'Congress', 'Barton Springs', 'Guadalupe', 'Red River', 'Lamar'],
+    ['Zilker Green', 'Festival Gate', 'Bat Bridge', 'Campus Drag', 'Food Truck Lot']),
+  city('chicago', 'Chicago', 'US', '🌬️',
+    { name: 'The Hawk', blurb: 'That wind off the lake keeps the temperature down and the crowds moving.',
+      mods: { tempShift: -6, traffic: 1.1 } },
+    ['Wabash', 'Clark', 'Halsted', 'Michigan', 'Damen', 'Milwaukee'],
+    ['Navy Pier Gate', 'Millennium Park', 'Lakefront Path', 'Wrigley Corner', 'Riverwalk']),
+  city('boston', 'Boston', 'US', '🎓',
+    { name: 'Student Budgets', blurb: 'Packed pavements, empty pockets. Nobody here overpays for anything.',
+      mods: { willingness: 0.85, traffic: 1.2 } },
+    ['Boylston', 'Newbury', 'Tremont', 'Beacon', 'Comm Ave', 'Hanover'],
+    ['Common Gate', 'Harvard Yard', 'Fenway Steps', 'Quincy Market', 'Esplanade']),
+  city('miami', 'Miami', 'US', '🌴',
+    { name: 'Storm Season', blurb: 'Blazing mornings, afternoon thunder. The sky decides your day.',
+      mods: { wetBias: 2, hotBias: 1.6, tempShift: 8, eventChance: 1.3 } },
+    ['Ocean', 'Collins', 'Brickell', 'Calle Ocho', 'Lincoln', 'Biscayne'],
+    ['South Beach Walk', 'Marina Gate', 'Wynwood Wall', 'Bayfront', 'Pier Head']),
+  city('la', 'Los Angeles', 'US', '🌞',
+    { name: 'Sprawl', blurb: 'Nobody walks here — except when something is on, and then everybody does.',
+      mods: { traffic: 0.85, eventChance: 1.6, tempShift: 4 } },
+    ['Sunset', 'Melrose', 'Abbot Kinney', 'Fairfax', 'Ventura', 'Figueroa'],
+    ['Venice Boardwalk', 'Griffith Trailhead', 'Studio Gate', 'Farmers Market', 'Pier Entrance']),
+  city('nola', 'New Orleans', 'US', '🎺',
+    { name: 'Festival City', blurb: 'Parades, second lines, brass bands. The street throws surprises daily.',
+      mods: { eventChance: 2.2, tempShift: 6, wetBias: 1.4 } },
+    ['Bourbon', 'Frenchmen', 'Magazine', 'Decatur', 'Royal', 'Canal'],
+    ['Jackson Square', 'Riverwalk', 'Garden Gate', 'Streetcar Stop', 'Levee Path']),
+  city('denver', 'Denver', 'US', '⛰️',
+    { name: 'Mile High & Dry', blurb: 'Thin dry air makes everyone thirsty, and cool nights keep the crowds thin.',
+      mods: { tempShift: -3, strictness: 1.15, iceExtra: 1, traffic: 0.95 } },
+    ['Larimer', 'Colfax', 'Blake', 'Tennyson', 'Broadway', 'Pearl'],
+    ['Union Station', 'Park Trailhead', 'Stadium Gate', 'Botanic Entrance', 'Creek Path']),
+  city('barcelona', 'Barcelona', 'EU', '🇪🇸',
+    { name: 'Siesta Hours', blurb: 'Half the day the street is empty. The other half it is scorching.',
+      mods: { traffic: 0.8, tempShift: 8, willingness: 1.1 } },
+    ['Rambla', 'Gràcia', 'Diagonal', 'Born', 'Poblenou', 'Raval'],
+    ['Barceloneta Sand', 'Park Güell Gate', 'Sagrada Queue', 'Port Vell', 'Market Door']),
+  city('lisbon', 'Lisbon', 'EU', '🇵🇹',
+    { name: 'Hill Climb', blurb: 'Everything is uphill. Fewer feet get to you, but they arrive parched.',
+      mods: { traffic: 0.85, tempShift: 6, willingness: 1.15 } },
+    ['Alfama', 'Chiado', 'Bairro Alto', 'Baixa', 'Belém', 'Graça'],
+    ['Tram 28 Stop', 'Miradouro', 'Castle Gate', 'Riverside Walk', 'Market Hall']),
+  city('rome', 'Rome', 'EU', '🇮🇹',
+    { name: 'Tourist Season', blurb: 'Enormous crowds, ruinous pitch fees, and suppliers who know it.',
+      mods: { traffic: 1.4, rent: 2.5, lemonPrice: 1.2, sugarPrice: 1.2, icePrice: 1.2, cupPrice: 1.2 } },
+    ['Corso', 'Trastevere', 'Veneto', 'Nazionale', 'Cavour', 'Appia'],
+    ['Colosseum Gate', 'Trevi Steps', 'Pantheon Square', 'Villa Gardens', 'Spanish Steps']),
+  city('amsterdam', 'Amsterdam', 'EU', '🚲',
+    { name: 'Everyone Is Cycling', blurb: 'Plenty of traffic, but they are all moving. Only a bargain stops a bike.',
+      mods: { traffic: 1.3, willingness: 0.8 } },
+    ['Prinsengracht', 'Jordaan', 'Damrak', 'Utrechtsestraat', 'Kinkerstraat', 'Haarlemmerdijk'],
+    ['Vondelpark Gate', 'Canal Bridge', 'Museum Square', 'Ferry Landing', 'Market Row']),
+  city('berlin', 'Berlin', 'EU', '🇩🇪',
+    { name: 'Cheap And Cheerful', blurb: 'Supplies cost little, and nobody will pay much. Volume is the whole game.',
+      mods: { lemonPrice: 0.8, sugarPrice: 0.8, icePrice: 0.8, cupPrice: 0.8, willingness: 0.8, traffic: 1.15 } },
+    ['Kastanienallee', 'Sonnenallee', 'Karl-Marx', 'Torstraße', 'Bergmann', 'Warschauer'],
+    ['Mauerpark', 'Tempelhof Field', 'Museum Island', 'Canal Steps', 'Flea Market']),
+  city('dublin', 'Dublin', 'EU', '🇮🇪',
+    { name: 'Loyal Locals', blurb: 'Word travels fast in both directions. Your reputation moves twice as quickly.',
+      mods: { repSwing: 1.6, wetBias: 1.8, tempShift: -5 } },
+    ['Grafton', 'Camden', 'Dame', 'Capel', 'Thomas', 'Baggot'],
+    ['Stephens Green', 'Ha\'penny Bridge', 'Docklands', 'Phoenix Gate', 'Temple Bar']),
+  city('london', 'London', 'EU', '🇬🇧',
+    { name: 'Grey Skies', blurb: 'Huge footfall under permanent cloud. Hot days are rare and precious.',
+      mods: { wetBias: 2.2, hotBias: 0.6, tempShift: -6, traffic: 1.25 } },
+    ['Brick Lane', 'Portobello', 'Oxford', 'Borough', 'Camden High', 'Shoreditch'],
+    ['South Bank', 'Hyde Park Gate', 'Tube Exit', 'Market Arch', 'Bridge Steps']),
+  city('prague', 'Prague', 'EU', '🇨🇿',
+    { name: 'Bargain Hunters', blurb: 'Cheap supplies, cheap expectations. Margins are measured in coins.',
+      mods: { lemonPrice: 0.75, sugarPrice: 0.75, icePrice: 0.75, cupPrice: 0.75, willingness: 0.75, traffic: 1.2 } },
+    ['Karlova', 'Nerudova', 'Vinohradská', 'Dlouhá', 'Ječná', 'Křižíkova'],
+    ['Charles Bridge', 'Old Town Square', 'Castle Steps', 'Riverbank', 'Tram Stop']),
+  city('sf', 'San Francisco', 'US', '🌁',
+    { name: 'Fog And Money', blurb: 'It never gets hot, but the people who do stop will pay almost anything.',
+      mods: { tempShift: -10, hotBias: 0.4, willingness: 1.35 } },
+    ['Valencia', 'Haight', 'Columbus', 'Fillmore', 'Irving', 'Castro'],
+    ['Ferry Building', 'Dolores Park', 'Pier 39', 'Bridge Overlook', 'Cable Car Stop']),
+  city('phoenix', 'Phoenix', 'US', '🔥',
+    { name: 'Furnace', blurb: 'Brutal heat. Ice vanishes from the cup, and the ice man knows what he has.',
+      mods: { tempShift: 18, iceExtra: 2, icePrice: 1.5 } },
+    ['Mill', 'Roosevelt', 'Camelback', 'Van Buren', 'Grand', 'Central'],
+    ['Desert Trailhead', 'Ballpark Gate', 'Canal Path', 'Civic Plaza', 'Shade Awning']),
+  city('seattle', 'Seattle', 'US', '☔',
+    { name: 'Perpetual Drizzle', blurb: 'It rains. Then it rains. Sunny days are worth a fortune here.',
+      mods: { wetBias: 2.2, hotBias: 0.6, tempShift: -4, willingness: 1.15 } },
+    ['Pike', 'Ballard', 'Capitol', 'Alaskan', 'Fremont', 'Denny'],
+    ['Market Stall', 'Ferry Dock', 'Space Needle Lawn', 'Waterfront', 'Campus Path']),
+  city('athens', 'Athens', 'EU', '🏛️',
+    { name: 'Bone Dry', blurb: 'Relentless sun and ice priced like a luxury good.',
+      mods: { tempShift: 12, icePrice: 2.0, iceExtra: 1 } },
+    ['Ermou', 'Plaka', 'Monastiraki', 'Kolonaki', 'Psiri', 'Syntagma'],
+    ['Acropolis Path', 'Agora Gate', 'Metro Exit', 'Lycabettus Foot', 'Port Road']),
+  city('vegas', 'Las Vegas', 'US', '🎰',
+    { name: 'Tourist Trap', blurb: 'They will pay anything — and so will you, for everything.',
+      mods: { tempShift: 14, willingness: 1.4, rent: 3,
+              lemonPrice: 1.35, sugarPrice: 1.35, icePrice: 1.35, cupPrice: 1.35 } },
+    ['Fremont', 'Paradise', 'Flamingo', 'Tropicana', 'Sahara', 'Koval'],
+    ['Strip Sidewalk', 'Fountain View', 'Casino Doors', 'Convention Gate', 'Pool Deck']),
+  city('stockholm', 'Stockholm', 'EU', '🇸🇪',
+    { name: 'Expensive Everything', blurb: 'Supplies cost a fortune. Happily, so does everything else here.',
+      mods: { lemonPrice: 1.5, sugarPrice: 1.5, icePrice: 1.5, cupPrice: 1.5, willingness: 1.35, tempShift: -6 } },
+    ['Drottninggatan', 'Götgatan', 'Hornsgatan', 'Odengatan', 'Sveavägen', 'Kungsgatan'],
+    ['Gamla Stan', 'Ferry Quay', 'Djurgården Gate', 'Metro Steps', 'Harbour Walk']),
+  city('paris', 'Paris', 'EU', '🇫🇷',
+    { name: 'Discerning Palates', blurb: 'They will pay well for something excellent, and nothing at all for less.',
+      mods: { strictness: 1.6, willingness: 1.2, rent: 1.5 } },
+    ['Rivoli', 'Montmartre', 'Saint-Germain', 'Belleville', 'Marais', 'Bastille'],
+    ['Seine Quay', 'Louvre Court', 'Luxembourg Gate', 'Métro Exit', 'Canal Bank']),
+  city('vienna', 'Vienna', 'EU', '🎻',
+    { name: 'Refined Taste', blurb: 'A city of coffee houses. An unbalanced glass is an insult here.',
+      mods: { strictness: 1.8, willingness: 1.25 } },
+    ['Kärntner', 'Mariahilfer', 'Ringstraße', 'Naschmarkt', 'Praterstraße', 'Graben'],
+    ['Opera Steps', 'Prater Gate', 'Palace Garden', 'Danube Path', 'Museum Court']),
+  city('reykjavik', 'Reykjavík', 'EU', '🇮🇸',
+    { name: 'Sub-Arctic', blurb: 'Cold, wet, and nearly empty — but you are the only stand for a thousand miles.',
+      mods: { tempShift: -13, hotBias: 0.3, wetBias: 1.6, willingness: 1.55, traffic: 0.85 } },
+    ['Laugavegur', 'Skólavörðustígur', 'Hverfisgata', 'Bankastræti', 'Ægisgata', 'Frakkastígur'],
+    ['Harpa Steps', 'Harbour Front', 'Hallgrímskirkja', 'Pool Entrance', 'Geyser Road']),
+];
+
+const CITY_INDEX = Object.fromEntries(CITIES.map((c, i) => [c.id, i]));
+const getCity = (id) => CITIES[CITY_INDEX[id]];
+
+/* ------------------------------------------------------------------ *
+ * Corners
+ * ------------------------------------------------------------------ */
+
+/** Small local quirks, so no two corners in a city feel identical. */
+const QUIRKS = [
+  { id: 'plain',  label: null, mods: {} },
+  { id: 'shade',  label: 'Shady spot', mods: { iceExtra: -1, traffic: 0.95 } },
+  { id: 'suntrap',label: 'Sun trap', mods: { tempShift: 4, iceExtra: 1 } },
+  { id: 'busy',   label: 'Busy crossing', mods: { traffic: 1.25, willingness: 0.95 } },
+  { id: 'quiet',  label: 'Quiet street', mods: { traffic: 0.75, willingness: 1.15 } },
+  { id: 'posh',   label: 'Smart neighbourhood', mods: { willingness: 1.2, rent: 0.75 } },
+  { id: 'transit',label: 'Beside the station', mods: { traffic: 1.35, strictness: 1.1 } },
+  { id: 'park',   label: 'Park entrance', mods: { traffic: 1.1, hotBias: 1.2 } },
+];
+
+const cornerSeed = (cityIdx, i) => (cityIdx + 1) * 1_000_003 + (i + 1) * 7919;
+
+/** The 25 corners of a city, always generated the same way. */
+function cornersFor(cityId) {
+  const cityIdx = CITY_INDEX[cityId];
+  const c = CITIES[cityIdx];
+  const out = [];
+  for (let i = 0; i < CORNERS_PER_CITY; i++) {
+    const rng = mulberry32(cornerSeed(cityIdx, i));
+    const tier = TIER_LAYOUT[i];
+    // Later corners in a tier lean on the quirkier pitches.
+    const quirk = QUIRKS[Math.floor(rng() * QUIRKS.length)];
+    const usePlace = rng() < 0.4;
+    const name = usePlace
+      ? c.places[Math.floor(rng() * c.places.length)]
+      : `${c.streets[Math.floor(rng() * c.streets.length)]} & ${c.streets[Math.floor(rng() * c.streets.length)]}`;
+    const traffic = 0.85 + rng() * 0.4;
+    out.push({
+      index: i,
+      cityId,
+      name: dedupeName(out, name, i),
+      tier,
+      quirk: quirk.label,
+      seed: cornerSeed(cityIdx, i),
+      mods: mergeMods(quirk.mods, { traffic }),
+    });
+  }
+  return out;
+}
+
+/** Two corners in a city sharing a name would be confusing on the map. */
+function dedupeName(existing, name, i) {
+  if (!existing.some((c) => c.name === name)) return name;
+  return `${name} (${i + 1})`;
+}
+
+/** Multipliers multiply, shifts add. */
+function mergeMods(...list) {
+  const out = {};
+  const additive = new Set(['tempShift', 'iceExtra', 'rent']);
+  for (const mods of list) {
+    for (const [key, value] of Object.entries(mods || {})) {
+      if (additive.has(key)) out[key] = (out[key] ?? 0) + value;
+      else out[key] = (out[key] ?? 1) * value;
+    }
+  }
+  return out;
+}
+
+/** Everything sim.js needs to play one corner. */
+function runConfigFor(cityId, cornerIndex) {
+  const c = getCity(cityId);
+  const corner = cornersFor(cityId)[cornerIndex];
+  const tier = TIERS[corner.tier];
+  return {
+    seed: corner.seed,
+    days: tier.days,
+    stake: tier.stake,
+    mods: mergeMods(tier.mods, c.challenge.mods, corner.mods),
+    corner: { cityId, index: cornerIndex, name: corner.name, tier: corner.tier },
+  };
+}
+
+/**
+ * The profit needed to claim a corner: a share of what near-perfect play
+ * clears there. Cached on the campaign so the bar never moves under a player.
+ */
+function targetFor(campaign, cityId, cornerIndex) {
+  const key = `${cityId}:${cornerIndex}`;
+  if (campaign?.targets?.[key] != null) return campaign.targets[key];
+  const config = runConfigFor(cityId, cornerIndex);
+  const tier = TIERS[cornersFor(cityId)[cornerIndex].tier];
+  const par = parProfit(config);
+  const target = Math.max(5, Math.round(par * tier.parFactor));
+  if (campaign) {
+    campaign.targets = campaign.targets || {};
+    campaign.targets[key] = target;
+  }
+  return target;
+}
+
+/* ------------------------------------------------------------------ *
+ * Progress
+ * ------------------------------------------------------------------ */
+
+function newCampaign() {
+  return {
+    version: 2,
+    treasury: 0,
+    claimed: {},   // cityId → array of claimed corner indexes
+    targets: {},   // "cityId:index" → the bar, cached once shown
+    ops: null,     // built by ops.js once five cities are done
+    stats: { runsPlayed: 0, runsWon: 0, cupsSold: 0 },
+  };
+}
+
+const claimedIn = (campaign, cityId) => campaign.claimed[cityId] || [];
+const isClaimed = (campaign, cityId, i) => claimedIn(campaign, cityId).includes(i);
+const cityDone = (campaign, cityId) => claimedIn(campaign, cityId).length >= CORNERS_TO_TAKE_CITY;
+
+function completedCities(campaign) {
+  return CITIES.filter((c) => cityDone(campaign, c.id)).map((c) => c.id);
+}
+
+/** Cities open up two at a time, so there is always somewhere else to go. */
+function isCityUnlocked(campaign, cityId) {
+  return CITY_INDEX[cityId] <= completedCities(campaign).length + 1;
+}
+
+/** Corners are claimed in order, so the difficulty ramp holds. */
+function isCornerUnlocked(campaign, cityId, i) {
+  if (!isCityUnlocked(campaign, cityId)) return false;
+  if (i === 0) return true;
+  return isClaimed(campaign, cityId, i - 1);
+}
+
+function nextCorner(campaign, cityId) {
+  const claimed = claimedIn(campaign, cityId);
+  for (let i = 0; i < CORNERS_PER_CITY; i++) if (!claimed.includes(i)) return i;
+  return null;
+}
+
+/** Record a won corner. Returns what changed, for the celebration screen. */
+function claimCorner(campaign, cityId, i, profit) {
+  const before = cityDone(campaign, cityId);
+  const list = campaign.claimed[cityId] || (campaign.claimed[cityId] = []);
+  if (!list.includes(i)) list.push(i);
+  list.sort((a, b) => a - b);
+  campaign.treasury = Math.round((campaign.treasury + profit) * 100) / 100;
+  const cityJustDone = !before && cityDone(campaign, cityId);
+  const done = completedCities(campaign).length;
+  return {
+    cityJustDone,
+    citiesDone: done,
+    opsJustUnlocked: cityJustDone && done === CITIES_FOR_OPS,
+  };
+}
+
+const opsUnlocked = (campaign) => completedCities(campaign).length >= CITIES_FOR_OPS;
+
+function campaignProgress(campaign) {
+  const claimed = CITIES.reduce((n, c) => n + claimedIn(campaign, c.id).length, 0);
+  return {
+    corners: claimed,
+    totalCorners: CITIES.length * CORNERS_PER_CITY,
+    cities: completedCities(campaign).length,
+    totalCities: CITIES.length,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Explaining a corner
+ * ------------------------------------------------------------------ */
+
+/**
+ * Turn merged modifiers into plain sentences. A player should be able to see
+ * what a corner will do to them before they put money on it.
+ */
+function describeMods(mods) {
+  const m = { ...NEUTRAL, ...mods };
+  const out = [];
+  const pct = (v) => `${Math.round(Math.abs(v - 1) * 100)}%`;
+
+  if (m.tempShift >= 4) out.push({ icon: '🔥', text: `Runs hot — about ${Math.round(m.tempShift)}°F warmer than usual.` });
+  if (m.tempShift <= -4) out.push({ icon: '🧊', text: `Runs cold — about ${Math.round(-m.tempShift)}°F cooler than usual.` });
+  if (m.traffic >= 1.15) out.push({ icon: '👣', text: `Busy pitch — ${pct(m.traffic)} more people walk past.` });
+  if (m.traffic <= 0.9) out.push({ icon: '🚶', text: `Quiet pitch — ${pct(m.traffic)} fewer people walk past.` });
+  if (m.willingness >= 1.15) out.push({ icon: '💰', text: `Deep pockets — they will pay ${pct(m.willingness)} more.` });
+  if (m.willingness <= 0.9) out.push({ icon: '🪙', text: `Tight wallets — they will pay ${pct(m.willingness)} less.` });
+  if (m.strictness >= 1.2) out.push({ icon: '🧐', text: 'Fussy palates — a mediocre glass will not do.' });
+  if (m.strictness <= 0.85) out.push({ icon: '🙂', text: 'Forgiving crowd — they drink what you pour.' });
+  if (m.wetBias >= 1.5) out.push({ icon: '🌧️', text: 'Wet climate — expect rain to shut the street.' });
+  if (m.hotBias <= 0.7) out.push({ icon: '☁️', text: 'Hot days are rare here.' });
+  if (m.hotBias >= 1.3) out.push({ icon: '☀️', text: 'Long stretches of heat.' });
+  if (m.iceExtra >= 1) out.push({ icon: '🥤', text: `Ice vanishes fast — cups need about ${m.iceExtra} more.` });
+  if (m.iceExtra <= -1) out.push({ icon: '🌳', text: 'Shaded — cups need a little less ice.' });
+  if (m.icePrice >= 1.3) out.push({ icon: '💸', text: `Ice costs ${pct(m.icePrice)} more here.` });
+  if (m.lemonPrice >= 1.15) out.push({ icon: '🛒', text: 'Supplies are expensive in this city.' });
+  if (m.lemonPrice <= 0.85) out.push({ icon: '🛒', text: 'Supplies are cheap in this city.' });
+  if (m.rent > 0) out.push({ icon: '🏠', text: `Pitch fee of ${'$' + m.rent.toFixed(2)} a day, rain or shine.` });
+  if (m.eventChance >= 1.5) out.push({ icon: '🎪', text: 'Something is always happening on this street.' });
+  if (m.repSwing >= 1.4) out.push({ icon: '🗣️', text: 'Word travels fast — reputation moves quickly here.' });
+  return out;
+}
+
+const NEUTRAL = {
+  traffic: 1, willingness: 1, tempShift: 0, hotBias: 1, wetBias: 1, eventChance: 1,
+  strictness: 1, iceExtra: 0, rent: 0, repSwing: 1,
+  lemonPrice: 1, sugarPrice: 1, icePrice: 1, cupPrice: 1,
+};
+
+  return { cornersFor, mergeMods, runConfigFor, targetFor, newCampaign, completedCities, isCityUnlocked, isCornerUnlocked, nextCorner, claimCorner, campaignProgress, describeMods, CORNERS_PER_CITY, CORNERS_TO_TAKE_CITY, CITIES_FOR_OPS, TIERS, TIER_LAYOUT, CITIES, CITY_INDEX, getCity, claimedIn, isClaimed, cityDone, opsUnlocked };
+})();
+
+/* ---- js/ops.js ---- */
+__modules["ops"] = (function () {
+/**
+ * Lemonade Stand — operations: warehouses, wholesale buying, production and
+ * distribution.
+ *
+ * Unlocked once five cities are complete. Corners you have already claimed can
+ * be staffed and supplied from a city warehouse, so they trade on their own
+ * while you work a new corner by hand. Campaign days tick with the days you
+ * play, so the network earns exactly as fast as you do.
+ *
+ * Ice is deliberately absent from the warehouse: it melts, so staffed corners
+ * buy it locally at street prices — unless the city has an ice maker, which
+ * presses a fresh batch every morning instead of ever stockpiling any. The
+ * same rule that shapes the core game shapes the empire.
+ */
+const { CITIES, getCity, cornersFor, claimedIn, TIERS, mergeMods } = __modules["campaign"];
+const { withMods, mulberry32 } = __modules["sim"];
+
+const WAREHOUSE_COST = 250;
+const WAREHOUSE_BASE_CAPACITY = 2500;  // units of stock (any mix)
+const CAPACITY_UPGRADE_COST = 220;
+const CAPACITY_UPGRADE_STEP = 2000;
+const STAFF_HIRE_COST = 60;            // one-off, per corner
+const STAFF_WAGE = 4;                  // per staffed corner per day
+const WAREHOUSE_UPKEEP = 3;            // per warehouse per day
+
+/** Wholesale unit prices — cheaper than the street, cheaper still in bulk. */
+const WHOLESALE = { lemons: 0.26, sugar: 0.2, cups: 0.06 };
+const BULK_BREAKS = [
+  { min: 2000, discount: 0.8 },
+  { min: 1000, discount: 0.87 },
+  { min: 400, discount: 0.94 },
+  { min: 0, discount: 1 },
+];
+
+function bulkDiscount(qty) {
+  return BULK_BREAKS.find((b) => qty >= b.min).discount;
+}
+
+function wholesaleCost(unit, qty) {
+  return Math.round(WHOLESALE[unit] * qty * bulkDiscount(qty) * 100) / 100;
+}
+
+/**
+ * Production buildings — at most one of each per city. Each needs a depot to
+ * work with and costs upkeep every day whether or not it has anywhere to put
+ * its output. Three of them press raw stock into the depot each morning; the
+ * ice maker instead hands staffed corners a free daily allowance of ice
+ * before the street price kicks in, since ice is never warehoused.
+ */
+const BUILDINGS = {
+  lemonFarm:  { id: 'lemonFarm',  label: 'Lemon Farm',      icon: '🍋', unit: 'lemons', cost: 450, dailyYield: 220, upkeep: 4 },
+  caneFarm:   { id: 'caneFarm',   label: 'Sugar Cane Farm', icon: '🎋', unit: 'sugar',  cost: 450, dailyYield: 220, upkeep: 4 },
+  cupFactory: { id: 'cupFactory', label: 'Cup Factory',     icon: '📦', unit: 'cups',   cost: 380, dailyYield: 450, upkeep: 3 },
+  iceMaker:   { id: 'iceMaker',   label: 'Ice Maker',       icon: '🧊', unit: 'ice',    cost: 320, dailyYield: 400, upkeep: 5 },
+};
+
+/** Which building supplies which warehoused good (the ice maker is not one — see above). */
+const STOCK_BUILDING_FOR = { lemons: 'lemonFarm', sugar: 'caneFarm', cups: 'cupFactory' };
+
+const TRUCK_COST = 300;
+const TRUCK_UPKEEP = 2;   // per day, only while a truck is running a route
+const TRUCK_CARGO = ['lemons', 'sugar', 'cups'];
+
+function newOps() {
+  return {
+    day: 0,
+    warehouses: {},   // cityId → { capacity, stock: { lemons, sugar, cups } }
+    staffed: {},      // cityId → [cornerIndex]
+    buildings: {},    // cityId → { lemonFarm: true, caneFarm: true, ... }
+    trucks: [],       // [{ id, from, to, cargo, amount }] — from/to/cargo null until assigned
+    nextTruckId: 1,
+    ledger: [],       // most recent days first
+    alerts: [],
+    totals: { income: 0, costs: 0, cups: 0 },
+  };
+}
+
+/** Fills in fields a save made before buildings/trucks existed won't have. */
+function ensureOpsShape(ops) {
+  if (!ops) return ops;
+  if (!ops.buildings) ops.buildings = {};
+  if (!ops.trucks) ops.trucks = [];
+  if (ops.nextTruckId == null) ops.nextTruckId = ops.trucks.reduce((n, t) => Math.max(n, t.id || 0), 0) + 1;
+  return ops;
+}
+
+const hasWarehouse = (ops, cityId) => Boolean(ops?.warehouses?.[cityId]);
+const staffedIn = (ops, cityId) => ops?.staffed?.[cityId] || [];
+const isStaffed = (ops, cityId, i) => staffedIn(ops, cityId).includes(i);
+const buildingsIn = (ops, cityId) => Object.keys(ops?.buildings?.[cityId] || {}).filter((id) => ops.buildings[cityId][id]);
+const hasBuilding = (ops, cityId, buildingId) => Boolean(ops?.buildings?.[cityId]?.[buildingId]);
+
+function stockTotal(warehouse) {
+  if (!warehouse) return 0;
+  const s = warehouse.stock;
+  return s.lemons + s.sugar + s.cups;
+}
+
+function spaceLeft(warehouse) {
+  return Math.max(0, warehouse.capacity - stockTotal(warehouse));
+}
+
+/** Adds stock without ever pushing a depot over capacity. Returns what fit. */
+function addStock(warehouse, unit, amount) {
+  if (!warehouse || amount <= 0) return 0;
+  const fit = Math.min(amount, spaceLeft(warehouse));
+  warehouse.stock[unit] += fit;
+  return fit;
+}
+
+/* ------------------------------------------------------------------ *
+ * What a staffed corner does on an average day
+ * ------------------------------------------------------------------ */
+
+const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+
+/**
+ * Staff work an average day rather than a simulated one: no weather roll, no
+ * recipe to dial in. They also price a little under the mark — that gap is
+ * what you are paid for when you work a corner yourself.
+ */
+function cornerOutlook(cityId, cornerIndex) {
+  const corner = cornersFor(cityId)[cornerIndex];
+  const cityMods = getCity(cityId).challenge.mods;
+  const mods = withMods(mergeMods(TIERS[corner.tier].mods, cityMods, corner.mods));
+
+  const avgTemp = 76 + mods.tempShift;
+  const heat = clamp((avgTemp - 48) / 46, 0, 1);
+  const thirst = 0.35 + 1.25 * heat * heat;
+  const cups = Math.max(0, Math.round(14 * thirst * mods.traffic * (mods.hotBias > 1 ? 1.05 : 0.95)));
+
+  const willingness = (0.1 + 1.35 * 0.9 + 0.7 * heat) * mods.willingness;
+  const price = Math.round(0.7 * willingness * 0.85 * 100) / 100;
+
+  const icePerCup = clamp(Math.round((avgTemp - 52) / 12) + mods.iceExtra, 0, 7);
+  const iceUnits = cups * icePerCup;
+  const icePriceEach = 0.05 * mods.icePrice;
+  const iceCost = Math.round(iceUnits * icePriceEach * 100) / 100;
+
+  // 5 lemons + 5 sugar per 10 cups, plus a cup each
+  const needs = { lemons: Math.ceil(cups / 2), sugar: Math.ceil(cups / 2), cups };
+  return {
+    cups,
+    price,
+    revenue: Math.round(cups * price * 100) / 100,
+    iceCost,
+    iceUnits,
+    icePriceEach,
+    rent: mods.rent,
+    needs,
+    // Stock was paid for at the depot, but a day still eats this much value.
+    stockCost: restockCost(needs),
+  };
+}
+
+/** Everything a city's staffed corners would do in one day, if stocked. */
+function cityOutlook(campaign, cityId) {
+  const ops = ensureOpsShape(campaign.ops);
+  const staffed = staffedIn(ops, cityId);
+  const rows = staffed.map((i) => ({ index: i, ...cornerOutlook(cityId, i) }));
+  const sum = (key) => rows.reduce((n, r) => n + r[key], 0);
+  const needs = rows.reduce(
+    (acc, r) => ({
+      lemons: acc.lemons + r.needs.lemons,
+      sugar: acc.sugar + r.needs.sugar,
+      cups: acc.cups + r.needs.cups,
+    }),
+    { lemons: 0, sugar: 0, cups: 0 }
+  );
+
+  const built = buildingsIn(ops, cityId);
+  const buildingUpkeep = built.reduce((n, id) => n + BUILDINGS[id].upkeep, 0);
+
+  // A farm or factory offsets the wholesale cost of what it can supply.
+  const farmSavings = ['lemons', 'sugar', 'cups'].reduce((n, unit) => {
+    const bId = STOCK_BUILDING_FOR[unit];
+    if (!hasBuilding(ops, cityId, bId)) return n;
+    return n + Math.min(needs[unit], BUILDINGS[bId].dailyYield) * WHOLESALE[unit];
+  }, 0);
+
+  // An ice maker covers ice up to its daily press before the street price applies.
+  const iceUnitsNeeded = sum('iceUnits');
+  const iceCostGross = sum('iceCost');
+  const avgIcePrice = iceUnitsNeeded > 0 ? iceCostGross / iceUnitsNeeded : 0;
+  const freeIce = hasBuilding(ops, cityId, 'iceMaker') ? Math.min(iceUnitsNeeded, BUILDINGS.iceMaker.dailyYield) : 0;
+
+  const wages = staffed.length * STAFF_WAGE;
+  const upkeep = (hasWarehouse(ops, cityId) ? WAREHOUSE_UPKEEP : 0) + buildingUpkeep;
+  const revenue = Math.round(sum('revenue') * 100) / 100;
+  const stockCost = Math.round(Math.max(0, sum('stockCost') - farmSavings) * 100) / 100;
+  const iceCost = Math.round(Math.max(0, iceCostGross - freeIce * avgIcePrice) * 100) / 100;
+  const costs = Math.round((iceCost + sum('rent') + wages + upkeep + stockCost) * 100) / 100;
+  return {
+    cityId,
+    corners: rows.length,
+    cups: sum('cups'),
+    revenue,
+    stockCost,
+    iceCost,
+    farmSavings: Math.round(farmSavings * 100) / 100,
+    wages,
+    upkeep,
+    buildingUpkeep,
+    buildings: built,
+    costs,
+    net: Math.round((revenue - costs) * 100) / 100,
+    needs,
+    daysOfStock: daysOfStock(ops.warehouses[cityId], needs, buildingYields(ops, cityId)),
+  };
+}
+
+/** What a city's farms and factory add to the depot each day, by unit. */
+function buildingYields(ops, cityId) {
+  const out = { lemons: 0, sugar: 0, cups: 0 };
+  for (const [unit, buildingId] of Object.entries(STOCK_BUILDING_FOR)) {
+    if (hasBuilding(ops, cityId, buildingId)) out[unit] = BUILDINGS[buildingId].dailyYield;
+  }
+  return out;
+}
+
+/**
+ * How many more days the warehouse can feed this city's staffed corners.
+ * `Infinity` means production keeps up (or nothing at all is being drawn
+ * down) — the UI shows that as a steady supply rather than a number of days.
+ */
+function daysOfStock(warehouse, needs, production = { lemons: 0, sugar: 0, cups: 0 }) {
+  if (!warehouse) return 0;
+  const per = (unit) => {
+    const net = needs[unit] - (production[unit] || 0);
+    return net <= 0 ? Infinity : Math.floor(warehouse.stock[unit] / net);
+  };
+  return Math.min(per('lemons'), per('sugar'), per('cups'));
+}
+
+function networkOutlook(campaign) {
+  const cities = CITIES.filter((c) => staffedIn(campaign.ops, c.id).length > 0).map((c) =>
+    cityOutlook(campaign, c.id)
+  );
+  return {
+    cities,
+    corners: cities.reduce((n, c) => n + c.corners, 0),
+    net: Math.round(cities.reduce((n, c) => n + c.net, 0) * 100) / 100,
+    revenue: Math.round(cities.reduce((n, c) => n + c.revenue, 0) * 100) / 100,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Actions
+ * ------------------------------------------------------------------ */
+
+function buyWarehouse(campaign, cityId) {
+  const ops = ensureOpsShape(campaign.ops);
+  if (hasWarehouse(ops, cityId)) return { ok: false, why: 'You already have a depot here.' };
+  if (campaign.treasury < WAREHOUSE_COST) return { ok: false, why: 'Not enough in the treasury.' };
+  campaign.treasury = round2(campaign.treasury - WAREHOUSE_COST);
+  ops.warehouses[cityId] = {
+    capacity: WAREHOUSE_BASE_CAPACITY,
+    stock: { lemons: 0, sugar: 0, cups: 0 },
+  };
+  return { ok: true };
+}
+
+function upgradeWarehouse(campaign, cityId) {
+  const w = campaign.ops.warehouses[cityId];
+  if (!w) return { ok: false, why: 'No depot here yet.' };
+  if (campaign.treasury < CAPACITY_UPGRADE_COST) return { ok: false, why: 'Not enough in the treasury.' };
+  campaign.treasury = round2(campaign.treasury - CAPACITY_UPGRADE_COST);
+  w.capacity += CAPACITY_UPGRADE_STEP;
+  return { ok: true };
+}
+
+function restock(campaign, cityId, order) {
+  const w = campaign.ops.warehouses[cityId];
+  if (!w) return { ok: false, why: 'No depot here yet.' };
+  const units = (order.lemons || 0) + (order.sugar || 0) + (order.cups || 0);
+  if (units <= 0) return { ok: false, why: 'Nothing ordered.' };
+  if (units > spaceLeft(w)) return { ok: false, why: 'The depot cannot hold that much.' };
+  const cost = restockCost(order);
+  if (cost > campaign.treasury) return { ok: false, why: 'Not enough in the treasury.' };
+  campaign.treasury = round2(campaign.treasury - cost);
+  for (const unit of ['lemons', 'sugar', 'cups']) w.stock[unit] += order[unit] || 0;
+  return { ok: true, cost };
+}
+
+function restockCost(order) {
+  const units = (order.lemons || 0) + (order.sugar || 0) + (order.cups || 0);
+  const discount = bulkDiscount(units); // the whole order counts toward the break
+  const raw =
+    WHOLESALE.lemons * (order.lemons || 0) +
+    WHOLESALE.sugar * (order.sugar || 0) +
+    WHOLESALE.cups * (order.cups || 0);
+  return Math.round(raw * discount * 100) / 100;
+}
+
+function hireStaff(campaign, cityId, cornerIndex) {
+  const ops = campaign.ops;
+  if (!claimedIn(campaign, cityId).includes(cornerIndex)) {
+    return { ok: false, why: 'You have not claimed that corner yet.' };
+  }
+  if (isStaffed(ops, cityId, cornerIndex)) return { ok: false, why: 'Already staffed.' };
+  if (!hasWarehouse(ops, cityId)) return { ok: false, why: 'Build a depot in this city first.' };
+  if (campaign.treasury < STAFF_HIRE_COST) return { ok: false, why: 'Not enough in the treasury.' };
+  campaign.treasury = round2(campaign.treasury - STAFF_HIRE_COST);
+  (ops.staffed[cityId] || (ops.staffed[cityId] = [])).push(cornerIndex);
+  ops.staffed[cityId].sort((a, b) => a - b);
+  return { ok: true };
+}
+
+function closeStand(campaign, cityId, cornerIndex) {
+  const list = staffedIn(campaign.ops, cityId);
+  const at = list.indexOf(cornerIndex);
+  if (at === -1) return { ok: false, why: 'That corner is not staffed.' };
+  list.splice(at, 1);
+  return { ok: true };
+}
+
+/** Build one of the four production buildings. One of each per city, at most. */
+function buildBuilding(campaign, cityId, buildingId) {
+  const ops = ensureOpsShape(campaign.ops);
+  const def = BUILDINGS[buildingId];
+  if (!def) return { ok: false, why: 'No such building.' };
+  if (!hasWarehouse(ops, cityId)) return { ok: false, why: 'Build a depot in this city first.' };
+  if (hasBuilding(ops, cityId, buildingId)) return { ok: false, why: 'Already built here.' };
+  if (campaign.treasury < def.cost) return { ok: false, why: 'Not enough in the treasury.' };
+  campaign.treasury = round2(campaign.treasury - def.cost);
+  const cityBuildings = ops.buildings[cityId] || (ops.buildings[cityId] = {});
+  cityBuildings[buildingId] = true;
+  return { ok: true };
+}
+
+/** Buy an unassigned truck. Give it a route with assignTruckRoute. */
+function buyTruck(campaign) {
+  const ops = ensureOpsShape(campaign.ops);
+  if (campaign.treasury < TRUCK_COST) return { ok: false, why: 'Not enough in the treasury.' };
+  campaign.treasury = round2(campaign.treasury - TRUCK_COST);
+  const id = ops.nextTruckId++;
+  ops.trucks.push({ id, from: null, to: null, cargo: 'lemons', amount: 100 });
+  return { ok: true, id };
+}
+
+/** Point a truck at a route: it hauls `amount` of `cargo` from one depot to another, every day. */
+function assignTruckRoute(campaign, truckId, { from, to, cargo, amount }) {
+  const ops = ensureOpsShape(campaign.ops);
+  const truck = ops.trucks.find((t) => t.id === truckId);
+  if (!truck) return { ok: false, why: 'No such truck.' };
+  if (!from || !to) return { ok: false, why: 'Pick both a pickup and a drop-off city.' };
+  if (from === to) return { ok: false, why: 'Pick two different cities.' };
+  if (!hasWarehouse(ops, from) || !hasWarehouse(ops, to)) return { ok: false, why: 'Both ends need a depot.' };
+  if (!TRUCK_CARGO.includes(cargo)) return { ok: false, why: 'Not a haulable good.' };
+  truck.from = from;
+  truck.to = to;
+  truck.cargo = cargo;
+  truck.amount = Math.max(1, Math.round(amount) || 0);
+  return { ok: true };
+}
+
+/** Parks a truck — it costs nothing and moves nothing until reassigned. */
+function unassignTruck(campaign, truckId) {
+  const ops = ensureOpsShape(campaign.ops);
+  const truck = ops.trucks.find((t) => t.id === truckId);
+  if (!truck) return { ok: false, why: 'No such truck.' };
+  truck.from = null;
+  truck.to = null;
+  return { ok: true };
+}
+
+/* ------------------------------------------------------------------ *
+ * Time
+ * ------------------------------------------------------------------ */
+
+const round2 = (n) => Math.round(n * 100) / 100;
+
+/**
+ * Advance the network by `days` (one per day you played by hand). Each day:
+ * farms and factories press their yield into the depot, trucks haul whatever
+ * is sitting there to wherever they are routed, and only then do staffed
+ * corners trade against what is left. Corners trade only as far as the depot
+ * can feed them; anything short goes on the alert list rather than silently
+ * vanishing.
+ */
+function tickOps(campaign, days) {
+  const ops = ensureOpsShape(campaign.ops);
+  if (!ops) return null;
+  const summary = {
+    days,
+    income: 0,
+    costs: 0,
+    cups: 0,
+    stockUsed: { lemons: 0, sugar: 0, cups: 0 },
+    produced: { lemons: 0, sugar: 0, cups: 0 },
+    trucked: 0,
+    dry: [],
+  };
+
+  for (let d = 0; d < days; d++) {
+    ops.day += 1;
+
+    // 1. Farms and the factory press their yield into the depot; the ice
+    //    maker instead banks a free daily allowance for the corners below.
+    const freeIce = {};
+    for (const cityData of CITIES) {
+      const cityId = cityData.id;
+      const built = buildingsIn(ops, cityId);
+      if (built.length === 0) continue;
+      const w = ops.warehouses[cityId];
+      let buildingCost = 0;
+      for (const id of built) {
+        const b = BUILDINGS[id];
+        buildingCost += b.upkeep;
+        if (id === 'iceMaker') freeIce[cityId] = (freeIce[cityId] || 0) + b.dailyYield;
+        else if (w) summary.produced[b.unit] += addStock(w, b.unit, b.dailyYield);
+      }
+      campaign.treasury = round2(campaign.treasury - buildingCost);
+      summary.costs += buildingCost;
+    }
+
+    // 2. Trucks haul cargo between depots before the day's trading starts.
+    for (const truck of ops.trucks) {
+      if (!truck.from || !truck.to) continue;
+      const src = ops.warehouses[truck.from];
+      const dst = ops.warehouses[truck.to];
+      if (!src || !dst) continue;
+      const moved = Math.min(truck.amount, src.stock[truck.cargo], spaceLeft(dst));
+      if (moved > 0) {
+        src.stock[truck.cargo] -= moved;
+        dst.stock[truck.cargo] += moved;
+        summary.trucked += moved;
+      }
+      campaign.treasury = round2(campaign.treasury - TRUCK_UPKEEP);
+      summary.costs += TRUCK_UPKEEP;
+    }
+
+    // 3. Staffed corners trade against whatever the depot now holds.
+    for (const cityData of CITIES) {
+      const cityId = cityData.id;
+      const staffed = staffedIn(ops, cityId);
+      if (staffed.length === 0) continue;
+      const w = ops.warehouses[cityId];
+      const rng = mulberry32(ops.day * 7717 + cityId.length * 131);
+      let cityFreeIce = freeIce[cityId] || 0;
+
+      let dayCosts = (hasWarehouse(ops, cityId) ? WAREHOUSE_UPKEEP : 0) + staffed.length * STAFF_WAGE;
+      let dayIncome = 0;
+      let served = 0;
+
+      for (const index of staffed) {
+        const look = cornerOutlook(cityId, index);
+        // A little day-to-day weather noise, so the network is not a metronome.
+        const swing = 0.8 + rng() * 0.45;
+        const wanted = Math.round(look.cups * swing);
+        const canPour = w
+          ? Math.min(
+              wanted,
+              w.stock.cups,
+              Math.floor(w.stock.lemons * 2),
+              Math.floor(w.stock.sugar * 2)
+            )
+          : 0;
+        if (canPour < wanted) summary.dry.push(cityId);
+
+        const lemonsUsed = Math.ceil(canPour / 2);
+        const sugarUsed = Math.ceil(canPour / 2);
+        if (w) {
+          w.stock.cups -= canPour;
+          w.stock.lemons = Math.max(0, w.stock.lemons - lemonsUsed);
+          w.stock.sugar = Math.max(0, w.stock.sugar - sugarUsed);
+        }
+        summary.stockUsed.lemons += lemonsUsed;
+        summary.stockUsed.sugar += sugarUsed;
+        summary.stockUsed.cups += canPour;
+
+        const share = look.cups > 0 ? canPour / look.cups : 0;
+        const iceNeeded = look.iceUnits * share;
+        const fromFree = Math.min(cityFreeIce, iceNeeded);
+        cityFreeIce -= fromFree;
+        const paidIce = Math.round((iceNeeded - fromFree) * look.icePriceEach * 100) / 100;
+
+        dayIncome += look.price * canPour;
+        dayCosts += paidIce + look.rent;
+        served += canPour;
+      }
+
+      summary.income += dayIncome;
+      summary.costs += dayCosts;
+      summary.cups += served;
+      campaign.treasury = round2(campaign.treasury + dayIncome - dayCosts);
+    }
+  }
+
+  summary.income = round2(summary.income);
+  summary.costs = round2(summary.costs);
+  summary.net = round2(summary.income - summary.costs);
+  ops.totals.income = round2(ops.totals.income + summary.income);
+  ops.totals.costs = round2(ops.totals.costs + summary.costs);
+  ops.totals.cups += summary.cups;
+
+  summary.dry = [...new Set(summary.dry)];
+  ops.alerts = summary.dry.map((cityId) => ({
+    cityId,
+    text: `${getCity(cityId).name} ran short — corners stood idle.`,
+  }));
+  ops.ledger.unshift({ day: ops.day, net: summary.net, cups: summary.cups });
+  ops.ledger = ops.ledger.slice(0, 30);
+  return summary;
+}
+
+  return { bulkDiscount, wholesaleCost, newOps, stockTotal, spaceLeft, cornerOutlook, cityOutlook, daysOfStock, networkOutlook, buyWarehouse, upgradeWarehouse, restock, restockCost, hireStaff, closeStand, buildBuilding, buyTruck, assignTruckRoute, unassignTruck, tickOps, WAREHOUSE_COST, WAREHOUSE_BASE_CAPACITY, CAPACITY_UPGRADE_COST, CAPACITY_UPGRADE_STEP, STAFF_HIRE_COST, STAFF_WAGE, WAREHOUSE_UPKEEP, WHOLESALE, BUILDINGS, TRUCK_COST, TRUCK_UPKEEP, TRUCK_CARGO, hasWarehouse, staffedIn, isStaffed, buildingsIn, hasBuilding };
+})();
+
+/* ---- js/achievements.js ---- */
+__modules["achievements"] = (function () {
+/**
+ * Achievements — a catalog of concrete, checkable accomplishments, plus the
+ * pure logic that decides which ones just became true.
+ *
+ * No storage here. store.js persists which ids are unlocked and gathers the
+ * numbers below from live game state; this file only knows the rules, so it
+ * can be tested the same way as everything else in this codebase.
+ */
+
+const ACHIEVEMENTS = {
+  firstCup:      { icon: '🍋', title: 'First Cup',        desc: 'Sell your very first cup of lemonade.' },
+  soldOut:       { icon: '🎉', title: 'Sold Out',         desc: 'Sell out of stock before the day is over.' },
+  perfectPour:   { icon: '✨', title: 'Perfect Pour',      desc: 'Pour a recipe at 98%+ quality.' },
+  centuryDay:    { icon: '💯', title: 'Century Day',      desc: 'Sell 100 cups in a single day.' },
+  firstCorner:   { icon: '🏅', title: 'Staked a Claim',   desc: 'Claim your first street corner.' },
+  homeTown:      { icon: '🏙️', title: 'Home Town Hero',   desc: 'Take an entire city — all of its corners.' },
+  globetrotter:  { icon: '🌍', title: 'Globetrotter',     desc: 'Claim a corner on two different continents.' },
+  fiveCities:    { icon: '🏭', title: 'Going Global',     desc: 'Take five cities and unlock Operations.' },
+  industrialist: { icon: '🚜', title: 'Industrialist',    desc: 'Build every farm and factory in one city.' },
+  trucker:       { icon: '🚚', title: 'On the Road',      desc: 'Buy your first delivery truck.' },
+  fullMenu:      { icon: '🧃', title: 'Full Menu',        desc: 'Offer all four enhancers at once.' },
+  wasteNot:      { icon: '🍋', title: 'Waste Not',        desc: 'Finish a corner without a single lemon spoiling.' },
+  tycoon:        { icon: '👑', title: 'Tycoon',           desc: 'Bank $1,000 in cash.' },
+  dedicated:     { icon: '📅', title: 'Dedicated',        desc: 'Play 50 days total, across every corner.' },
+};
+
+/**
+ * `ctx` is a grab-bag of the numbers achievements care about — every field
+ * is optional, callers pass whatever they actually have on hand. Conditions
+ * are checked against live state rather than one-time events, so calling
+ * this repeatedly is always safe: an id only ever unlocks once.
+ */
+function evaluateAchievements(ctx, unlocked) {
+  const newly = [];
+  const check = (id, condition) => {
+    if (condition && !unlocked[id]) newly.push(id);
+  };
+
+  check('firstCup', (ctx.cupsSoldEver || 0) >= 1);
+  check('soldOut', !!ctx.soldOutToday);
+  check('perfectPour', (ctx.bestQualityToday || 0) >= 0.98);
+  check('centuryDay', (ctx.cupsToday || 0) >= 100);
+  check('firstCorner', (ctx.cornersClaimed || 0) >= 1);
+  check('homeTown', (ctx.citiesClaimed || 0) >= 1);
+  check('globetrotter', !!ctx.hasUSCorner && !!ctx.hasEUCorner);
+  check('fiveCities', (ctx.citiesClaimed || 0) >= 5);
+  check('industrialist', !!ctx.allBuildingsInOneCity);
+  check('trucker', !!ctx.trucksBought);
+  check('fullMenu', (ctx.enhancersOfferedTogether || 0) >= 4);
+  check('wasteNot', !!ctx.cleanRunFinished);
+  check('tycoon', (ctx.peakMoney || 0) >= 1000);
+  check('dedicated', (ctx.daysPlayed || 0) >= 50);
+
+  return newly;
+}
+
+  return { evaluateAchievements, ACHIEVEMENTS };
+})();
+
+/* ---- js/store.js ---- */
+__modules["store"] = (function () {
+/**
+ * Shared game state and the save file.
+ *
+ * `campaign` is the long game (cities, corners, treasury, supply chain).
+ * `run` is the stretch of days currently being played on one corner.
+ * `ui` is throwaway view state — which screen, the basket being filled in.
+ */
+const { ENHANCERS } = __modules["sim"];
+const { getCity, completedCities } = __modules["campaign"];
+const { ACHIEVEMENTS, evaluateAchievements } = __modules["achievements"];
+
+const SAVE_KEY = 'lemonade-stand-campaign-v2';
+const BEST_KEY = 'lemonade-stand-best-v1';
+const PREMIUM_KEY = 'lemonade-stand-premium-v1';
+const STATS_KEY = 'lemonade-stand-stats-v1';
+const ACHIEVEMENTS_KEY = 'lemonade-stand-achievements-v1';
+const TUTORIAL_KEY = 'lemonade-stand-tutorial-seen-v1';
+
+const zeroedEnhancers = () => Object.fromEntries(Object.keys(ENHANCERS).map((id) => [id, 0]));
+
+const store = {
+  campaign: null,
+  run: null,
+  ui: {
+    view: 'title',      // title | world | city | corner | run | ops | opsCity | help
+    cityId: null,
+    cornerIndex: null,
+    order: { lemons: 0, sugar: 0, ice: 0, cups: 0, enhancers: zeroedEnhancers() },
+    restock: { lemons: 0, sugar: 0, cups: 0 },
+    pending: null,      // simulated day awaiting its report
+    opsReport: null,    // what the network did while you were working
+    editingTruck: null, // id of the truck whose route is being set, or null
+    truckDraft: null,   // { from, to, cargo, amount } while editingTruck is set
+    showPremium: false,      // the never-expire paywall screen, shown over whatever's current
+    showAchievements: false, // the achievements list, shown over whatever's current
+    showTutorial: false,     // the first-time welcome sequence
+    tutorialStep: 0,
+    lastKey: null,
+    notice: null,
+  },
+};
+
+let renderFn = () => {};
+const onRender = (fn) => { renderFn = fn; };
+const render = () => renderFn();
+
+function save() {
+  if (!store.campaign) return;
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      version: 2,
+      campaign: store.campaign,
+      run: store.run,
+      view: store.ui.view === 'help' ? 'world' : store.ui.view,
+      cityId: store.ui.cityId,
+      cornerIndex: store.ui.cornerIndex,
+    }));
+  } catch {
+    /* private mode or a full quota: the game still plays, it just won't resume */
+  }
+}
+
+function loadSave() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    return data?.version === 2 && data.campaign ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearSave() {
+  try { localStorage.removeItem(SAVE_KEY); } catch { /* ignore */ }
+}
+
+function bestScore() {
+  const n = Number(localStorage.getItem(BEST_KEY));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function recordBest(amount) {
+  try {
+    if (amount > bestScore()) localStorage.setItem(BEST_KEY, String(amount));
+  } catch { /* ignore */ }
+}
+
+/* ------------------------------------------------------------------ *
+ * Premium unlocks
+ *
+ * There is no payment processor wired into this game — it's a static page
+ * with no server. This is the hook a real one would plug into: the paywall
+ * screen is real and the mechanic it unlocks is real, but the "purchase"
+ * button here just flips a local flag rather than charging anyone. Shipping
+ * this for real would mean wiring it to App Store / Play Store IAP, or
+ * Stripe for a web build, behind this exact same call.
+ * ------------------------------------------------------------------ */
+
+function loadPremium() {
+  try {
+    return JSON.parse(localStorage.getItem(PREMIUM_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function isPremiumUnlocked(flag) {
+  return Boolean(loadPremium()[flag]);
+}
+
+/** Flips the flag locally. Not a real purchase — see the note above. */
+function unlockPremiumDemo(flag) {
+  try {
+    const current = loadPremium();
+    current[flag] = true;
+    localStorage.setItem(PREMIUM_KEY, JSON.stringify(current));
+  } catch {
+    /* private mode or a full quota — the unlock just won't stick around */
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Tutorial
+ * ------------------------------------------------------------------ */
+
+function hasTutorialBeenSeen() {
+  try {
+    return localStorage.getItem(TUTORIAL_KEY) === '1';
+  } catch {
+    return true; // if storage is unavailable, don't force it on every load
+  }
+}
+
+function markTutorialSeen() {
+  try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch { /* ignore */ }
+}
+
+/* ------------------------------------------------------------------ *
+ * Lifetime stats and achievements
+ *
+ * A handful of numbers persist across every campaign and every free-play
+ * season — total cups sold, total days played, the most cash ever held —
+ * since a fresh campaign or a cleared save shouldn't erase what you've
+ * actually accomplished. Everything else an achievement needs (corners,
+ * cities, buildings, trucks) is read fresh from the current campaign, so
+ * there's nothing to keep in sync by hand.
+ * ------------------------------------------------------------------ */
+
+function loadStats() {
+  try {
+    return { cupsSoldEver: 0, daysPlayed: 0, peakCash: 0, ...(JSON.parse(localStorage.getItem(STATS_KEY)) || {}) };
+  } catch {
+    return { cupsSoldEver: 0, daysPlayed: 0, peakCash: 0 };
+  }
+}
+
+function saveStats(stats) {
+  try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); } catch { /* ignore */ }
+}
+
+/** Call once per day committed, in any run — campaign or free play. */
+function recordDay(result, cashNow) {
+  const stats = loadStats();
+  stats.cupsSoldEver += result.sold;
+  stats.daysPlayed += 1;
+  stats.peakCash = Math.max(stats.peakCash, cashNow || 0);
+  saveStats(stats);
+}
+
+function loadUnlockedAchievements() {
+  try {
+    return JSON.parse(localStorage.getItem(ACHIEVEMENTS_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveUnlockedAchievements(map) {
+  try { localStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(map)); } catch { /* ignore */ }
+}
+
+/**
+ * Re-checks every achievement against the current state of the world.
+ * `extra` carries the handful of facts that only exist for a moment — how a
+ * day just went, whether a run just finished clean — everything else is
+ * read fresh from the campaign so calling this after any state change is
+ * always safe. Returns the ids that newly unlocked, for a toast.
+ */
+function checkAchievements(extra = {}) {
+  const stats = loadStats();
+  const campaign = store.campaign;
+  const claimed = campaign?.claimed || {};
+  const cornersClaimed = Object.values(claimed).reduce((n, list) => n + list.length, 0);
+  const claimedCityIds = Object.keys(claimed).filter((id) => (claimed[id] || []).length > 0);
+  const regions = claimedCityIds.map((id) => getCity(id).region);
+  const buildings = campaign?.ops?.buildings || {};
+  const allBuildingsInOneCity = Object.values(buildings).some((b) => Object.values(b).filter(Boolean).length >= 4);
+  const currentCash = store.run ? store.run.money : (campaign?.treasury || 0);
+
+  const ctx = {
+    cupsSoldEver: stats.cupsSoldEver,
+    daysPlayed: stats.daysPlayed,
+    peakMoney: Math.max(stats.peakCash, currentCash),
+    cornersClaimed,
+    citiesClaimed: campaign ? completedCities(campaign).length : 0,
+    hasUSCorner: regions.includes('US'),
+    hasEUCorner: regions.includes('EU'),
+    allBuildingsInOneCity,
+    trucksBought: (campaign?.ops?.trucks?.length || 0) >= 1,
+    ...extra,
+  };
+
+  const unlocked = loadUnlockedAchievements();
+  const newly = evaluateAchievements(ctx, unlocked);
+  if (newly.length) {
+    const now = Date.now();
+    for (const id of newly) unlocked[id] = { at: now };
+    saveUnlockedAchievements(unlocked);
+  }
+  return newly;
+}
+
+/** A one-line notice for whatever checkAchievements() just returned, or null. */
+function achievementToast(newlyUnlockedIds) {
+  if (!newlyUnlockedIds || newlyUnlockedIds.length === 0) return null;
+  if (newlyUnlockedIds.length === 1) {
+    return `🏅 Achievement unlocked: ${ACHIEVEMENTS[newlyUnlockedIds[0]].title}!`;
+  }
+  return `🏅 ${newlyUnlockedIds.length} achievements unlocked: ${newlyUnlockedIds.map((id) => ACHIEVEMENTS[id].title).join(', ')}!`;
+}
+
+  return { save, loadSave, clearSave, bestScore, recordBest, isPremiumUnlocked, unlockPremiumDemo, hasTutorialBeenSeen, markTutorialSeen, recordDay, loadUnlockedAchievements, checkAchievements, achievementToast, store, onRender, render };
+})();
+
+/* ---- js/ui/kit.js ---- */
+__modules["ui/kit"] = (function () {
+/** Small rendering helpers shared by every screen. */
+const { TIERS } = __modules["campaign"];
+
+const money = (n) => `${n < 0 ? '-' : ''}$${Math.abs(n).toFixed(2)}`;
+const whole = (n) => `${n < 0 ? '-' : ''}$${Math.abs(Math.round(n))}`;
+const cents = (n) => `${Math.round(n * 100)}¢`;
+
+function fact(label, value, cls = '') {
+  return `<div class="fact"><div class="fact-label">${label}</div><div class="fact-value ${cls}">${value}</div></div>`;
+}
+
+function tierPill(tier) {
+  const t = TIERS[tier];
+  return `<span class="pill pill-${tier}">${t.icon} ${t.label}</span>`;
+}
+
+function bar(fraction, cls = '') {
+  const pct = Math.max(0, Math.min(1, fraction)) * 100;
+  return `<span class="bar ${cls}"><i style="width:${pct.toFixed(1)}%"></i></span>`;
+}
+
+/**
+ * A plus/minus control. `group` and `field` route the tap back to a handler;
+ * every screen re-renders on change, so the buttons are always in step.
+ */
+function stepper(group, field, value, step, min, max, display) {
+  const shown = display ?? value;
+  return `
+    <div class="stepper">
+      <button data-act="step" data-group="${group}" data-field="${field}" data-step="${-step}"
+              ${value <= min ? 'disabled' : ''} aria-label="Less ${field}">−</button>
+      <output>${shown}</output>
+      <button data-act="step" data-group="${group}" data-field="${field}" data-step="${step}"
+              ${value >= max ? 'disabled' : ''} aria-label="More ${field}">+</button>
+    </div>`;
+}
+
+function row(name, sub, control) {
+  return `
+    <div class="row">
+      <div class="row-main">
+        <div class="row-name">${name}</div>
+        ${sub ? `<div class="row-sub">${sub}</div>` : ''}
+      </div>
+      ${control || ''}
+    </div>`;
+}
+
+function backBar(label, act, extra = '') {
+  return `<button class="crumb" data-act="${act}" ${extra}>‹ ${label}</button>`;
+}
+
+  return { fact, tierPill, bar, stepper, row, backBar, money, whole, cents };
+})();
+
+/* ---- js/ui/map.js ---- */
+__modules["ui/map"] = (function () {
+/** Title, world map, city map and the corner briefing. */
+const C = __modules["campaign"];
+const S = __modules["sim"];
+const { opsUnlocked } = __modules["campaign"];
+const { restockCost } = __modules["ops"];
+const { store, save, loadSave, clearSave, bestScore, loadUnlockedAchievements } = __modules["store"];
+const { ACHIEVEMENTS } = __modules["achievements"];
+const { money, whole, fact, tierPill, bar, backBar } = __modules["ui/kit"];
+
+/* ------------------------------------------------------------------ *
+ * Title
+ * ------------------------------------------------------------------ */
+
+function titleScreen() {
+  const saved = loadSave();
+  const progress = saved ? C.campaignProgress(saved.campaign) : null;
+  const best = bestScore();
+  const achievementCount = Object.keys(loadUnlockedAchievements()).length;
+  const achievementTotal = Object.keys(ACHIEVEMENTS).length;
+  return {
+    body: `
+      <div class="title-art">🍋</div>
+      <div class="center">
+        <h1>Lemonade Stand</h1>
+        <p class="muted">${C.CITIES.length} cities. ${C.CORNERS_PER_CITY} corners apiece.<br />
+        Start on one street corner and take the whole map.</p>
+        ${progress ? `<p class="muted">Season so far: <strong>${progress.corners}</strong> corners,
+          <strong>${progress.cities}</strong> cit${progress.cities === 1 ? 'y' : 'ies'} taken ·
+          <strong>${whole(saved.campaign.treasury)}</strong> banked</p>` : ''}
+        ${best && !progress ? `<p class="muted">Best free season: <strong>${money(best)}</strong></p>` : ''}
+        <div class="chip-row" style="justify-content:center;margin-top:16px">
+          <button class="chip" data-act="start-tutorial">🎓 Tutorial</button>
+          <button class="chip" data-act="open-achievements">🏅 Achievements · ${achievementCount}/${achievementTotal}</button>
+        </div>
+      </div>`,
+    actions: `
+      ${saved ? '<button class="btn" data-act="continue">Continue</button>' : ''}
+      <button class="${saved ? 'btn-ghost' : 'btn'}" data-act="new-campaign">
+        ${saved ? 'New Campaign' : 'Start Campaign'}
+      </button>
+      <button class="btn-ghost" data-act="free-play">Free Play · 30 Days</button>
+      <button class="btn-ghost" data-act="help">How to Play</button>`,
+  };
+}
+
+function helpScreen() {
+  return {
+    body: `
+      <h1>How to Play</h1>
+      <div class="card">
+        <h2>A day at the stand</h2>
+        <p>Read the forecast, buy supplies, mix a pitcher, set a price, then open up. One pitcher pours ${S.CUPS_PER_PITCHER} cups.</p>
+      </div>
+      <div class="card">
+        <h2>What matters</h2>
+        <p><strong>Heat sells.</strong> A scorcher brings crowds and loosens wallets. Rain empties the street.</p>
+        <p><strong>Taste is a secret recipe.</strong> One balance of lemons and sugar wins people over — customers only tell you when it is off. Hotter days want more ice.</p>
+        <p><strong>Price is a trade.</strong> Charge more and fewer people buy. Reputation grows when the glass was worth the money.</p>
+        <p><strong>Ice melts overnight.</strong> Lemons, sugar and cups keep. Ice does not.</p>
+      </div>
+      <div class="card">
+        <h2>Taking the map</h2>
+        <p>Each corner sets a profit target over a handful of days. Clear it and the corner is yours, and the next one opens.</p>
+        <p>Corners run through four tiers — ${Object.values(C.TIERS).map((t) => `${t.icon} ${t.label}`).join(', ')}.
+        Every target is measured against what near-perfect play earns on that exact corner, so a hard city is never an unfair one.</p>
+        <p>Claim all ${C.CORNERS_PER_CITY} corners to take a city. Finish ${C.CITIES_FOR_OPS} cities and you can start running
+        depots, buying wholesale and staffing corners so they trade while you work.</p>
+      </div>`,
+    actions: `<button class="btn" data-act="back-from-help">Back</button>`,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * World
+ * ------------------------------------------------------------------ */
+
+function worldScreen() {
+  const campaign = store.campaign;
+  const progress = C.campaignProgress(campaign);
+  const rows = C.CITIES.map((city, i) => {
+    const claimed = C.claimedIn(campaign, city.id).length;
+    const unlocked = C.isCityUnlocked(campaign, city.id);
+    const done = C.cityDone(campaign, city.id);
+    if (!unlocked) {
+      return `<div class="city locked">
+          <div class="city-flag">🔒</div>
+          <div class="city-main">
+            <div class="city-name">${city.name}</div>
+            <div class="row-sub">Take ${i - progress.cities} more cit${i - progress.cities === 1 ? 'y' : 'ies'} to unlock</div>
+          </div>
+        </div>`;
+    }
+    return `<button class="city ${done ? 'done' : ''}" data-act="open-city" data-city="${city.id}">
+        <div class="city-flag">${city.flag}</div>
+        <div class="city-main">
+          <div class="city-name">${city.name} ${done ? '<span class="tick">✓</span>' : ''}</div>
+          <div class="row-sub">${city.challenge.name}</div>
+          ${bar(claimed / C.CORNERS_PER_CITY)}
+        </div>
+        <div class="city-count">${claimed}<small>/${C.CORNERS_PER_CITY}</small></div>
+      </button>`;
+  }).join('');
+
+  return {
+    body: `
+      <h1>The Map</h1>
+      <p class="muted">${progress.corners} of ${progress.totalCorners} corners claimed.
+        ${progress.cities > 0 ? `${progress.cities} cit${progress.cities === 1 ? 'y' : 'ies'} taken.` : 'Take a city by claiming all 25 of its corners.'}</p>
+      ${store.ui.opsReport ? opsReportCard(store.ui.opsReport) : ''}
+      <div class="city-list">${rows}</div>`,
+    actions: `
+      ${opsUnlocked(campaign)
+        ? '<button class="btn" data-act="open-ops">🏭 Operations</button>'
+        : `<div class="locked-note">🏭 Operations unlock after ${C.CITIES_FOR_OPS} cities (${C.completedCities(campaign).length}/${C.CITIES_FOR_OPS})</div>`}
+      <button class="btn-ghost" data-act="to-title">Menu</button>`,
+  };
+}
+
+function opsReportCard(report) {
+  const used = report.stockUsed || { lemons: 0, sugar: 0, cups: 0 };
+  const units = used.lemons + used.sugar + used.cups;
+  return `
+    <div class="card ops-report">
+      <h2>While you were working</h2>
+      <p>Your network traded for ${report.days} day${report.days === 1 ? '' : 's'}:
+        <strong class="${report.net >= 0 ? 'good' : 'bad'}">${money(report.net)}</strong>
+        into the treasury from ${report.cups} cups.</p>
+      ${units > 0
+        ? `<p class="muted">It drew ${units} units out of your depots — about ${money(restockCost(used))} to replace.</p>`
+        : ''}
+      ${report.produced && (report.produced.lemons + report.produced.sugar + report.produced.cups) > 0
+        ? `<p class="muted">Farms and the factory pressed ${report.produced.lemons + report.produced.sugar + report.produced.cups} units straight into the depots, for free.</p>`
+        : ''}
+      ${report.trucked > 0 ? `<p class="muted">Trucks hauled ${report.trucked} units between depots.</p>` : ''}
+      ${report.dry.length ? `<p class="warn">⚠️ Ran short in ${report.dry.map((id) => C.getCity(id).name).join(', ')}.</p>` : ''}
+    </div>`;
+}
+
+/* ------------------------------------------------------------------ *
+ * City
+ * ------------------------------------------------------------------ */
+
+function cityScreen() {
+  const campaign = store.campaign;
+  const city = C.getCity(store.ui.cityId);
+  const corners = C.cornersFor(city.id);
+  const claimed = C.claimedIn(campaign, city.id);
+
+  const list = corners.map((corner, i) => {
+    const isClaimed = claimed.includes(i);
+    const unlocked = C.isCornerUnlocked(campaign, city.id, i);
+    const target = unlocked || isClaimed ? C.targetFor(campaign, city.id, i) : null;
+    const cls = isClaimed ? 'claimed' : unlocked ? 'open' : 'locked';
+    return `<button class="corner ${cls}" ${unlocked && !isClaimed ? `data-act="open-corner" data-index="${i}"` : 'disabled'}>
+        <div class="corner-no">${isClaimed ? '✓' : unlocked ? i + 1 : '🔒'}</div>
+        <div class="corner-main">
+          <div class="corner-name">${unlocked || isClaimed ? corner.name : '???'}</div>
+          <div class="row-sub">${tierPill(corner.tier)}${corner.quirk && (unlocked || isClaimed) ? ` · ${corner.quirk}` : ''}</div>
+        </div>
+        ${target != null ? `<div class="corner-target">${whole(target)}<small>target</small></div>` : ''}
+      </button>`;
+  }).join('');
+
+  return {
+    body: `
+      ${backBar('The Map', 'to-world')}
+      <div class="head-row">
+        <h1>${city.flag} ${city.name}</h1>
+        <div class="treasury">${claimed.length}<small>/${C.CORNERS_PER_CITY}</small></div>
+      </div>
+      <div class="card challenge">
+        <h2>${city.challenge.name}</h2>
+        <p>${city.challenge.blurb}</p>
+      </div>
+      <div class="corner-list">${list}</div>`,
+    actions: C.cityDone(campaign, city.id)
+      ? `<div class="locked-note">✓ ${city.name} is yours — every corner claimed.</div>
+         <button class="btn" data-act="to-world">Back to the Map</button>`
+      : `<button class="btn" data-act="open-next">Next Corner</button>`,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Corner briefing
+ * ------------------------------------------------------------------ */
+
+function cornerScreen() {
+  const campaign = store.campaign;
+  const { cityId, cornerIndex } = store.ui;
+  const city = C.getCity(cityId);
+  const corner = C.cornersFor(cityId)[cornerIndex];
+  const tier = C.TIERS[corner.tier];
+  const config = C.runConfigFor(cityId, cornerIndex);
+  const target = C.targetFor(campaign, cityId, cornerIndex);
+  const notes = C.describeMods(config.mods);
+
+  return {
+    body: `
+      ${backBar(city.name, 'to-city')}
+      <h1>${corner.name}</h1>
+      <p class="muted">${city.flag} ${city.name} · corner ${cornerIndex + 1} of ${C.CORNERS_PER_CITY}
+        ${corner.quirk ? `· ${corner.quirk}` : ''}</p>
+      <div class="card">
+        <div class="head-row" style="margin-bottom:12px">
+          ${tierPill(corner.tier)}
+          <span class="muted">${tier.blurb}</span>
+        </div>
+        <div class="facts">
+          ${fact('You start with', money(tier.stake))}
+          ${fact('Days to trade', tier.days)}
+          ${fact('Profit needed', whole(target), 'good')}
+          ${fact('On a retry', 'same weather')}
+        </div>
+      </div>
+      <div class="card">
+        <h2>What you are walking into</h2>
+        <ul class="notes">
+          ${notes.map((n) => `<li>${n.icon} ${n.text}</li>`).join('') || '<li>An ordinary corner. No excuses.</li>'}
+        </ul>
+      </div>`,
+    actions: `
+      <button class="btn" data-act="start-run">Set Up Here</button>
+      <button class="btn-ghost" data-act="to-city">Pick Another Corner</button>`,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Actions
+ * ------------------------------------------------------------------ */
+
+const screens = {
+  title: titleScreen,
+  help: helpScreen,
+  world: worldScreen,
+  city: cityScreen,
+  corner: cornerScreen,
+};
+
+const actions = {
+  'new-campaign': () => {
+    clearSave();
+    store.campaign = C.newCampaign();
+    store.run = null;
+    store.ui.opsReport = null;
+    store.ui.view = 'world';
+  },
+  continue: () => {
+    const saved = loadSave();
+    if (!saved) return;
+    store.campaign = saved.campaign;
+    store.run = saved.run;
+    store.ui.cityId = saved.cityId;
+    store.ui.cornerIndex = saved.cornerIndex;
+    store.ui.view = saved.run ? 'run' : saved.view || 'world';
+  },
+  help: () => { store.ui.view = 'help'; },
+  'back-from-help': () => { store.ui.view = store.campaign ? 'world' : 'title'; },
+  'to-title': () => { save(); store.ui.view = 'title'; },
+  'to-world': () => { store.ui.view = 'world'; },
+  'to-city': () => { store.ui.view = 'city'; },
+  'open-city': (el) => {
+    store.ui.cityId = el.dataset.city;
+    store.ui.view = 'city';
+    store.ui.opsReport = null;
+  },
+  'open-corner': (el) => {
+    store.ui.cornerIndex = Number(el.dataset.index);
+    store.ui.view = 'corner';
+  },
+  'open-next': () => {
+    const next = C.nextCorner(store.campaign, store.ui.cityId);
+    if (next == null) return;
+    store.ui.cornerIndex = next;
+    store.ui.view = 'corner';
+  },
+};
+
+  return { screens, actions };
+})();
+
+/* ---- js/ui/run.js ---- */
+__modules["ui/run"] = (function () {
+/** The day loop: forecast, supplies, the stand, opening up, and the report. */
+const S = __modules["sim"];
+const C = __modules["campaign"];
+const { tickOps, newOps } = __modules["ops"];
+const { store, render, recordBest, isPremiumUnlocked, recordDay, checkAchievements, achievementToast } = __modules["store"];
+const { money, whole, cents, fact, stepper, row, tierPill } = __modules["ui/kit"];
+
+const zeroedEnhancers = () => Object.fromEntries(Object.keys(S.ENHANCERS).map((id) => [id, 0]));
+
+const run = () => store.run;
+
+/* ------------------------------------------------------------------ *
+ * Screens
+ * ------------------------------------------------------------------ */
+
+function forecastScreen() {
+  const r = run();
+  const w = S.WEATHER[r.today.weather];
+  const yesterday = r.history[r.history.length - 1];
+  return {
+    body: `
+      <h1>Day ${r.day} <span class="of">of ${r.days}</span></h1>
+      <div class="card">
+        <div class="weather">
+          <div class="weather-icon">${w.icon}</div>
+          <div class="weather-main">
+            <div class="weather-temp">${r.today.temp}°F</div>
+            <div class="weather-label">${w.label}</div>
+          </div>
+        </div>
+        ${r.today.event ? `<div class="headline">📣 ${r.today.event.text}</div>` : ''}
+      </div>
+      <div class="card">
+        <h2>In the cooler</h2>
+        <div class="facts">
+          ${fact('Lemons', r.inventory.lemons)}
+          ${fact('Sugar', r.inventory.sugar)}
+          ${fact('Ice', `${r.inventory.ice} 🧊`)}
+          ${fact('Cups', r.inventory.cups)}
+        </div>
+        ${lemonFreshnessNote(r)}
+        ${yesterday?.melted > 0
+          ? `<p class="muted" style="margin-top:6px">${yesterday.melted} ice cube${yesterday.melted === 1 ? '' : 's'} melted overnight.</p>`
+          : ''}
+        ${yesterday?.spoiledLemons > 0
+          ? `<p class="warn" style="margin-top:6px">${yesterday.spoiledLemons} lemon${yesterday.spoiledLemons === 1 ? '' : 's'} went bad overnight — a week in the cooler is all they get.</p>`
+          : ''}
+      </div>
+      ${yesterday ? `<p class="muted center">Yesterday you sold ${yesterday.sold} cup${yesterday.sold === 1 ? '' : 's'} for ${money(yesterday.revenue)}.</p>` : ''}`,
+    actions: `
+      <button class="btn" data-act="to-buy">Go Shopping</button>
+      <button class="btn-ghost" data-act="quit-run">${r.corner ? 'Give Up On This Corner' : 'Menu'}</button>`,
+  };
+}
+
+/** A quiet reminder near the lemons that the clock is running, unless it isn't. */
+function lemonFreshnessNote(r) {
+  if (r.premium?.neverExpireLemons) {
+    return r.inventory.lemons > 0
+      ? '<p class="muted good" style="margin-top:6px">✓ Never-expiring lemons — nothing in this cooler goes bad.</p>'
+      : '';
+  }
+  const daysLeft = S.daysUntilLemonsSpoil(r);
+  if (daysLeft == null) return '';
+  if (daysLeft <= 3) {
+    return `<p class="warn" style="margin-top:6px">Your oldest lemons spoil in ${daysLeft} day${daysLeft === 1 ? '' : 's'}.
+      <button class="link-btn" data-act="open-premium">Never let that happen →</button></p>`;
+  }
+  return `<p class="muted" style="margin-top:6px">Oldest lemons are good for ${daysLeft} more day${daysLeft === 1 ? '' : 's'}.</p>`;
+}
+
+function buyScreen() {
+  const r = run();
+  const p = r.today.prices;
+  const o = store.ui.order;
+  const baseCost = S.buyCost(p, o);
+  const enhCost = S.enhancerOrderCost(o.enhancers);
+  const cost = Math.round((baseCost + enhCost) * 100) / 100;
+  const left = r.money - cost;
+  const after = {
+    lemons: r.inventory.lemons + o.lemons,
+    sugar: r.inventory.sugar + o.sugar,
+    ice: r.inventory.ice + o.ice,
+    cups: r.inventory.cups + o.cups,
+  };
+  const pourable = S.maxCupsAvailable(after, r.recipe);
+  const line = (key, name, unit, step) =>
+    row(name, `${cents(p[unit])} each · cooler: ${after[key]}`,
+        stepper('order', key, o[key], step, 0, 9999));
+
+  const lemonSub = r.premium?.neverExpireLemons
+    ? `${cents(p.lemon)} each · cooler: ${after.lemons} · never expires`
+    : `${cents(p.lemon)} each · cooler: ${after.lemons} · good for ${S.LEMON_SHELF_LIFE_DAYS} days`;
+
+  const enhancerRows = Object.values(S.ENHANCERS).map((enh) => {
+    const held = r.inventory.enhancers?.[enh.id] || 0;
+    return row(`${enh.icon} ${enh.label}`, `${cents(enh.unitCost)} each to stock · adds ${money(enh.addPrice)} to the cup · cooler: ${held + (o.enhancers[enh.id] || 0)}`,
+      stepper('enhancerOrder', enh.id, o.enhancers[enh.id] || 0, 10, 0, 999));
+  }).join('');
+
+  return {
+    body: `
+      <h1>Supplies</h1>
+      <p class="muted">Prices move a little every day. Buy for the weather you are expecting.</p>
+      <div class="card">
+        ${row('Lemons 🍋', lemonSub, stepper('order', 'lemons', o.lemons, 5, 0, 9999))}
+        ${line('sugar', 'Sugar 🥄', 'sugar', 5)}
+        ${line('ice', 'Ice cubes 🧊', 'ice', 25)}
+        ${line('cups', 'Paper cups 🥤', 'cup', 10)}
+        <div class="total">
+          <span>Total</span>
+          <span class="${cost > r.money ? 'over' : ''}">${money(cost)}</span>
+        </div>
+        <div class="total subtotal">
+          <span class="muted">Cash left</span>
+          <span class="muted ${left < 0 ? 'over' : ''}">${money(left)}</span>
+        </div>
+        ${!r.premium?.neverExpireLemons
+          ? `<p class="muted" style="margin-top:10px">Lemons spoil after ${S.LEMON_SHELF_LIFE_DAYS} days in the cooler.
+             <button class="link-btn" data-act="open-premium">Never let that happen →</button></p>`
+          : ''}
+      </div>
+      <div class="card">
+        <h2>Quick stock-up</h2>
+        <div class="chip-row">
+          <button class="chip" data-act="preset" data-cups="25">25 cups</button>
+          <button class="chip" data-act="preset" data-cups="50">50 cups</button>
+          <button class="chip" data-act="preset" data-cups="100">100 cups</button>
+          <button class="chip" data-act="clear-order">Clear</button>
+        </div>
+        <p class="muted" style="margin-top:10px">Fills the order to pour that many cups with your current recipe, as far as your cash goes.</p>
+      </div>
+      <div class="card">
+        <h2>Enhancers <span class="muted" style="font-weight:600;text-transform:none;letter-spacing:0">· optional</span></h2>
+        <p class="muted">Stock these and offer them at the stand for extra per cup. Nobody has to take one — it is pure upside when they do.</p>
+        ${enhancerRows}
+      </div>
+      <p class="muted center">That is enough for <strong>${pourable}</strong> cup${pourable === 1 ? '' : 's'} today.</p>`,
+    actions: `
+      <button class="btn" data-act="confirm-buy" ${cost > r.money ? 'disabled' : ''}>
+        ${cost > 0 ? `Buy for ${money(cost)}` : 'Skip Shopping'}
+      </button>`,
+  };
+}
+
+function setupScreen() {
+  const r = run();
+  const pourable = S.maxCupsAvailable(r.inventory, r.recipe);
+  const unitCost = S.costPerCup(r.recipe, r.today.prices);
+  const margin = r.price - unitCost;
+
+  const enhancerToggles = Object.values(S.ENHANCERS).map((enh) => {
+    const stock = r.inventory.enhancers?.[enh.id] || 0;
+    const offered = !!r.enhancersOffered?.[enh.id];
+    return `<div class="row">
+        <div class="row-main">
+          <div class="row-name">${enh.icon} ${enh.label}</div>
+          <div class="row-sub">${stock > 0 ? `${stock} in stock · +${money(enh.addPrice)} a cup` : 'none in stock'}</div>
+        </div>
+        <button class="chip ${offered ? 'chip-on' : ''}" data-act="toggle-enhancer" data-id="${enh.id}"
+                ${stock === 0 ? 'disabled' : ''}>
+          ${offered ? 'Offering ✓' : 'Offer It'}
+        </button>
+      </div>`;
+  }).join('');
+
+  return {
+    body: `
+      <h1>The Stand</h1>
+      <div class="card">
+        <h2>Recipe · one pitcher makes ${S.CUPS_PER_PITCHER} cups</h2>
+        ${row('Lemons 🍋', 'per pitcher', stepper('recipe', 'lemons', r.recipe.lemons, 1, 1, 12))}
+        ${row('Sugar 🥄', 'per pitcher', stepper('recipe', 'sugar', r.recipe.sugar, 1, 1, 12))}
+        ${row('Ice 🧊', `per cup · it is ${r.today.temp}°F out`, stepper('recipe', 'ice', r.recipe.ice, 1, 0, 7))}
+      </div>
+      <div class="card">
+        <h2>Price per cup</h2>
+        ${row('What you charge', `costs you ${cents(unitCost)} to pour`,
+              stepper('price', 'price', r.price, 0.05, 0.05, 5, money(r.price)))}
+        <div class="facts" style="margin-top:12px">
+          ${fact('Profit per cup', money(margin), margin > 0 ? 'good' : 'bad')}
+          ${fact('Cups ready', pourable, pourable === 0 ? 'bad' : '')}
+        </div>
+      </div>
+      <div class="card">
+        <h2>Enhancers on offer</h2>
+        ${enhancerToggles}
+        <p class="muted" style="margin-top:10px">Only stocked enhancers can be offered. Customers who want one pay extra — it never affects whether the cup itself sells.</p>
+      </div>
+      ${pourable === 0 ? '<p class="muted center">Nothing to pour. Buy supplies, use less per pitcher — or sit this one out.</p>' : ''}`,
+    actions: `
+      <button class="btn" data-act="open-stand">${pourable === 0 ? 'Stay Closed Today' : 'Open for Business'}</button>
+      <button class="btn-ghost" data-act="back-to-buy">Back to Supplies</button>`,
+  };
+}
+
+const FACES = ['🧑', '👩', '🧒', '👴', '👱‍♀️', '🧔', '👧', '🧓', '👨', '👩‍🦰'];
+
+function openScreen() {
+  const r = run();
+  const w = S.WEATHER[r.today.weather];
+  return {
+    body: `
+      <h1>Day ${r.day}</h1>
+      <div class="card center">
+        <div class="weather-icon">${w.icon}</div>
+        <div class="stand">
+          <div class="stand-count" id="tick-count">0<small>cups sold</small></div>
+          <div class="till" id="tick-till">$0.00</div>
+        </div>
+        <div class="queue" id="tick-queue"></div>
+        <div class="progress"><i id="tick-bar"></i></div>
+      </div>
+      <p class="muted center">Tap to skip ahead</p>`,
+    actions: '',
+    mounted: () => playDay(store.ui.pending),
+  };
+}
+
+function playDay(result) {
+  const countEl = document.getElementById('tick-count');
+  const tillEl = document.getElementById('tick-till');
+  const queueEl = document.getElementById('tick-queue');
+  const barEl = document.getElementById('tick-bar');
+  const screenEl = document.getElementById('screen');
+  if (!countEl) return;
+
+  const total = result.sold;
+  const duration = 2200;
+  const started = performance.now();
+  let shown = -1;
+  let frameId = null;
+
+  const finish = () => {
+    if (frameId) cancelAnimationFrame(frameId);
+    countEl.innerHTML = `${total}<small>cups sold</small>`;
+    tillEl.textContent = money(result.revenue);
+    barEl.style.width = '100%';
+    run().phase = 'report';
+    render();
+  };
+
+  const frame = (now) => {
+    const t = Math.min(1, (now - started) / duration);
+    const sold = Math.round(total * t);
+    if (sold !== shown) {
+      shown = sold;
+      countEl.innerHTML = `${sold}<small>cups sold</small>`;
+      tillEl.textContent = money(sold * result.price);
+      const faces = Math.min(12, sold);
+      queueEl.innerHTML = Array.from({ length: faces },
+        (_, i) => `<span>${FACES[(i + sold) % FACES.length]}</span>`).join('');
+    }
+    barEl.style.width = `${t * 100}%`;
+    if (t < 1) frameId = requestAnimationFrame(frame);
+    else setTimeout(finish, 400);
+  };
+
+  frameId = requestAnimationFrame(frame);
+  screenEl.addEventListener('click', finish, { once: true });
+}
+
+function reportScreen() {
+  const r = run();
+  const result = store.ui.pending;
+  const w = S.WEATHER[result.weather];
+  const last = r.day >= r.days;
+  const enhancerLines = Object.entries(result.enhancers || {}).map(([id, s]) => {
+    const enh = S.ENHANCERS[id];
+    return `<li>${enh.icon} ${s.cups} customer${s.cups === 1 ? '' : 's'} added ${enh.label.toLowerCase()} for ${money(s.revenue)}.</li>`;
+  }).join('');
+
+  return {
+    body: `
+      <h1>Day ${result.day} · closed</h1>
+      <div class="card">
+        <div class="facts">
+          ${fact('Cups sold', `${result.sold}${result.stock > 0 && result.sold === result.stock ? ' (sold out)' : ''}`)}
+          ${fact('Taken', money(result.revenue), 'good')}
+          ${fact('Supplies used', money(result.cogs))}
+          ${fact("Day's profit", money(result.profit), result.profit >= 0 ? 'good' : 'bad')}
+        </div>
+        ${result.enhancerRevenue > 0 ? `<p class="muted" style="margin-top:8px">Enhancers added ${money(result.enhancerRevenue)} on top of the base price.</p>` : ''}
+        <ul class="notes">
+          ${result.notes.map((n) => `<li>${n}</li>`).join('')}
+          ${enhancerLines}
+          ${result.rent > 0 ? `<li>🏠 Pitch fee of ${money(result.rent)} came out of the till.</li>` : ''}
+          <li>${w.icon} ${w.label}, ${result.temp}°F · about ${result.potential} people walked past.</li>
+          <li>Reputation ${result.repDelta >= 0 ? 'rose ↑' : 'slipped ↓'} — word gets around.</li>
+        </ul>
+      </div>`,
+    actions: `<button class="btn" data-act="next-day">${last ? 'Close the Books' : 'Next Morning'}</button>`,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * End of a run
+ * ------------------------------------------------------------------ */
+
+function runOverScreen() {
+  const r = run();
+  const score = S.finalScore(r);
+  const profits = r.history.map((d) => d.profit);
+  const peak = Math.max(1, ...profits.map(Math.abs));
+  const chart = `
+    <div class="chart" aria-hidden="true">
+      ${profits.map((p) => {
+        const h = Math.max(2, Math.round((Math.abs(p) / peak) * 42));
+        return `<div class="chart-col">
+          <div class="chart-pos">${p >= 0 ? `<i style="height:${h}px"></i>` : ''}</div>
+          <div class="chart-neg">${p < 0 ? `<i style="height:${h}px"></i>` : ''}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  if (!r.corner) {
+    recordBest(score.money);
+    return {
+      body: `
+        <div class="rank">
+          <div class="rank-icon">${score.rank.icon}</div>
+          <div class="rank-title">${score.rank.title}</div>
+          <p class="muted">${score.bankrupt
+            ? 'You ran out of money before the season ended.'
+            : `You finished ${r.days} days with ${money(score.money)}.`}</p>
+        </div>
+        <div class="card">
+          <h2>The season</h2>
+          <div class="facts">
+            ${fact('Final cash', money(score.money), score.net >= 0 ? 'good' : 'bad')}
+            ${fact('Net', `${score.net >= 0 ? '+' : ''}${money(score.net)}`, score.net >= 0 ? 'good' : 'bad')}
+            ${fact('Cups sold', score.cupsSold)}
+            ${fact('Best day', score.bestDay ? money(score.bestDay.profit) : '—')}
+          </div>
+          ${score.enhancerCups > 0 ? `<p class="muted" style="margin-top:8px">${score.enhancerCups} enhancers sold for ${money(score.enhancerRevenue)} on top of the base price.</p>` : ''}
+          ${chart}
+          <p class="muted" style="margin-top:6px">Daily profit, day 1 → ${r.history.length}</p>
+        </div>`,
+      actions: `
+        <button class="btn" data-act="free-play">Play Again</button>
+        <button class="btn-ghost" data-act="to-title">Menu</button>`,
+    };
+  }
+
+  const city = C.getCity(r.corner.cityId);
+  const won = score.won;
+  const claimed = store.ui.claimResult;
+  return {
+    body: `
+      <div class="rank">
+        <div class="rank-icon">${won ? '🏅' : score.bankrupt ? '💸' : '😬'}</div>
+        <div class="rank-title">${won ? 'Corner Claimed' : score.bankrupt ? 'Out of Business' : 'Short of the Target'}</div>
+        <p class="muted">${r.corner.name} · ${city.flag} ${city.name}</p>
+      </div>
+      <div class="card">
+        <div class="facts">
+          ${fact('Profit made', money(score.net), score.net >= 0 ? 'good' : 'bad')}
+          ${fact('Target', whole(r.target), won ? 'good' : 'bad')}
+          ${fact('Cups sold', score.cupsSold)}
+          ${fact('Days traded', r.history.length)}
+        </div>
+        ${chart}
+        <p class="muted" style="margin-top:6px">Daily profit across the run</p>
+      </div>
+      ${won
+        ? `<div class="card">
+             <p>${money(score.net)} goes into the treasury.</p>
+             ${claimed?.cityJustDone ? `<p class="good"><strong>${city.name} is yours — all ${C.CORNERS_PER_CITY} corners.</strong></p>` : ''}
+             ${claimed?.opsJustUnlocked ? '<p class="good"><strong>🏭 Operations unlocked.</strong> You can now run depots, buy wholesale and staff the corners you own.</p>' : ''}
+           </div>`
+        : `<div class="card">
+             <p class="muted">The weather on a corner never changes — the same days are waiting for you. Try a different recipe, or a different price.</p>
+           </div>`}`,
+    actions: won
+      ? `<button class="btn" data-act="next-after-win">Next Corner</button>
+         <button class="btn-ghost" data-act="to-city">${city.name}</button>`
+      : `<button class="btn" data-act="retry-corner">Try This Corner Again</button>
+         <button class="btn-ghost" data-act="to-city">Back to ${city.name}</button>`,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Actions
+ * ------------------------------------------------------------------ */
+
+const emptyOrder = () => ({ lemons: 0, sugar: 0, ice: 0, cups: 0, enhancers: zeroedEnhancers() });
+
+/**
+ * What you would need to add to the cooler to pour `cups` cups today.
+ * Enhancers are a deliberate, separate purchase — a stock-up preset for the
+ * base drink should never silently add or drop them.
+ */
+function orderFor(cups) {
+  const r = run();
+  const pitchers = Math.ceil(cups / S.CUPS_PER_PITCHER);
+  const need = (have, want) => Math.max(0, want - have);
+  return {
+    lemons: need(r.inventory.lemons, pitchers * r.recipe.lemons),
+    sugar: need(r.inventory.sugar, pitchers * r.recipe.sugar),
+    ice: need(r.inventory.ice, cups * r.recipe.ice),
+    cups: need(r.inventory.cups, cups),
+    enhancers: store.ui.order.enhancers,
+  };
+}
+
+/**
+ * Fill the basket for `cups` cups, or the most the cash will cover. Solved as
+ * a whole order rather than trimmed line by line, so it stays balanced — no
+ * paying for ice that melts before there is lemonade to put it in.
+ */
+function presetOrder(cups) {
+  const r = run();
+  const prices = r.today.prices;
+  if (S.buyCost(prices, orderFor(cups)) <= r.money) {
+    store.ui.order = orderFor(cups);
+    return;
+  }
+  let lo = 0;
+  let hi = cups;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (S.buyCost(prices, orderFor(mid)) <= r.money) lo = mid;
+    else hi = mid - 1;
+  }
+  store.ui.order = orderFor(lo);
+}
+
+/** A corner's run config, with the bar it has to clear attached. */
+function cornerRun(cityId, index) {
+  return {
+    ...C.runConfigFor(cityId, index),
+    target: C.targetFor(store.campaign, cityId, index),
+  };
+}
+
+function startRun(config) {
+  store.run = S.newRun({
+    ...config,
+    premium: { neverExpireLemons: isPremiumUnlocked('neverExpireLemons') },
+  });
+  store.ui.order = emptyOrder();
+  store.ui.pending = null;
+  store.ui.claimResult = null;
+  store.ui.view = 'run';
+}
+
+/** Settle a finished run: bank a win, let the network trade, check achievements. */
+function settleRun() {
+  const r = run();
+  if (!r.corner || r.settled) return [];
+  r.settled = true;
+  const score = S.finalScore(r);
+  const campaign = store.campaign;
+  campaign.stats.runsPlayed += 1;
+  campaign.stats.cupsSold += score.cupsSold;
+
+  if (score.won) {
+    campaign.stats.runsWon += 1;
+    store.ui.claimResult = C.claimCorner(campaign, r.corner.cityId, r.corner.index, score.net);
+    if (store.ui.claimResult.opsJustUnlocked && !campaign.ops) campaign.ops = newOps();
+  }
+  if (campaign.ops) {
+    const summary = tickOps(campaign, r.history.length);
+    store.ui.opsReport = summary && summary.days > 0 ? summary : null;
+  }
+  const cleanRunFinished = r.history.every((d) => !(d.spoiledLemons > 0));
+  return checkAchievements({ cleanRunFinished });
+}
+
+const screens = {
+  forecast: forecastScreen,
+  buy: buyScreen,
+  setup: setupScreen,
+  open: openScreen,
+  report: reportScreen,
+  gameover: runOverScreen,
+};
+
+const actions = {
+  'free-play': () => startRun({ days: S.TOTAL_DAYS, stake: S.STARTING_MONEY }),
+  'start-run': () => startRun(cornerRun(store.ui.cityId, store.ui.cornerIndex)),
+  'retry-corner': () => startRun(cornerRun(store.run.corner.cityId, store.run.corner.index)),
+  'next-after-win': () => {
+    const cityId = store.run.corner.cityId;
+    store.run = null;
+    store.ui.cityId = cityId;
+    const next = C.nextCorner(store.campaign, cityId);
+    if (next == null) {
+      store.ui.view = 'city';
+    } else {
+      store.ui.cornerIndex = next;
+      store.ui.view = 'corner';
+    }
+  },
+  'quit-run': () => {
+    const corner = store.run?.corner;
+    store.run = null;
+    store.ui.view = corner ? 'city' : 'title';
+  },
+  'to-buy': () => { store.ui.order = emptyOrder(); run().phase = 'buy'; },
+  preset: (el) => presetOrder(Number(el.dataset.cups)),
+  'clear-order': () => { store.ui.order = emptyOrder(); },
+  'confirm-buy': () => {
+    const r = run();
+    const order = store.ui.order;
+    const cost = Math.round((S.buyCost(r.today.prices, order) + S.enhancerOrderCost(order.enhancers)) * 100) / 100;
+    if (cost > r.money) return;
+    r.money = Math.round((r.money - cost) * 100) / 100;
+    S.receiveOrder(r, order);
+    store.ui.order = emptyOrder();
+    r.phase = 'setup';
+  },
+  'back-to-buy': () => { run().phase = 'buy'; },
+  'toggle-enhancer': (el) => {
+    const r = run();
+    const id = el.dataset.id;
+    if ((r.inventory.enhancers?.[id] || 0) === 0) return; // nothing to offer
+    r.enhancersOffered[id] = !r.enhancersOffered[id];
+    const offeredTogether = Object.values(r.enhancersOffered).filter(Boolean).length;
+    const toast = achievementToast(checkAchievements({ enhancersOfferedTogether: offeredTogether }));
+    if (toast) store.ui.notice = toast;
+  },
+  'open-premium': () => { store.ui.showPremium = true; },
+  'open-stand': () => {
+    store.ui.pending = S.simulateDay(run());
+    run().phase = 'open';
+  },
+  'next-day': () => {
+    const pending = store.ui.pending;
+    S.commitDay(run(), pending);
+    store.ui.pending = null;
+    recordDay(pending, run().money);
+    const dayNewly = checkAchievements({
+      soldOutToday: pending.stock > 0 && pending.sold === pending.stock,
+      bestQualityToday: pending.quality,
+      cupsToday: pending.sold,
+    });
+    const runNewly = run().phase === 'gameover' ? settleRun() : [];
+    const toast = achievementToast([...dayNewly, ...runNewly]);
+    if (toast) store.ui.notice = toast;
+  },
+};
+
+  return { screens, actions };
+})();
+
+/* ---- js/ui/opsui.js ---- */
+__modules["ui/opsui"] = (function () {
+/** Operations: the depot network, wholesale buying and staffed corners. */
+const C = __modules["campaign"];
+const O = __modules["ops"];
+const { store, checkAchievements, achievementToast } = __modules["store"];
+const { money, whole, fact, bar, backBar, row, stepper, tierPill } = __modules["ui/kit"];
+
+const ops = () => store.campaign.ops;
+
+const CARGO_ICON = { lemons: '🍋', sugar: '🥄', cups: '🥤' };
+const CARGO_LABEL = { lemons: 'lemons', sugar: 'sugar', cups: 'paper cups' };
+
+/* ------------------------------------------------------------------ *
+ * Network overview
+ * ------------------------------------------------------------------ */
+
+function opsScreen() {
+  const campaign = store.campaign;
+  const outlook = O.networkOutlook(campaign);
+  const owned = C.CITIES.filter((c) => C.claimedIn(campaign, c.id).length > 0);
+
+  const rows = owned.map((city) => {
+    const staffed = O.staffedIn(ops(), city.id).length;
+    const depot = ops().warehouses[city.id];
+    const look = staffed > 0 ? O.cityOutlook(campaign, city.id) : null;
+    const dry = look && look.daysOfStock <= 2;
+    return `<button class="city" data-act="open-ops-city" data-city="${city.id}">
+        <div class="city-flag">${city.flag}</div>
+        <div class="city-main">
+          <div class="city-name">${city.name} ${dry ? '<span class="warn-dot">⚠️</span>' : ''}</div>
+          <div class="row-sub">
+            ${depot ? `Depot · ${O.stockTotal(depot)}/${depot.capacity} units` : 'No depot'} ·
+            ${staffed} staffed
+          </div>
+          ${depot ? bar(O.stockTotal(depot) / depot.capacity, dry ? 'bar-warn' : '') : ''}
+        </div>
+        <div class="city-count">${look ? money(look.net) : '—'}<small>/day</small></div>
+      </button>`;
+  }).join('');
+
+  const editing = store.ui.editingTruck != null ? ops().trucks.find((t) => t.id === store.ui.editingTruck) : null;
+
+  return {
+    body: `
+      ${backBar('The Map', 'to-world')}
+      <h1>🏭 Operations</h1>
+      <div class="card">
+        <h2>The network</h2>
+        <div class="facts">
+          ${fact('Staffed corners', outlook.corners)}
+          ${fact('Net per day', money(outlook.net), outlook.net >= 0 ? 'good' : 'bad')}
+          ${fact('Cups per day', outlook.cities.reduce((n, c) => n + c.cups, 0))}
+          ${fact('Days traded', ops().day)}
+        </div>
+        <p class="muted" style="margin-top:10px">Your network trades one day for every day you work a corner by hand.</p>
+      </div>
+      ${ops().alerts.length
+        ? `<div class="card warn-card"><h2>Alerts</h2>${ops().alerts.map((a) => `<p>⚠️ ${a.text}</p>`).join('')}</div>`
+        : ''}
+      ${editing ? truckEditorCard(editing) : trucksCard()}
+      <div class="city-list">${rows || '<p class="muted center">Claim some corners first.</p>'}</div>`,
+    actions: editing
+      ? `<button class="btn" data-act="confirm-truck-route" ${store.ui.truckDraft.from && store.ui.truckDraft.to ? '' : 'disabled'}>Set Route</button>
+         <button class="btn-ghost" data-act="cancel-truck-edit">Cancel</button>`
+      : `<button class="btn" data-act="to-world">Back to the Map</button>`,
+  };
+}
+
+function truckRouteLabel(truck) {
+  if (!truck.from || !truck.to) return 'Not assigned yet';
+  const from = C.getCity(truck.from);
+  const to = C.getCity(truck.to);
+  return `${from.flag} ${from.name} → ${to.flag} ${to.name} · ${truck.amount} ${CARGO_LABEL[truck.cargo]}/day`;
+}
+
+function trucksCard() {
+  const trucks = ops().trucks;
+  const rows = trucks.map((truck) => `
+    <div class="row">
+      <div class="row-main">
+        <div class="row-name">Truck #${truck.id}</div>
+        <div class="row-sub">${truckRouteLabel(truck)}</div>
+      </div>
+      <button class="chip" data-act="edit-truck" data-truck="${truck.id}">${truck.from ? 'Reroute' : 'Assign'}</button>
+    </div>`).join('');
+
+  return `
+    <div class="card">
+      <h2>Trucks</h2>
+      ${rows || '<p class="muted">No trucks yet — buy one to start hauling stock between your depots.</p>'}
+      <div class="chip-row" style="margin-top:10px">
+        <button class="chip" data-act="buy-truck" ${store.campaign.treasury < O.TRUCK_COST ? 'disabled' : ''}>
+          🚚 Buy Truck · ${money(O.TRUCK_COST)}
+        </button>
+      </div>
+      <p class="muted" style="margin-top:10px">A truck hauls one good between two depots every day, for ${money(O.TRUCK_UPKEEP)} a day while it has a route.</p>
+    </div>`;
+}
+
+function truckEditorCard(truck) {
+  const depotCities = C.CITIES.filter((c) => O.hasWarehouse(ops(), c.id));
+  const draft = store.ui.truckDraft;
+  const cityChip = (city, group) => `
+    <button class="chip ${draft[group] === city.id ? 'chip-on' : ''}" data-act="truck-pick-${group}" data-city="${city.id}">
+      ${city.flag} ${city.name}
+    </button>`;
+
+  return `
+    <div class="card">
+      <h2>Route for Truck #${truck.id}</h2>
+      ${depotCities.length < 2
+        ? '<p class="muted">You need depots in at least two cities before a truck has anywhere to run.</p>'
+        : `
+          <p class="row-sub">Pick up in</p>
+          <div class="chip-row">${depotCities.map((c) => cityChip(c, 'from')).join('')}</div>
+          <p class="row-sub" style="margin-top:12px">Drop off in</p>
+          <div class="chip-row">${depotCities.filter((c) => c.id !== draft.from).map((c) => cityChip(c, 'to')).join('')}</div>
+          <p class="row-sub" style="margin-top:12px">Cargo</p>
+          <div class="chip-row">
+            ${O.TRUCK_CARGO.map((cargo) => `
+              <button class="chip ${draft.cargo === cargo ? 'chip-on' : ''}" data-act="truck-pick-cargo" data-cargo="${cargo}">
+                ${CARGO_ICON[cargo]} ${CARGO_LABEL[cargo]}
+              </button>`).join('')}
+          </div>
+          ${row('Amount per day', null, stepper('truckDraft', 'amount', draft.amount, 25, 25, 2000))}
+        `}
+    </div>`;
+}
+
+function stockDaysLabel(days) {
+  if (!Number.isFinite(days)) return 'production is keeping up — steady supply';
+  return `about <strong>${days}</strong> day${days === 1 ? '' : 's'} of stock`;
+}
+
+function buildingsCard(campaign, cityId) {
+  const rows = Object.values(O.BUILDINGS).map((b) => {
+    const built = O.hasBuilding(ops(), cityId, b.id);
+    const yieldLabel = b.id === 'iceMaker'
+      ? `${b.dailyYield} free ice cubes/day`
+      : `${b.dailyYield} ${b.unit}/day`;
+    return `<div class="row">
+        <div class="row-main">
+          <div class="row-name">${b.icon} ${b.label}</div>
+          <div class="row-sub">${built ? `Built · ${yieldLabel}` : `${yieldLabel} · ${money(b.upkeep)}/day upkeep`}</div>
+        </div>
+        ${built
+          ? '<span class="chip chip-on">Built ✓</span>'
+          : `<button class="chip" data-act="build-building" data-city="${cityId}" data-building="${b.id}"
+               ${campaign.treasury < b.cost ? 'disabled' : ''}>Build ${money(b.cost)}</button>`}
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="card">
+      <h2>Farms &amp; Factories</h2>
+      ${rows}
+      <p class="muted" style="margin-top:10px">A farm or factory feeds this depot for free, up to its daily output. The ice maker never stocks ice — it just covers what corners need before they pay street price.</p>
+    </div>`;
+}
+
+/* ------------------------------------------------------------------ *
+ * One city's operation
+ * ------------------------------------------------------------------ */
+
+function opsCityScreen() {
+  const campaign = store.campaign;
+  const cityId = store.ui.cityId;
+  const city = C.getCity(cityId);
+  const depot = ops().warehouses[cityId];
+  const claimed = C.claimedIn(campaign, cityId);
+  const corners = C.cornersFor(cityId);
+  const look = O.staffedIn(ops(), cityId).length > 0 ? O.cityOutlook(campaign, cityId) : null;
+
+  if (!depot) {
+    return {
+      body: `
+        ${backBar('Operations', 'to-ops')}
+        <h1>${city.flag} ${city.name}</h1>
+        <div class="card">
+          <h2>No depot here</h2>
+          <p>A depot lets you buy lemons, sugar and cups by the crate at wholesale, and supply the corners you own in this city.</p>
+          <p class="muted">Ice is never stocked — it melts. Staffed corners buy theirs locally each morning.</p>
+          <div class="facts" style="margin-top:12px">
+            ${fact('Depot', money(O.WAREHOUSE_COST))}
+            ${fact('Holds', `${O.WAREHOUSE_BASE_CAPACITY} units`)}
+          </div>
+        </div>`,
+      actions: `
+        <button class="btn" data-act="buy-depot" data-city="${cityId}"
+          ${campaign.treasury < O.WAREHOUSE_COST ? 'disabled' : ''}>
+          Build Depot · ${money(O.WAREHOUSE_COST)}
+        </button>
+        <button class="btn-ghost" data-act="to-ops">Back</button>`,
+    };
+  }
+
+  const order = store.ui.restock;
+  const units = order.lemons + order.sugar + order.cups;
+  const cost = O.restockCost(order);
+  const space = O.spaceLeft(depot);
+  const discount = O.bulkDiscount(units);
+
+  const stockRow = (unit, label) => {
+    const held = depot.stock[unit];
+    const perDay = look ? look.needs[unit] : 0;
+    return row(`${label}`, `${held} in the depot${perDay ? ` · ${perDay}/day used` : ''}`,
+      stepper('restock', unit, order[unit], 100, 0, 99999));
+  };
+
+  const staffRows = claimed.map((i) => {
+    const corner = corners[i];
+    const staffed = O.isStaffed(ops(), cityId, i);
+    const look1 = O.cornerOutlook(cityId, i);
+    return `<div class="row">
+        <div class="row-main">
+          <div class="row-name">${corner.name}</div>
+          <div class="row-sub">${tierPill(corner.tier)} · about ${look1.cups} cups a day</div>
+        </div>
+        <button class="chip ${staffed ? 'chip-on' : ''}"
+                data-act="${staffed ? 'close-stand' : 'hire-staff'}" data-city="${cityId}" data-index="${i}"
+                ${!staffed && campaign.treasury < O.STAFF_HIRE_COST ? 'disabled' : ''}>
+          ${staffed ? 'Staffed ✓' : `Hire ${money(O.STAFF_HIRE_COST)}`}
+        </button>
+      </div>`;
+  }).join('');
+
+  return {
+    body: `
+      ${backBar('Operations', 'to-ops')}
+      <h1>${city.flag} ${city.name}</h1>
+      <div class="card">
+        <h2>Depot</h2>
+        ${bar(O.stockTotal(depot) / depot.capacity, look && look.daysOfStock <= 2 ? 'bar-warn' : '')}
+        <p class="muted" style="margin-top:8px">${O.stockTotal(depot)} of ${depot.capacity} units held${
+          look ? ` · ${stockDaysLabel(look.daysOfStock)}` : ''}</p>
+        ${stockRow('lemons', 'Lemons 🍋')}
+        ${stockRow('sugar', 'Sugar 🥄')}
+        ${stockRow('cups', 'Paper cups 🥤')}
+        <div class="total">
+          <span>${units} units${discount < 1 ? ` · ${Math.round((1 - discount) * 100)}% bulk discount` : ''}</span>
+          <span class="${cost > campaign.treasury || units > space ? 'over' : ''}">${money(cost)}</span>
+        </div>
+        <div class="chip-row" style="margin-top:12px">
+          <button class="chip" data-act="restock-preset" data-days="7">7 days</button>
+          <button class="chip" data-act="restock-preset" data-days="14">14 days</button>
+          <button class="chip" data-act="restock-preset" data-days="fill">Fill depot</button>
+          <button class="chip" data-act="clear-restock">Clear</button>
+        </div>
+        ${units > space ? `<p class="warn" style="margin-top:10px">Only ${space} units of space left.</p>` : ''}
+      </div>
+      ${buildingsCard(campaign, cityId)}
+      <div class="card">
+        <h2>Corners you own here</h2>
+        ${staffRows || '<p class="muted">No claimed corners in this city yet.</p>'}
+        <p class="muted" style="margin-top:10px">Staff cost ${money(O.STAFF_WAGE)} a day each, and the depot ${money(O.WAREHOUSE_UPKEEP)} a day — paid whether they sell or not.</p>
+      </div>
+      ${look ? `<div class="card">
+        <h2>Every day, as things stand</h2>
+        <div class="facts">
+          ${fact('Cups', look.cups)}
+          ${fact('Takings', money(look.revenue), 'good')}
+          ${fact('Stock used', money(look.stockCost))}
+          ${fact('Net', money(look.net), look.net >= 0 ? 'good' : 'bad')}
+        </div>
+        ${look.farmSavings > 0 ? `<p class="muted" style="margin-top:8px">Farms and the factory are covering ${money(look.farmSavings)} of that stock for free.</p>` : ''}
+        ${look.buildingUpkeep > 0 ? `<p class="muted">Building upkeep: ${money(look.buildingUpkeep)}/day.</p>` : ''}
+      </div>` : ''}`,
+    actions: `
+      <button class="btn" data-act="confirm-restock" data-city="${cityId}"
+        ${units === 0 || cost > campaign.treasury || units > space ? 'disabled' : ''}>
+        ${units ? `Order ${units} units · ${money(cost)}` : 'Order Stock'}
+      </button>
+      <button class="btn-ghost" data-act="upgrade-depot" data-city="${cityId}"
+        ${campaign.treasury < O.CAPACITY_UPGRADE_COST ? 'disabled' : ''}>
+        Expand Depot · ${money(O.CAPACITY_UPGRADE_COST)} for +${O.CAPACITY_UPGRADE_STEP}
+      </button>`,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Actions
+ * ------------------------------------------------------------------ */
+
+const emptyRestock = () => ({ lemons: 0, sugar: 0, cups: 0 });
+
+function restockForDays(days) {
+  const campaign = store.campaign;
+  const cityId = store.ui.cityId;
+  const depot = ops().warehouses[cityId];
+  const staffed = O.staffedIn(ops(), cityId);
+  if (!depot || staffed.length === 0) return;
+  const look = O.cityOutlook(campaign, cityId);
+
+  let order = {
+    lemons: Math.max(0, look.needs.lemons * days - depot.stock.lemons),
+    sugar: Math.max(0, look.needs.sugar * days - depot.stock.sugar),
+    cups: Math.max(0, look.needs.cups * days - depot.stock.cups),
+  };
+  order = trimToFit(order, O.spaceLeft(depot), campaign.treasury);
+  store.ui.restock = order;
+}
+
+/** Fill the depot to the brim with a balanced order, within budget. */
+function fillDepot() {
+  const campaign = store.campaign;
+  const cityId = store.ui.cityId;
+  const depot = ops().warehouses[cityId];
+  if (!depot) return;
+  const space = O.spaceLeft(depot);
+  // Two cups per lemon and per sugar is the shape of the recipe.
+  const unitsPerSet = 4; // 1 lemon + 1 sugar + 2 cups
+  const sets = Math.floor(space / unitsPerSet);
+  let order = { lemons: sets, sugar: sets, cups: sets * 2 };
+  order = trimToFit(order, space, campaign.treasury);
+  store.ui.restock = order;
+}
+
+function trimToFit(order, space, budget) {
+  let scale = 1;
+  const units = () => Math.round(order.lemons * scale) + Math.round(order.sugar * scale) + Math.round(order.cups * scale);
+  const cost = () => O.restockCost({
+    lemons: Math.round(order.lemons * scale),
+    sugar: Math.round(order.sugar * scale),
+    cups: Math.round(order.cups * scale),
+  });
+  let guard = 60;
+  while ((units() > space || cost() > budget) && scale > 0.01 && guard-- > 0) scale *= 0.9;
+  return {
+    lemons: Math.round(order.lemons * scale),
+    sugar: Math.round(order.sugar * scale),
+    cups: Math.round(order.cups * scale),
+  };
+}
+
+const screens = {
+  ops: opsScreen,
+  opsCity: opsCityScreen,
+};
+
+const actions = {
+  'open-ops': () => { store.ui.view = 'ops'; store.ui.opsReport = null; },
+  'to-ops': () => { store.ui.view = 'ops'; store.ui.restock = emptyRestock(); },
+  'open-ops-city': (el) => {
+    store.ui.cityId = el.dataset.city;
+    store.ui.restock = emptyRestock();
+    store.ui.view = 'opsCity';
+  },
+  'buy-depot': (el) => {
+    const result = O.buyWarehouse(store.campaign, el.dataset.city);
+    store.ui.notice = result.ok ? null : result.why;
+  },
+  'upgrade-depot': (el) => {
+    const result = O.upgradeWarehouse(store.campaign, el.dataset.city);
+    store.ui.notice = result.ok ? null : result.why;
+  },
+  'hire-staff': (el) => {
+    const result = O.hireStaff(store.campaign, el.dataset.city, Number(el.dataset.index));
+    store.ui.notice = result.ok ? null : result.why;
+  },
+  'close-stand': (el) => O.closeStand(store.campaign, el.dataset.city, Number(el.dataset.index)),
+  'restock-preset': (el) => {
+    if (el.dataset.days === 'fill') fillDepot();
+    else restockForDays(Number(el.dataset.days));
+  },
+  'clear-restock': () => { store.ui.restock = emptyRestock(); },
+  'confirm-restock': (el) => {
+    const result = O.restock(store.campaign, el.dataset.city, store.ui.restock);
+    if (result.ok) store.ui.restock = emptyRestock();
+    else store.ui.notice = result.why;
+  },
+  'build-building': (el) => {
+    const result = O.buildBuilding(store.campaign, el.dataset.city, el.dataset.building);
+    if (!result.ok) { store.ui.notice = result.why; return; }
+    store.ui.notice = achievementToast(checkAchievements());
+  },
+  'buy-truck': () => {
+    const result = O.buyTruck(store.campaign);
+    if (!result.ok) { store.ui.notice = result.why; return; }
+    store.ui.editingTruck = result.id;
+    store.ui.truckDraft = { from: null, to: null, cargo: 'lemons', amount: 100 };
+    store.ui.notice = achievementToast(checkAchievements());
+  },
+  'edit-truck': (el) => {
+    const id = Number(el.dataset.truck);
+    const truck = ops().trucks.find((t) => t.id === id);
+    if (!truck) return;
+    store.ui.editingTruck = id;
+    store.ui.truckDraft = { from: truck.from, to: truck.to, cargo: truck.cargo, amount: truck.amount };
+  },
+  'cancel-truck-edit': () => {
+    store.ui.editingTruck = null;
+    store.ui.truckDraft = null;
+  },
+  'truck-pick-from': (el) => {
+    store.ui.truckDraft.from = el.dataset.city;
+    if (store.ui.truckDraft.to === el.dataset.city) store.ui.truckDraft.to = null;
+  },
+  'truck-pick-to': (el) => { store.ui.truckDraft.to = el.dataset.city; },
+  'truck-pick-cargo': (el) => { store.ui.truckDraft.cargo = el.dataset.cargo; },
+  'confirm-truck-route': () => {
+    const result = O.assignTruckRoute(store.campaign, store.ui.editingTruck, store.ui.truckDraft);
+    if (result.ok) {
+      store.ui.editingTruck = null;
+      store.ui.truckDraft = null;
+    } else {
+      store.ui.notice = result.why;
+    }
+  },
+};
+
+  return { screens, actions };
+})();
+
+/* ---- js/ui/premium.js ---- */
+__modules["ui/premium"] = (function () {
+/**
+ * The one premium unlock in the game: lemons that never spoil.
+ *
+ * There is no payment processor wired into this build — it is a static page
+ * with no server to talk to. This screen is the real hook a shipped app
+ * would connect to App Store / Play Store IAP or Stripe: the price, the
+ * copy and the mechanic it flips are all real, but the button here is
+ * explicitly labelled as a demo unlock rather than pretending to charge
+ * anyone. See js/store.js for the local flag it sets.
+ */
+const { store, isPremiumUnlocked, unlockPremiumDemo } = __modules["store"];
+const { LEMON_SHELF_LIFE_DAYS } = __modules["sim"];
+
+const PRICE = '$1.99';
+const FLAG = 'neverExpireLemons';
+
+function premiumScreen() {
+  const unlocked = isPremiumUnlocked(FLAG);
+  return {
+    body: `
+      <div class="rank">
+        <div class="rank-icon">🔒</div>
+        <div class="rank-title">Never-Expiring Lemons</div>
+      </div>
+      <div class="card">
+        <p>Every lemon you buy is good for ${LEMON_SHELF_LIFE_DAYS} days in the cooler, then it spoils —
+          whatever's left over is gone, and buying too far ahead of a slow stretch stops paying off.</p>
+        <p>This unlock removes the clock. Buy in bulk whenever prices are good, hold as much stock as
+          you like, and none of it ever goes bad.</p>
+      </div>
+      ${unlocked
+        ? `<div class="card">
+             <p class="good"><strong>✓ Unlocked.</strong> Your lemons never expire, in every run from here on.</p>
+           </div>`
+        : `<div class="card paywall">
+             <div class="paywall-price">${PRICE}<small>one-time</small></div>
+             <p class="muted">This is a prototype with no payment processor connected — no card is charged and
+               no store is involved. Tapping the button below flips the unlock locally so you can see what it
+               does. A shipped version would put a real App Store / Play Store / Stripe purchase behind this
+               exact same button.</p>
+           </div>`}`,
+    actions: unlocked
+      ? `<button class="btn" data-act="close-premium">Back</button>`
+      : `<button class="btn" data-act="unlock-premium-demo">Unlock — ${PRICE} (Demo, No Charge)</button>
+         <button class="btn-ghost" data-act="close-premium">Not Now</button>`,
+  };
+}
+
+const screens = { premium: premiumScreen };
+
+const actions = {
+  'unlock-premium-demo': () => {
+    unlockPremiumDemo(FLAG);
+    if (store.run) store.run.premium = { ...(store.run.premium || {}), neverExpireLemons: true };
+    store.ui.notice = '🔒 Never-Expiring Lemons unlocked (demo) — your lemons stop spoiling from now on.';
+  },
+  'close-premium': () => { store.ui.showPremium = false; },
+};
+
+  return { screens, actions };
+})();
+
+/* ---- js/ui/tutorial.js ---- */
+__modules["ui/tutorial"] = (function () {
+/**
+ * A short, skippable welcome sequence shown once to a first-time player.
+ * Reachable again anytime from the title screen.
+ */
+const { store, markTutorialSeen } = __modules["store"];
+
+const SLIDES = [
+  {
+    icon: '🍋',
+    title: 'Welcome to the corner',
+    body: 'You start with a few dollars and one street corner. Read the weather, mix a pitcher, name your price, and see who stops by.',
+  },
+  {
+    icon: '🌡️',
+    title: 'Heat brings customers',
+    body: 'A scorcher fills the street and loosens wallets. Rain empties it. Check the forecast every morning before you shop.',
+  },
+  {
+    icon: '🤫',
+    title: 'The recipe is a secret',
+    body: 'One balance of lemons, sugar and ice wins people over — the game never shows you which. Customers tell you when it is off: too sour, not sweet enough, warm on a hot day. Adjust and listen.',
+  },
+  {
+    icon: '💲',
+    title: 'Price is a trade-off',
+    body: 'Charge more and fewer people buy. Reputation grows when the lemonade was worth what you charged, and a strong reputation brings the crowds back tomorrow.',
+  },
+  {
+    icon: '🗺️',
+    title: 'One corner, then the world',
+    body: 'Every corner sets a profit target. Clear it and the next one opens. Take every corner in a city to claim it — and once you have taken five cities, you can start running the whole operation from the top.',
+  },
+];
+
+function tutorialScreen() {
+  const i = store.ui.tutorialStep || 0;
+  const slide = SLIDES[i];
+  const last = i === SLIDES.length - 1;
+  const dots = SLIDES.map((_, idx) => `<span class="tut-dot ${idx === i ? 'on' : ''}"></span>`).join('');
+
+  return {
+    body: `
+      <div class="tut-slide">
+        <div class="tut-icon">${slide.icon}</div>
+        <h1>${slide.title}</h1>
+        <p>${slide.body}</p>
+      </div>
+      <div class="tut-dots">${dots}</div>`,
+    actions: `
+      <button class="btn" data-act="tutorial-next">${last ? "Let's Go" : 'Next'}</button>
+      ${last ? '' : '<button class="btn-ghost" data-act="tutorial-skip">Skip</button>'}`,
+  };
+}
+
+const screens = { tutorial: tutorialScreen };
+
+const actions = {
+  'start-tutorial': () => {
+    store.ui.tutorialStep = 0;
+    store.ui.showTutorial = true;
+  },
+  'tutorial-next': () => {
+    if ((store.ui.tutorialStep || 0) >= SLIDES.length - 1) {
+      markTutorialSeen();
+      store.ui.showTutorial = false;
+    } else {
+      store.ui.tutorialStep = (store.ui.tutorialStep || 0) + 1;
+    }
+  },
+  'tutorial-skip': () => {
+    markTutorialSeen();
+    store.ui.showTutorial = false;
+  },
+};
+
+  return { screens, actions };
+})();
+
+/* ---- js/ui/achievements.js ---- */
+__modules["ui/achievements"] = (function () {
+/** The achievements list — a record of what you've actually done, nothing to buy. */
+const { store, loadUnlockedAchievements } = __modules["store"];
+const { ACHIEVEMENTS } = __modules["achievements"];
+
+function achievementsScreen() {
+  const unlocked = loadUnlockedAchievements();
+  const total = Object.keys(ACHIEVEMENTS).length;
+  const got = Object.keys(unlocked).length;
+
+  const rows = Object.entries(ACHIEVEMENTS).map(([id, a]) => {
+    const earned = unlocked[id];
+    return `<div class="row ${earned ? '' : 'locked'}">
+        <div class="row-main">
+          <div class="row-name">${earned ? a.icon : '🔒'} ${a.title}</div>
+          <div class="row-sub">${a.desc}</div>
+        </div>
+        ${earned ? '<span class="chip chip-on">✓</span>' : ''}
+      </div>`;
+  }).join('');
+
+  return {
+    body: `
+      <h1>Achievements</h1>
+      <p class="muted">${got} of ${total} unlocked.</p>
+      <div class="card">${rows}</div>`,
+    actions: `<button class="btn" data-act="close-achievements">Back</button>`,
+  };
+}
+
+const screens = { achievements: achievementsScreen };
+
+const actions = {
+  'open-achievements': () => { store.ui.showAchievements = true; },
+  'close-achievements': () => { store.ui.showAchievements = false; },
+};
+
+  return { screens, actions };
+})();
+
+/* ---- js/app.js ---- */
+__modules["app"] = (function () {
+/**
+ * Lemonade Stand — shell and router.
+ *
+ * Screens live in js/ui/*. Each exports `screens` (view name → function
+ * returning { body, actions, mounted }) and `actions` (button name → handler).
+ * This file owns the DOM, the HUD, input, and saving after every action.
+ */
+const { store, onRender, render, save, hasTutorialBeenSeen } = __modules["store"];
+const C = __modules["campaign"];
+const S = __modules["sim"];
+const mapUi = __modules["ui/map"];
+const runUi = __modules["ui/run"];
+const opsUi = __modules["ui/opsui"];
+const premiumUi = __modules["ui/premium"];
+const tutorialUi = __modules["ui/tutorial"];
+const achievementsUi = __modules["ui/achievements"];
+const { money, whole, bar } = __modules["ui/kit"];
+const { restockCost, spaceLeft } = __modules["ops"];
+
+const screenEl = document.getElementById('screen');
+const actionsEl = document.getElementById('actions');
+const hudEl = document.getElementById('hud');
+
+const SCREENS = { ...mapUi.screens, ...opsUi.screens, ...premiumUi.screens, ...tutorialUi.screens, ...achievementsUi.screens };
+const RUN_SCREENS = runUi.screens;
+const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions, ...premiumUi.actions, ...tutorialUi.actions, ...achievementsUi.actions };
+
+/* ------------------------------------------------------------------ *
+ * Render
+ * ------------------------------------------------------------------ */
+
+/** Full-screen overlays take priority over whatever's underneath, in this order. */
+function overlayView() {
+  if (store.ui.showTutorial) return 'tutorial';
+  if (store.ui.showPremium) return 'premium';
+  if (store.ui.showAchievements) return 'achievements';
+  return null;
+}
+
+function currentScreen() {
+  const overlay = overlayView();
+  if (overlay) return SCREENS[overlay];
+  if (store.ui.view === 'run' && store.run) {
+    return RUN_SCREENS[store.run.phase] || RUN_SCREENS.forecast;
+  }
+  return SCREENS[store.ui.view] || SCREENS.title;
+}
+
+function draw() {
+  const overlay = overlayView();
+  const view = overlay || (store.ui.view === 'run' && store.run ? `run:${store.run.phase}` : store.ui.view);
+  const screen = currentScreen()();
+
+  screenEl.innerHTML = (store.ui.notice ? `<div class="notice">${store.ui.notice}</div>` : '') + screen.body;
+  store.ui.notice = null;
+  actionsEl.innerHTML = screen.actions ?? '';
+  actionsEl.hidden = !screen.actions;
+
+  drawHud();
+
+  // Replay the entrance animation only when the screen actually changed.
+  if (store.ui.lastKey !== view) {
+    screenEl.style.animation = 'none';
+    void screenEl.offsetWidth;
+    screenEl.style.animation = '';
+    store.ui.lastKey = view;
+    screenEl.scrollTop = 0;
+    window.scrollTo(0, 0);
+  }
+  screen.mounted?.();
+  save();
+}
+
+function drawHud() {
+  const inRun = store.ui.view === 'run' && store.run;
+  const showHud = inRun || (store.campaign && ['world', 'city', 'corner', 'ops', 'opsCity'].includes(store.ui.view));
+  hudEl.hidden = !showHud;
+  if (!showHud) {
+    hudEl.innerHTML = '';
+    return;
+  }
+
+  if (inRun) {
+    const r = store.run;
+    const pending = store.ui.pending ? store.ui.pending.revenue : 0;
+    const cash = r.money + pending;
+    const profit = cash - r.stake;
+    hudEl.innerHTML = `
+      <div class="hud-item">
+        <span class="hud-label">Day</span>
+        <span class="hud-value">${Math.min(r.day, r.days)}/${r.days}</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">Cash</span>
+        <span class="hud-value">${money(cash)}</span>
+      </div>
+      ${r.target != null
+        ? `<div class="hud-item hud-goal">
+             <span class="hud-label">Target ${whole(r.target)}</span>
+             ${bar(profit / r.target, profit >= r.target ? 'bar-win' : '')}
+           </div>`
+        : `<div class="hud-item hud-goal">
+             <span class="hud-label">Reputation</span>
+             ${bar(r.reputation)}
+           </div>`}`;
+    return;
+  }
+
+  const progress = C.campaignProgress(store.campaign);
+  hudEl.innerHTML = `
+    <div class="hud-item">
+      <span class="hud-label">Corners</span>
+      <span class="hud-value">${progress.corners}</span>
+    </div>
+    <div class="hud-item">
+      <span class="hud-label">Cities</span>
+      <span class="hud-value">${progress.cities}/${progress.totalCities}</span>
+    </div>
+    <div class="hud-item hud-goal">
+      <span class="hud-label">Treasury</span>
+      <span class="hud-value">${whole(store.campaign.treasury)}</span>
+    </div>`;
+}
+
+onRender(draw);
+
+/* ------------------------------------------------------------------ *
+ * Input
+ * ------------------------------------------------------------------ */
+
+const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+
+const LIMITS = {
+  recipe: { lemons: [1, 12], sugar: [1, 12], ice: [0, 7] },
+  price: { price: [0.05, 5] },
+  order: { lemons: [0, 9999], sugar: [0, 9999], ice: [0, 9999], cups: [0, 9999] },
+  restock: { lemons: [0, 99999], sugar: [0, 99999], cups: [0, 99999] },
+  truckDraft: { amount: [25, 2000] },
+  enhancerOrder: Object.fromEntries(Object.keys(S.ENHANCERS).map((id) => [id, [0, 999]])),
+};
+
+/** Apply one tap of a stepper. Returns false when it could not move. */
+function applyStep(group, field, step) {
+  const [min, max] = LIMITS[group][field];
+
+  if (group === 'order') {
+    const r = store.run;
+    const next = clamp(store.ui.order[field] + step, min, max);
+    const trial = { ...store.ui.order, [field]: next };
+    if (step > 0 && S.buyCost(r.today.prices, trial) > r.money) return false; // never overspend
+    store.ui.order[field] = next;
+    return true;
+  }
+  if (group === 'restock') {
+    const next = clamp(store.ui.restock[field] + step, min, max);
+    const trial = { ...store.ui.restock, [field]: next };
+    return acceptRestock(trial, field, next);
+  }
+  if (group === 'enhancerOrder') {
+    const r = store.run;
+    const next = clamp(store.ui.order.enhancers[field] + step, min, max);
+    const trial = { ...store.ui.order.enhancers, [field]: next };
+    if (step > 0) {
+      const total = S.buyCost(r.today.prices, store.ui.order) + S.enhancerOrderCost(trial);
+      if (total > r.money) return false; // never overspend
+    }
+    store.ui.order.enhancers[field] = next;
+    return true;
+  }
+  if (group === 'truckDraft') {
+    store.ui.truckDraft[field] = clamp(store.ui.truckDraft[field] + step, min, max);
+    return true;
+  }
+  if (group === 'price') {
+    store.run.price = Math.round(clamp(store.run.price + step, min, max) * 100) / 100;
+    return true;
+  }
+  store.run.recipe[field] = clamp(store.run.recipe[field] + step, min, max);
+  return true;
+}
+
+/** An order may not outgrow the depot or the treasury. */
+function acceptRestock(trial, field, next) {
+  const depot = store.campaign.ops?.warehouses?.[store.ui.cityId];
+  if (!depot) return false;
+  const units = trial.lemons + trial.sugar + trial.cups;
+  if (units > spaceLeft(depot)) return false;
+  if (restockCost(trial) > store.campaign.treasury) return false;
+  store.ui.restock[field] = next;
+  return true;
+}
+
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-act]');
+  if (!el || el.disabled) return;
+  const act = el.dataset.act;
+
+  if (act === 'step') {
+    if (applyStep(el.dataset.group, el.dataset.field, Number(el.dataset.step))) render();
+    return;
+  }
+  const handler = ACTIONS[act];
+  if (!handler) return;
+  handler(el);
+  render();
+});
+
+/* Press and hold a stepper to run the number up quickly. */
+let holdTimer = null;
+let holdRepeat = null;
+
+function stopHold() {
+  clearTimeout(holdTimer);
+  clearInterval(holdRepeat);
+  holdTimer = holdRepeat = null;
+}
+
+document.addEventListener('pointerdown', (e) => {
+  const el = e.target.closest('[data-act="step"]');
+  if (!el || el.disabled) return;
+  const { group, field } = el.dataset;
+  const step = Number(el.dataset.step);
+  holdTimer = setTimeout(() => {
+    holdRepeat = setInterval(() => {
+      if (applyStep(group, field, step)) render();
+      else stopHold();
+    }, 80);
+  }, 400);
+});
+
+for (const evt of ['pointerup', 'pointercancel', 'pointerleave']) {
+  document.addEventListener(evt, stopHold);
+}
+
+/* Steppers repeat on hold; a stray double-tap should not zoom the page. */
+document.addEventListener('dblclick', (e) => e.preventDefault());
+
+
+// Always open on the title screen; Continue picks the saved game back up.
+store.ui.view = 'title';
+if (!hasTutorialBeenSeen()) store.ui.showTutorial = true;
+render();
+
+  return {  };
+})();
+
+})();
+
+</script>
+<script>
+/* Preview-only shortcut: seeds a five-city empire so Operations can be seen
+   without grinding through the campaign first. Not part of the shipped game. */
+(function () {
+  function seedAndJump() {
+    const C = window.__modules.campaign;
+    const O = window.__modules.ops;
+    const { store, render } = window.__modules.store;
+
+    const campaign = C.newCampaign();
+    const veteran = C.CITIES.slice(0, 5); // nyc, austin, chicago, boston, miami
+    for (const city of veteran) campaign.claimed[city.id] = [...Array(25).keys()];
+    campaign.treasury = 5000;
+    campaign.ops = O.newOps();
+
+    // NYC: a fully stocked, fully staffed depot with a farm and an ice maker
+    // already running — the screen worth landing on.
+    O.buyWarehouse(campaign, 'nyc');
+    O.restock(campaign, 'nyc', { lemons: 500, sugar: 500, cups: 1000 });
+    O.buildBuilding(campaign, 'nyc', 'lemonFarm');
+    O.buildBuilding(campaign, 'nyc', 'iceMaker');
+    for (let i = 0; i < 6; i++) O.hireStaff(campaign, 'nyc', i);
+
+    // Austin: a smaller operation, so the network overview shows more than one
+    // city, and a truck to show the distribution side of things.
+    O.buyWarehouse(campaign, 'austin');
+    O.restock(campaign, 'austin', { lemons: 60, sugar: 150, cups: 300 });
+    for (let i = 0; i < 2; i++) O.hireStaff(campaign, 'austin', i);
+    const truck = O.buyTruck(campaign);
+    O.assignTruckRoute(campaign, truck.id, { from: 'nyc', to: 'austin', cargo: 'lemons', amount: 150 });
+
+    O.tickOps(campaign, 3); // a few days of history so the ledger isn't empty
+
+    store.campaign = campaign;
+    store.run = null;
+    store.ui.cityId = 'nyc';
+    store.ui.cornerIndex = null;
+    store.ui.restock = { lemons: 0, sugar: 0, cups: 0 };
+    store.ui.opsReport = null;
+    store.ui.showTutorial = false;
+    store.ui.showPremium = false;
+    store.ui.showAchievements = false;
+    store.ui.view = 'opsCity';
+    render();
+  }
+
+  const btn = document.createElement('button');
+  btn.id = 'preview-ops-jump';
+  btn.type = 'button';
+  btn.textContent = '🏭 Jump to Operations';
+  btn.addEventListener('click', seedAndJump);
+  document.querySelector('.preview-banner').appendChild(btn);
+})();
+
+</script>

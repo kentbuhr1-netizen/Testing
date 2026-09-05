@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as C from '../js/campaign.js';
 import * as S from '../js/sim.js';
+import * as E from '../js/employees.js';
 
 test('the map is 25 cities across the US and Europe', () => {
   assert.equal(C.CITIES.length, 25);
@@ -65,6 +66,16 @@ test('targets rise with the tier', () => {
   assert.ok(impossible > easy * 2, `${impossible} vs ${easy}`);
 });
 
+test('parFactor strictly increases tier by tier', () => {
+  // Regression guard for tools/calibrate-campaign-difficulty.mjs: a decent-
+  // but-imperfect player's win rate should step down smoothly tier to
+  // tier, not collapse two tiers into the same difficulty (or invert them).
+  const factors = ['easy', 'medium', 'hard', 'impossible'].map((id) => C.TIERS[id].parFactor);
+  for (let i = 1; i < factors.length; i++) {
+    assert.ok(factors[i] > factors[i - 1], `${factors[i - 1]} -> ${factors[i]} does not strictly increase`);
+  }
+});
+
 test('a target never moves once it has been seen', () => {
   const campaign = C.newCampaign();
   const first = C.targetFor(campaign, 'rome', 3);
@@ -114,6 +125,34 @@ test('the supply chain unlocks on the fifth completed city', () => {
   assert.equal(C.opsUnlocked(campaign), true);
   assert.equal(result.opsJustUnlocked, true);
   assert.equal(C.campaignProgress(campaign).corners, 125);
+});
+
+test('acquiring a corner requires an M&A Specialist, an unlocked corner, and the cash', () => {
+  const campaign = C.newCampaign();
+  campaign.treasury = 100000;
+  const withoutMA = C.acquireCorner(campaign, 'nyc', 0);
+  assert.equal(withoutMA.ok, false);
+  assert.equal(C.isClaimed(campaign, 'nyc', 0), false);
+
+  E.hire(campaign, 'ma');
+  const lockedCorner = C.acquireCorner(campaign, 'nyc', 5); // corner 0 not claimed yet, so 5 is locked
+  assert.equal(lockedCorner.ok, false);
+
+  const cost = C.acquisitionCost(campaign, 'nyc', 0);
+  const treasuryBefore = campaign.treasury;
+  const result = C.acquireCorner(campaign, 'nyc', 0);
+  assert.equal(result.ok, true);
+  assert.equal(C.isClaimed(campaign, 'nyc', 0), true);
+  assert.equal(campaign.treasury, Math.round((treasuryBefore - cost) * 100) / 100);
+
+  const again = C.acquireCorner(campaign, 'nyc', 0);
+  assert.equal(again.ok, false, 'already yours');
+});
+
+test('an acquisition is a stiff premium over the corner\'s own target', () => {
+  const campaign = C.newCampaign();
+  const target = C.targetFor(campaign, 'nyc', 0);
+  assert.equal(C.acquisitionCost(campaign, 'nyc', 0), Math.round(target * 3 * 100) / 100);
 });
 
 test('locked corners stay locked in a locked city', () => {

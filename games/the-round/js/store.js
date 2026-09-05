@@ -48,7 +48,14 @@ export function loadSave() {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    return data?.version === 1 && data.campaign ? data : null;
+    if (data?.version !== 1 || !data.campaign) return null;
+    // A season saved before the round had a take-your-time list carries on
+    // without one rather than throwing on the first render.
+    if (data.run) {
+      data.run.care = data.run.care || [];
+      data.run.standing = data.run.standing ?? 1;
+    }
+    return data;
   } catch {
     return null;
   }

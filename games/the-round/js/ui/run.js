@@ -47,6 +47,7 @@ function forecast() {
         ${fact('On the books', active(r).length)}
         ${fact('At risk', atRisk, atRisk ? 'bad' : 'good')}
         ${fact('Blade', pct(r.sharpness), r.sharpness < 0.4 ? 'bad' : '')}
+        ${fact('Your name', pct(r.standing), r.standing < 0.85 ? 'bad' : '')}
       </section>
 
       ${offer ? `
@@ -91,6 +92,11 @@ function routeScreen() {
 
   // The list is ordered by what a person would scan for: due first, then the
   // ones about to walk, then everything else.
+  // Every unrouted lawn is quoted from wherever the route currently leaves the
+  // van, because that is the number the next choice actually turns on.
+  const last = r.route.length ? r.properties[r.route[r.route.length - 1]] : null;
+  const from = last || S.DEPOT;
+
   const rows = active(r)
     .slice()
     .sort((a, b) => {
@@ -105,28 +111,42 @@ function routeScreen() {
       const step = r.route.indexOf(p.id);
       const leg = plan.legs.find((l) => l.id === p.id);
       const overdueBy = Math.max(0, S.daysSinceCut(p, r.day) - p.expectedGap);
+      // Past the stop that overruns, planRoute stops costing the day out — so
+      // there are no minutes to show rather than zero of them.
+      const beyondDark = step >= 0 && !leg;
       const detail = step >= 0
-        ? `${clock(leg ? leg.drive : 0)} drive · ${clock(leg ? leg.mow : 0)} mowing${leg && !leg.fits ? ' · won’t fit' : ''}`
-        : `${money(p.rate)} · size ${p.size.toFixed(1)} · ${due(p) ? `${p.height.toFixed(1)}cm, ready` : `${p.height.toFixed(1)}cm, nothing to cut yet`}`;
+        ? (leg
+            ? `${clock(leg.drive)} drive · ${clock(leg.mow)} mowing${leg.fits ? '' : ' · won’t fit'}`
+            : 'the day has already run out before here')
+        : `${money(p.rate)} · ${clock(S.travelMinutes(from, p, r.mods))} ${last ? 'on from stop ' + r.route.length : 'from the yard'} · ${due(p) ? `${p.height.toFixed(1)}cm, ready` : `${p.height.toFixed(1)}cm, nothing to cut yet`}`;
 
+      const careful = r.care.includes(p.id);
       return `
-        <button class="lawn-row ${step >= 0 ? 'picked' : ''} ${leg && !leg.fits ? 'wont-fit' : ''}"
-                data-act="toggleStop" data-id="${p.id}">
-          <span class="lawn-step-badge">${step >= 0 ? step + 1 : (due(p) ? '·' : '')}</span>
-          <span class="lawn-main">
-            <span class="lawn-name">${p.name}${overdueBy > 0 ? ` <em>${overdueBy}d late</em>` : ''}</span>
-            <span class="lawn-sub">${detail}</span>
-          </span>
-          <span class="lawn-patience">${bar(p.patience, p.patience < 0.3 ? 'bar-bad' : '')}</span>
-        </button>`;
+        <div class="lawn-row ${step >= 0 ? 'picked' : ''} ${(leg && !leg.fits) || beyondDark ? 'wont-fit' : ''}">
+          <button class="lawn-pick" data-act="toggleStop" data-id="${p.id}">
+            <span class="lawn-step-badge">${step >= 0 ? step + 1 : (due(p) ? '·' : '')}</span>
+            <span class="lawn-main">
+              <span class="lawn-name">${p.name}${overdueBy > 0 ? ` <em>${overdueBy}d late</em>` : ''}</span>
+              <span class="lawn-sub">${detail}</span>
+            </span>
+            <span class="lawn-patience">${bar(p.patience, p.patience < 0.3 ? 'bar-bad' : '')}</span>
+          </button>
+          ${step >= 0 ? `
+            <button class="chip care ${careful ? 'on' : ''}" data-act="toggleCare" data-id="${p.id}"
+                    title="Take your time over this one">
+              ${careful ? '✓ taking your time' : 'take your time'}
+            </button>` : ''}
+        </div>`;
     }).join('');
 
   return {
     body: `
       <h1 class="title">Day ${r.day} <span class="of">the round</span></h1>
-      <p class="sub">Tap in the order you will drive it. The van starts and ends at the yard.</p>
+      <p class="sub">Tap the map, or the list, in the order you will drive it. The van starts
+        and ends at the yard. Some of them want more than a quick once-over — you have to
+        work out which.</p>
 
-      ${roundMap(r.properties, r.route, { due })}
+      ${roundMap(r.properties, r.route, { due, interactive: true })}
 
       <section class="card">
         <div class="row">
@@ -179,13 +199,17 @@ function report() {
         ${fact('Profit', money(res.profit), res.profit >= 0 ? 'good' : 'bad')}
       </section>
 
+      ${res.standing < res.standingWas ? `
+        <div class="warn">Word has got round. Your name is worth
+          ${pct(res.standing)} of a full rate now, down from ${pct(res.standingWas)}.</div>` : ''}
+
       ${res.jobs.length ? `
         <section class="card">
           <h2 class="card-title">The day's work</h2>
           ${res.jobs.map((j) => `
             <div class="row">
               <div class="row-main">
-                <div class="row-name">${j.name}</div>
+                <div class="row-name">${j.name}${j.careful ? ' <em>took your time</em>' : ''}</div>
                 <div class="row-sub">${j.note}</div>
               </div>
               <div class="row-value ${j.due ? '' : 'muted'}">${j.due ? money(j.rate) : '—'}</div>
@@ -251,6 +275,21 @@ function gameover() {
 
 export const screens = { forecast, route: routeScreen, report, gameover };
 
+/** The map is drawn with a margin, and a tap has to land near something. */
+const MAP_PAD = 6;
+const MAP_PICK_RANGE = 12;
+
+/** Add a stop to the round, or take it back off. */
+function toggleStop(id) {
+  const r = store.run;
+  const at = r.route.indexOf(id);
+  if (at >= 0) {
+    r.route.splice(at, 1);
+    // Dropping the stop drops the decision to linger over it.
+    r.care = r.care.filter((c) => c !== id);
+  } else r.route.push(id);
+}
+
 /* ------------------------------------------------------------------ *
  * Actions
  * ------------------------------------------------------------------ */
@@ -264,16 +303,46 @@ export const actions = {
   },
   declineOffer() { store.run.today.offer = null; },
 
-  toggleStop(el) {
+  toggleStop(el) { toggleStop(Number(el.dataset.id)); },
+
+  /**
+   * A tap anywhere on the map takes the lawn nearest to it.
+   *
+   * Giving every lawn its own target means the targets overlap in a tight
+   * round and one lawn quietly swallows its neighbour's taps. Measuring from
+   * the tap instead is unambiguous however close together they sit.
+   */
+  mapPick(el, event) {
+    const svg = el.ownerSVGElement;
+    if (!svg || !svg.getScreenCTM) return;
+    const point = svg.createSVGPoint();
+    point.x = event.clientX;
+    point.y = event.clientY;
+    // Through the viewBox, so this holds however the map has been scaled.
+    const local = point.matrixTransform(svg.getScreenCTM().inverse());
+    const x = local.x - MAP_PAD;
+    const y = local.y - MAP_PAD;
+
+    let best = null;
+    for (const p of store.run.properties) {
+      if (!p.active) continue;
+      const d = Math.hypot(p.x - x, p.y - y);
+      if (!best || d < best.d) best = { d, id: p.id };
+    }
+    if (best && best.d <= MAP_PICK_RANGE) toggleStop(best.id);
+  },
+
+
+  toggleCare(el) {
     const r = store.run;
     const id = Number(el.dataset.id);
-    const at = r.route.indexOf(id);
-    if (at >= 0) r.route.splice(at, 1);
-    else r.route.push(id);
+    const at = r.care.indexOf(id);
+    if (at >= 0) r.care.splice(at, 1);
+    else if (r.route.includes(id)) r.care.push(id);
   },
 
   toggleSharpen() { store.run.sharpenToday = !store.run.sharpenToday; },
-  clearRoute() { store.run.route = []; },
+  clearRoute() { store.run.route = []; store.run.care = []; },
 
   workDay() {
     const r = store.run;
