@@ -12,7 +12,7 @@
  * honestly lower bar than a tight terrace, without anyone balancing 625
  * numbers by hand.
  */
-import { parProfit, mulberry32 } from './sim.js';
+import { parProfit, plainSpread, plainPercentile, mulberry32 } from './sim.js';
 
 export const ROUNDS_PER_TOWN = 25;
 /**
@@ -28,26 +28,50 @@ export const TOWNS_FOR_OPS = 5;   // the yard unlocks once this many towns are d
 
 export const TIERS = {
   easy: {
-    id: 'easy', label: 'Easy', icon: '🟢', days: 14, stake: 60, parFactor: 0.4,
+    id: 'easy', label: 'Easy', icon: '🟢', days: 14, stake: 60, 
     blurb: 'Forgiving clients and a short season. Room to learn the round.',
     mods: { fussiness: 0.85 },
   },
   medium: {
-    id: 'medium', label: 'Medium', icon: '🟡', days: 18, stake: 55, parFactor: 0.62,
+    id: 'medium', label: 'Medium', icon: '🟡', days: 18, stake: 55, 
     blurb: 'A fair round. Every wasted mile is a lawn you did not get to.',
     mods: {},
   },
   hard: {
-    id: 'hard', label: 'Hard', icon: '🟠', days: 22, stake: 50, parFactor: 0.8,
+    id: 'hard', label: 'Hard', icon: '🟠', days: 22, stake: 50, 
     blurb: 'Sharp eyes on the finish, and the blade goes off fast.',
     mods: { fussiness: 1.15, dulling: 1.15 },
   },
   impossible: {
-    id: 'impossible', label: 'Impossible', icon: '🔴', days: 26, stake: 45, parFactor: 0.93,
+    id: 'impossible', label: 'Impossible', icon: '🔴', days: 26, stake: 45, 
     blurb: 'Every mile planned, every blade sharp, or you will be dropped.',
     mods: { fussiness: 1.35, dulling: 1.3, travel: 1.1 },
   },
 };
+
+/**
+ * How hard a round asks you to play, as a position in the spread of imperfect
+ * attempts at it.
+ *
+ * The first round of a town asks for about what a poor season on it makes;
+ * the last asks for better than all but the best of two dozen. Past 1.0 the
+ * bar would climb on into the gap between the best plain attempt and what the
+ * reference routers manage — the range stops short of that, because measured
+ * against simulated play it was punishing without being interesting.
+ *
+ * This replaced a flat share of par per tier. Par alone cannot tell two rounds
+ * apart when one is far harder to play badly on than the other. Measured over
+ * 42 rounds at 60 seasons each, it cut the spread of clear rates between
+ * rounds from 0.37 to 0.24, against a sampling-noise floor of 0.07.
+ */
+const ASK_FROM = 0.02;
+const ASK_TO = 0.95;
+/** How much of the plain-best-to-par gap an ask of 1.15 reaches into. */
+
+export function askFor(roundIndex) {
+  const t = roundIndex / (ROUNDS_PER_TOWN - 1);
+  return ASK_FROM + (ASK_TO - ASK_FROM) * t;
+}
 
 /** Which tier each of a town's 25 neighbourhoods belongs to. */
 export const TIER_LAYOUT = [
@@ -252,9 +276,15 @@ export function targetFor(campaign, townId, roundIndex) {
   const key = `${townId}:${roundIndex}`;
   if (campaign?.targets?.[key] != null) return campaign.targets[key];
   const config = runConfigFor(townId, roundIndex);
-  const tier = TIERS[roundsFor(townId)[roundIndex].tier];
   const par = parProfit(config);
-  const target = Math.max(10, Math.round(par * tier.parFactor));
+  const spread = plainSpread(config);
+  const ask = askFor(roundIndex);
+
+  // A target is a percentile of ordinary play on this exact round — never past
+  // the best plain attempt (askFor tops out below 1), and never more than the
+  // best of the reference family actually cleared here.
+  const bar = plainPercentile(spread, ask);
+  const target = Math.max(10, Math.min(Math.round(bar), Math.round(par)));
   if (campaign) {
     campaign.targets = campaign.targets || {};
     campaign.targets[key] = target;

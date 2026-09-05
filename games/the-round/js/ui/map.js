@@ -37,6 +37,7 @@ function title() {
       ${saved ? `<button class="btn primary" data-act="continueGame">Continue</button>` : ''}
       <button class="btn ${saved ? '' : 'primary'}" data-act="newCampaign">${saved ? 'New career' : 'Start a career'}</button>
       <button class="btn" data-act="freePlay">Free season</button>
+      <button class="btn ghost" data-act="open-bonus-shop">🎬 Bonus Shop</button>
       ${Entitlements.configured() && !Entitlements.owns('the-round')
         ? `<button class="btn ghost" data-act="openShop">Unlock the full campaign</button>` : ''}
       <button class="btn ghost" data-act="openHelp">How to play</button>`,
@@ -192,9 +193,10 @@ function round() {
       </section>
 
       <section class="card">
-        <p class="muted small">The target is ${Math.round(tier.parFactor * 100)}% of what the best reference
-        router clears on this exact round — not a number someone guessed. The weather never
-        changes, so a round you lose is a puzzle you can learn.</p>
+        <p class="muted small">The target is measured, not picked: two dozen seasons of ordinary play are
+        played out on this exact round, and the bar is set among them. The first rounds of
+        a town ask for about what a poor season makes; the last ask for better than any of
+        them. The weather never changes, so a round you lose is a puzzle you can learn.</p>
       </section>
     `,
     actions: held

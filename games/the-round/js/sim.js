@@ -99,14 +99,33 @@ export const WEATHER = {
   storm:    { id: 'storm',    label: 'Downpour',   icon: '⛈️', workable: 0.3,  growth: 1.7, wet: true },
 };
 
-function pickWeather(rng, mods) {
-  const weights = [
+/**
+ * The daylight an average day on this round is worth, before anyone plans it.
+ *
+ * The same weights `pickWeather` rolls against, resolved rather than sampled,
+ * so anything wanting a typical day — the firm's outlook, for one — takes it
+ * from the weather table itself instead of keeping a second copy of it.
+ */
+/** The one weather table: what each sky weighs on this round, wet ones scaled by the town. */
+export function weatherWeights(mods) {
+  const m = withMods(mods);
+  return [
     [WEATHER.clear, 0.30],
     [WEATHER.overcast, 0.26],
     [WEATHER.heat, 0.1],
-    [WEATHER.showers, 0.22 * mods.wetBias],
-    [WEATHER.storm, 0.12 * mods.wetBias],
+    [WEATHER.showers, 0.22 * m.wetBias],
+    [WEATHER.storm, 0.12 * m.wetBias],
   ];
+}
+
+export function expectedWorkable(mods) {
+  const weights = weatherWeights(mods);
+  const total = weights.reduce((n, [, w]) => n + w, 0);
+  return WORK_MINUTES * weights.reduce((n, [w, weight]) => n + w.workable * weight, 0) / total;
+}
+
+function pickWeather(rng, mods) {
+  const weights = weatherWeights(mods);
   const total = weights.reduce((s, [, w]) => s + w, 0);
   let roll = rng() * total;
   for (const [w, weight] of weights) {
@@ -592,35 +611,36 @@ function rankFor(net, lost) {
 
 export const POLICIES = (() => {
   const out = [];
-  // Three ways of deciding where the extra time goes, because that decision is
-  // the point of the lever: never, on a finish that is visibly heading for
-  // trouble, or knowing what each client will actually accept. The gap between
-  // the last two is what the hidden standard is worth.
-  const care = ['never', 'visible', 'standard'];
+  // Four ways of deciding where the extra time goes, because that decision is
+  // the point of the lever: never; on a finish that is visibly heading for
+  // trouble; and two that know what each client will accept, differing in how
+  // far short things have to be before the minutes are worth it. The gap
+  // between those and `visible` is what the hidden standard is worth.
+  const care = [
+    { careMode: 'never', careMargin: 0 },
+    { careMode: 'visible', careMargin: 0 },
+    { careMode: 'standard', careMargin: 0.05 },
+    { careMode: 'standard', careMargin: 0.15 },
+  ];
   const sharpen = [0.45, 0.75];
 
-  for (const rescueAt of [0, 0.15]) {
-    for (const careMode of care) {
+  for (const mode of ['loop', 'nearest', 'value']) {
+    for (const c of care) {
       for (const sharpenAt of sharpen) {
-        out.push({ mode: 'loop', careMode, sharpenAt, takeOffers: true,
-                   rescueAt, urgency: 0, rateWeight: 0 });
+        out.push({
+          mode, ...c, sharpenAt, takeOffers: true, rescueAt: 0,
+          urgency: mode === 'value' ? 25 : 0,
+          rateWeight: mode === 'value' ? 1 : 0,
+        });
       }
     }
   }
-  for (const careMode of care) {
-    for (const sharpenAt of sharpen) {
-      out.push({ mode: 'nearest', careMode, sharpenAt, takeOffers: true,
-                 rescueAt: 0, urgency: 0, rateWeight: 0 });
-      out.push({ mode: 'value', careMode, sharpenAt, takeOffers: true,
-                 rescueAt: 0, urgency: 25, rateWeight: 1 });
-    }
-  }
-  // Turning work down is measurably never the answer, but the axis stays in
-  // the family so that a change to the model can say otherwise.
-  out.push({ mode: 'loop', careMode: 'standard', sharpenAt: 0.75, takeOffers: false,
-             rescueAt: 0, urgency: 0, rateWeight: 0 });
-  out.push({ mode: 'nearest', careMode: 'standard', sharpenAt: 0.75, takeOffers: false,
-             rescueAt: 0, urgency: 0, rateWeight: 0 });
+  // Two axes that are measurably never the answer, kept live in the family so
+  // that a change to the model can say otherwise: turning work down, and
+  // detouring to somebody on the brink.
+  const keen = { careMode: 'standard', careMargin: 0.15, sharpenAt: 0.75, urgency: 0, rateWeight: 0 };
+  out.push({ mode: 'loop', ...keen, takeOffers: false, rescueAt: 0 });
+  out.push({ mode: 'loop', ...keen, takeOffers: true, rescueAt: 0.15 });
   return out;
 })();
 
@@ -631,14 +651,21 @@ const VISIBLY_POOR = 0.8;
  * Should this stop get the extra time?
  *
  * `visible` uses only what is on the screen — a wet day, a blunt blade, grass
- * that got away from you. `standard` also knows what this client will accept,
+ * that got away from you. The others also know what this client will accept,
  * which is the thing the player has to infer.
+ *
+ * They differ in how far short the finish has to be heading before the minutes
+ * are worth spending. Missing a standard by a hair costs almost no patience,
+ * so lingering over it is a lawn you do not get to; the margin is what stops
+ * the bot buying insurance it does not need. Measured over 52 rounds, a margin
+ * of 0.15 is worth 6% more than taking the time whenever the finish would fall
+ * short at all.
  */
 function wantsCare(p, van, policy) {
   switch (policy.careMode) {
     case 'always': return true;
     case 'visible': return cutQuality(p, van, false) < VISIBLY_POOR;
-    case 'standard': return cutQuality(p, van, false) < qualityBar(p);
+    case 'standard': return qualityBar(p) - cutQuality(p, van, false) > policy.careMargin;
     default: return false;
   }
 }
@@ -805,9 +832,138 @@ export function playPolicy(config, policy) {
   return round2(state.money - state.stake);
 }
 
+/* ------------------------------------------------------------------ *
+ * Plain play
+ *
+ * Par is the ceiling, and on its own it is a poor yardstick: the gap between
+ * par and a person is not the same on every round. Two rounds with identical
+ * par cleared at wildly different rates in simulated play — 100% on one, 11%
+ * on the next — because what makes a round awkward for somebody who is not
+ * paying full attention is not what makes it awkward for a router.
+ *
+ * Anchoring on a second bot does not fix it: a tidy reference player lands at
+ * 86-100% of par and moves with par rather than against it. What does fix it
+ * is measuring the round against a spread of *imperfect* attempts and asking
+ * the player to beat a share of them. Whatever it is that makes a round hard
+ * then shows up in the spread, without anyone having to name it.
+ *
+ * Seeded from the round, so the bar is the same every time it is drawn.
+ * ------------------------------------------------------------------ */
+
+/** How many imperfect seasons a round is measured against. */
+export const PLAIN_SAMPLES = 24;
+
+/**
+ * One plausible way of not playing very well.
+ *
+ * The range has to span how badly a person can actually play, not a tidy
+ * approximation of it. A first version left out the two commonest habits —
+ * knocking off with half the day left, and lingering over every lawn on the
+ * round — and set a bar that 54 of 100 simulated players could not clear once.
+ */
+function plainTraits(rng) {
+  return {
+    fill: 0.5 + rng() * 0.55,        // how much of the day they bother to use
+    sharpens: rng() < 0.45,
+    // Most people act on being told off; some linger over everybody, which
+    // costs them the day; some never touch it.
+    care: rng() < 0.62 ? 'told' : (rng() < 0.5 ? 'everyone' : 'never'),
+    remembers: 0.5 + rng() * 0.45,
+    takesOffers: rng() < 0.85,
+    // How often they take whoever is closest to cancelling rather than
+    // whoever is closest. The round list on screen is sorted by exactly that,
+    // so following it is the path of least resistance and most people do.
+    wander: 0.2 + rng() * 0.5,
+  };
+}
+
+/** A day's round as somebody distracted would plan it. */
+function plainRoute(state, traits, told, rng) {
+  const mods = state.mods;
+  const budget = state.today.workable * traits.fill;
+  const route = [];
+  const care = [];
+  let spent = state.sharpenToday ? SHARPEN_MINUTES : 0;
+  let sharpness = state.sharpenToday ? 1 : state.sharpness;
+  let at = DEPOT;
+
+  for (;;) {
+    const open = state.properties.filter(
+      (p) => p.active && isDue(p) && !route.includes(p.id));
+    if (!open.length) break;
+    // Nearest to hand, mostly — with a fair chance of just taking whoever is
+    // nearest to walking, which is who the list puts at the top.
+    open.sort((a, b) => travelMinutes(at, a, mods) - travelMinutes(at, b, mods));
+    const byRisk = open.slice().sort((a, b) => a.patience - b.patience);
+    const p = rng() < traits.wander ? byRisk[0] : open[0];
+
+    const careful = traits.care === 'everyone'
+      || (traits.care === 'told' && told.has(p.id) && rng() < traits.remembers);
+    const van = atSharpness(state, sharpness);
+    const drive = travelMinutes(at, p, mods);
+    const mow = mowMinutes(p, van, careful);
+    if (spent + drive + mow + travelMinutes(p, DEPOT, mods) > state.today.workable) break;
+    if (spent + drive + mow > budget) break;   // they call it a day early
+
+    route.push(p.id);
+    if (careful) care.push(p.id);
+    spent += drive + mow;
+    sharpness = clamp(sharpness - p.size * 0.012 * mods.dulling, 0.15, 1);
+    at = p;
+  }
+  return { route, care };
+}
+
+/** Play one imperfect season end to end. */
+function plainSeason(config, seed) {
+  const rng = mulberry32(seed);
+  const traits = plainTraits(rng);
+  const state = newRun({ ...config, target: null });
+  const told = new Set();   // clients who have complained about the finish
+
+  while (state.phase !== 'gameover') {
+    if (state.today.offer && traits.takesOffers) acceptOffer(state);
+    state.sharpenToday = traits.sharpens && state.sharpness < 0.45 && rng() < 0.7;
+    const plan = plainRoute(state, traits, told, rng);
+    state.route = plan.route;
+    state.care = plan.care;
+    const result = simulateDay(state);
+    // The only thing they learn from, and only about clients named at them.
+    for (const job of result.jobs) {
+      if (/hurry|said nothing/.test(job.note)) told.add(job.id);
+      if (/in and out/.test(job.note)) told.delete(job.id);
+    }
+    commitDay(state, result);
+  }
+  return round2(state.money - state.stake);
+}
+
+/**
+ * What imperfect play makes of this round, worst to best.
+ *
+ * Ask for the 40th of these and roughly 60% of plain attempts clear it; ask
+ * for the 90th and almost none do. That is a bar that means the same thing on
+ * every round in the game.
+ */
+export function plainSpread(config, samples = PLAIN_SAMPLES) {
+  const out = [];
+  for (let i = 0; i < samples; i++) {
+    out.push(plainSeason(config, ((config.seed ?? 1) + i * 2654435761) >>> 0));
+  }
+  return out.sort((a, b) => a - b);
+}
+
+/** The profit that beats `share` of imperfect attempts at this round. */
+export function plainPercentile(spread, share) {
+  const at = clamp(share, 0, 1) * (spread.length - 1);
+  const lo = Math.floor(at);
+  const hi = Math.min(spread.length - 1, lo + 1);
+  return spread[lo] + (spread[hi] - spread[lo]) * (at - lo);
+}
+
 /**
  * Profit the best policy in the family clears on this neighbourhood.
- * This is what targets are measured against.
+ * This is the ceiling a target is measured against.
  */
 export function parProfit(config) {
   let best = -Infinity;

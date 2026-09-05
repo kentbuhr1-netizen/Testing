@@ -383,3 +383,13 @@ test('ignoring what people want does not get you through the hard rounds', () =>
   assert.ok(careless < par * 0.92,
     `never taking your time got ${careless} of par ${par} — the standard is not costing anything`);
 });
+
+test('the firm plans against the same weather table the round rolls', () => {
+  const weights = S.weatherWeights({});
+  assert.equal(weights.length, Object.keys(S.WEATHER).length, 'every sky is weighted');
+  const total = weights.reduce((n, [, w]) => n + w, 0);
+  const mean = S.WORK_MINUTES * weights.reduce((n, [w, weight]) => n + w.workable * weight, 0) / total;
+  assert.equal(S.expectedWorkable({}), mean);
+  const wet = S.weatherWeights({ wetBias: 2 });
+  assert.ok(wet.find(([w]) => w.id === 'storm')[1] > weights.find(([w]) => w.id === 'storm')[1], 'wetBias scales the wet skies');
+});

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as O from '../js/ops.js';
 import * as C from '../js/campaign.js';
+import * as S from '../js/sim.js';
 
 const TOWN = 'willowbrook';
 
@@ -183,4 +184,61 @@ test('a bigger round takes a crew longer, so it cuts fewer lawns', () => {
   const estates = O.roundOutlook('pinehurst', 0);
   const terraces = O.roundOutlook('fairhaven', 0);
   assert.ok(estates.jobs < terraces.jobs, 'big gardens should mean fewer of them');
+});
+
+test('the outlook does not drift away from the game it is meant to average', () => {
+  // roundOutlook models an average day in closed form rather than simulating
+  // one, and nothing kept the two in step. They had come apart badly: it
+  // assumed a 34-unit hop between stops where the game plays out at 17, and
+  // took no account of weather at all. This is the guard that says so.
+  const policy = { mode: 'loop', careMode: 'standard', careMargin: 0.15, sharpenAt: 0.75,
+                   takeOffers: true, rescueAt: 0, urgency: 0, rateWeight: 0 };
+  const DAYS = 6;   // before attrition starts shrinking the book
+
+  const ratios = [];
+  for (const [townId, index] of [['willowbrook', 9], ['fairhaven', 9], ['millbrook', 9],
+                                 ['sandmere', 16], ['cranmoor', 9]]) {
+    const run = S.newRun({ ...C.runConfigFor(townId, index), target: null });
+    let lawns = 0, days = 0;
+    while (run.phase !== 'gameover' && days < DAYS) {
+      if (run.today.offer) S.acceptOffer(run);
+      run.sharpenToday = run.sharpness < policy.sharpenAt;
+      const plan = S.referencePlan(run, policy);
+      run.route = plan.route;
+      run.care = [...plan.care];
+      const result = S.simulateDay(run);
+      lawns += result.jobs.filter((j) => j.due).length;
+      days += 1;
+      S.commitDay(run, result);
+    }
+    const byHand = lawns / days;
+    const crew = O.roundOutlook(townId, index).jobs;
+    const ratio = crew / (byHand * O.CREW_EFFECT);
+    assert.ok(ratio > 0.5 && ratio < 2.3,
+      `${townId}:${index} — a crew is modelled at ${crew.toFixed(2)} lawns a day ` +
+      `against ${byHand.toFixed(2)} by hand (${ratio.toFixed(2)}x CREW_EFFECT)`);
+    ratios.push(ratio);
+  }
+
+  // Loose per round, because a round of estates rounds badly when one lawn is
+  // most of a day. Tight on average, because that is where drift shows.
+  const mean = ratios.reduce((n, r) => n + r, 0) / ratios.length;
+  assert.ok(mean > 0.75 && mean < 1.5,
+    `the firm is modelled at ${mean.toFixed(2)}x what a person manages, times CREW_EFFECT`);
+});
+
+test('a crew is worth stationing on some rounds and not others', () => {
+  // If every round paid, the firm would be a button rather than a decision.
+  const nets = [];
+  for (const town of C.TOWNS) {
+    for (let i = 0; i < C.ROUNDS_PER_TOWN; i++) {
+      const o = O.roundOutlook(town.id, i);
+      nets.push(o.takings - o.wage);
+    }
+  }
+  const paying = nets.filter((n) => n > 0).length;
+  assert.ok(paying > nets.length * 0.2 && paying < nets.length * 0.8,
+    `${paying} of ${nets.length} rounds pay a crew — the choice has gone one way or the other`);
+  assert.ok(Math.max(...nets) > 40, 'the best rounds should be clearly worth crewing');
+  assert.ok(Math.min(...nets) < -20, 'the worst rounds should be clearly not');
 });
