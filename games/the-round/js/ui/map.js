@@ -37,6 +37,7 @@ function title() {
       ${saved ? `<button class="btn primary" data-act="continueGame">Continue</button>` : ''}
       <button class="btn ${saved ? '' : 'primary'}" data-act="newCampaign">${saved ? 'New career' : 'Start a career'}</button>
       <button class="btn" data-act="freePlay">Free season</button>
+      <button class="btn ghost" data-act="open-bonus-shop">🎬 Bonus Shop</button>
       ${Entitlements.configured() && !Entitlements.owns('the-round')
         ? `<button class="btn ghost" data-act="openShop">Unlock the full campaign</button>` : ''}
       <button class="btn ghost" data-act="openHelp">How to play</button>`,

@@ -76,7 +76,8 @@ function forecast() {
           <p class="muted">Nothing yet. They will tell you soon enough.</p>
         </section>`}
     `,
-    actions: `<button class="btn primary" data-act="toRoute">Plan the round</button>`,
+    actions: `<button class="btn primary" data-act="toRoute">Plan the round</button>
+             <button class="btn ghost" data-act="open-bonus-shop">🎬 Bonus</button>`,
   };
 }
 
