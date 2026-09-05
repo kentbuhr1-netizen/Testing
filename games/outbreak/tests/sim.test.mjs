@@ -305,3 +305,58 @@ test('naive play does not come close to par', () => {
     }
   }
 });
+
+/* ------------------------------------------------------------------ *
+ * The week must always be runnable — for the player and the bots alike
+ * ------------------------------------------------------------------ */
+
+test('a district that funds beds to the maximum every week can always run the week', () => {
+  const state = S.newRun({ ...CFG, funds: 11, baseFunds: 7 });
+  for (let w = 0; w < state.weeks; w++) {
+    state.levels = { ...S.NO_LEVELS, beds: S.MAX_LEVEL };
+    S.affordWeek(state);
+    const bill = S.weeklySpend(state.levels, state.pop, state.builtBeds);
+    assert.ok(bill <= state.funds, `week ${state.week}: bill ${bill} exceeds funds ${state.funds}`);
+    S.commitWeek(state, S.simulateWeek(state));
+    assert.ok(state.funds >= 0, `week ${state.week}: ended in debt (${state.funds})`);
+  }
+});
+
+test('wards close only as far as the shortfall needs, never further', () => {
+  const upkeep = S.bedUpkeep(100);
+  assert.equal(S.wardsToClose(upkeep, 100), 0, 'exactly affordable closes nothing');
+  assert.equal(S.wardsToClose(upkeep * 2, 100), 0);
+  const closed = S.wardsToClose(upkeep / 2, 100);
+  assert.ok(closed > 0 && closed <= 100);
+  assert.ok(S.bedUpkeep(100 - closed) <= upkeep / 2, 'what is left is affordable');
+  assert.ok(closed < 100, 'it does not close the lot when half the money is there');
+  assert.ok(Math.abs(S.bedUpkeep(100 - closed) - upkeep / 2) < S.BED_UPKEEP_PER_BED + 0.02, 'and it closes no more than the shortfall needs');
+  assert.equal(S.wardsToClose(-5, 100), 100, 'no money at all closes every ward');
+});
+
+test('closing wards never forgives a debt it did not cover', () => {
+  const state = S.newRun(CFG);
+  state.builtBeds = 10; state.bedCapacity = 10;
+  state.funds = -1000;                                   // far more than ten beds' upkeep
+  const before = state.funds;
+  S.commitWeek(state, { ...S.simulateWeek(state), spend: 0, income: 0 });
+  assert.equal(state.builtBeds, 0, 'every ward closed');
+  assert.ok(state.funds < 0, 'the remainder is still owed');
+  assert.ok(state.funds > before, 'but the closures did refund their upkeep');
+  assert.equal(Math.round((before + S.bedUpkeep(10) - state.funds) * 100) / 100, 0, 'to the penny');
+});
+
+test('the reference bots never run a week the player could not', () => {
+  const orig = S.commitWeek;
+  for (const policy of S.POLICIES.slice(0, 40)) {
+    const state = S.newRun(CFG);
+    while (state.phase !== 'gameover') {
+      S.affordWeek(state);
+      state.levels = S.referenceLevels(state, policy);
+      const bill = S.weeklySpend(state.levels, state.pop, state.builtBeds);
+      assert.ok(bill <= state.funds + 1e-9, `policy ${JSON.stringify(policy)} week ${state.week} overspent`);
+      S.commitWeek(state, S.simulateWeek(state));
+    }
+  }
+  assert.equal(S.commitWeek, orig);
+});

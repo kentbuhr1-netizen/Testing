@@ -118,6 +118,35 @@ export function affordLevels(levels, funds, pop, builtBeds = 0) {
   return out;
 }
 
+/**
+ * Wards the budget can no longer staff. Standing upkeep is the one bill
+ * `affordLevels` cannot trim — a bed is a bed — so when upkeep alone exceeds
+ * the funds, exactly enough wards close to bring it back within reach. Returns
+ * the number of beds to close (0 when the money covers them all).
+ */
+export function wardsToClose(funds, builtBeds) {
+  if (builtBeds <= 0 || bedUpkeep(builtBeds) <= funds) return 0;
+  const shortfall = bedUpkeep(builtBeds) - Math.max(0, funds);
+  return Math.min(builtBeds, Math.ceil(shortfall / BED_UPKEEP_PER_BED * 100) / 100);
+}
+
+/**
+ * Make this week affordable, the one way the game allows: close wards the
+ * budget cannot staff, then trim the levers. This is the same rule for the
+ * player and for the reference bots that set par — a target may only ever be
+ * measured against play the UI would actually permit. Mutates `state`; returns
+ * the beds closed so the briefing can say so.
+ */
+export function affordWeek(state) {
+  const closed = wardsToClose(state.funds, state.builtBeds);
+  if (closed > 0) {
+    state.builtBeds = round2(state.builtBeds - closed);
+    state.bedCapacity = round2(Math.max(0, state.bedCapacity - closed));
+  }
+  state.levels = affordLevels(state.levels, state.funds, state.pop, state.builtBeds);
+  return closed;
+}
+
 /* ------------------------------------------------------------------ *
  * Modifiers — every knob a district, region or tier can turn
  * ------------------------------------------------------------------ */
@@ -433,15 +462,17 @@ export function commitWeek(state, result) {
 
   state.funds = round2(state.funds - result.spend + result.income);
 
-  // A ward you cannot staff is a ward that closes. Rather than strand the
-  // player in debt, exactly enough beds shut to balance the books — the same
-  // bargain `affordLevels` strikes with the levers.
+  // A ward you cannot staff is a ward that closes. `affordWeek` should have
+  // kept the books balanced before the week ran; this is the safety net for a
+  // week that still ended in the red. Closures refund exactly the upkeep they
+  // save and not a penny more — a shortfall that outlives every ward stays
+  // owed, for the bots exactly as for the player.
   result.bedsClosed = 0;
   if (state.funds < 0 && state.builtBeds > 0) {
     const closed = Math.min(state.builtBeds, -state.funds / BED_UPKEEP_PER_BED);
-    state.builtBeds -= closed;
-    state.bedCapacity -= closed;
-    state.funds = 0;
+    state.builtBeds = round2(state.builtBeds - closed);
+    state.bedCapacity = round2(Math.max(0, state.bedCapacity - closed));
+    state.funds = round2(state.funds + closed * BED_UPKEEP_PER_BED);
     result.bedsClosed = closed;
   }
   state.compliance = clamp(state.compliance + result.complianceDelta, 0.1, 1);
@@ -646,6 +677,7 @@ export function playPolicy(config, policy) {
   const state = rawRun(config);
   state.baselineDeaths = 0;
   while (state.phase !== 'gameover') {
+    affordWeek(state);                       // the bots close wards exactly as the player must
     state.levels = referenceLevels(state, policy);
     commitWeek(state, simulateWeek(state));
   }

@@ -273,12 +273,14 @@ export const actions = {
     const r = store.run;
     // Last week's programme may no longer be affordable — closures shrink the
     // budget. Scale it back rather than stranding the player on a dead button.
-    const affordable = S.affordLevels(r.levels, r.funds, r.pop, r.builtBeds);
-    if (S.weeklySpend(affordable, r.pop, r.builtBeds)
-        < S.weeklySpend(r.levels, r.pop, r.builtBeds)) {
+    const before = S.weeklySpend(r.levels, r.pop, r.builtBeds);
+    const closed = S.affordWeek(r);
+    const after = S.weeklySpend(r.levels, r.pop, r.builtBeds);
+    if (closed > 0) {
+      store.ui.notice = `The budget cannot staff every ward. ${lives(closed)} beds have closed to balance the books.`;
+    } else if (after < before) {
       store.ui.notice = 'The budget will not stretch to last week’s programme. Some measures have been scaled back.';
     }
-    r.levels = affordable;
     r.phase = 'measures';
   },
 
