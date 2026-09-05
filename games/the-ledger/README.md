@@ -192,7 +192,7 @@ open-ended twenty-week book with no target — is also on the menu.
 The numbers here were measured, not guessed, and the measuring changed the
 design four times.
 
-**Par across all 625 books** — min $22, median $502, 95th percentile $1,120.
+**Par across all 625 books** — min $19, median $503, 95th percentile $1,107.
 No book has a par at or below zero, which is what makes the target invariant
 hold everywhere.
 
@@ -289,7 +289,7 @@ they are.
 A full fourteen-week book driven end to end in headless Chromium, and won —
 using a strategy computed **only from what is printed on the file card**,
 which is the check that the screen actually shows you enough to play well. It
-cleared $235.69 against a target of $127. The same harness playing on
+cleared $236.36 against a target of $127. The same harness playing on
 keywords alone — "clean books, good word" — cleared $86.54 and lost. Banked
 the book, reloaded the page, and the career resumed with it held.
 
