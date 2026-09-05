@@ -11,6 +11,7 @@ import * as S from './sim.js';
 import * as mapUi from './ui/map.js';
 import * as runUi from './ui/run.js';
 import * as opsUi from './ui/opsui.js';
+import * as bonusShopUi from './ui/bonusshop.js';
 import { money, lives, bar } from './ui/kit.js';
 import { wholesaleCost, spaceLeft } from './ops.js';
 import * as Entitlements from './payments/client/entitlements.js';
@@ -20,15 +21,17 @@ const screenEl = document.getElementById('screen');
 const actionsEl = document.getElementById('actions');
 const hudEl = document.getElementById('hud');
 
-const SCREENS = { ...mapUi.screens, ...opsUi.screens };
+const SCREENS = { ...mapUi.screens, ...opsUi.screens, ...bonusShopUi.screens };
 const RUN_SCREENS = runUi.screens;
-const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions };
+const ACTIONS = { ...mapUi.actions, ...runUi.actions, ...opsUi.actions, ...bonusShopUi.actions };
 
 /* ------------------------------------------------------------------ *
  * Render
  * ------------------------------------------------------------------ */
 
 function currentScreen() {
+  // The bonus shop sits over whatever is current, so a mid-district boost lands where it is needed.
+  if (store.ui.showBonusShop) return SCREENS.bonusShop;
   if (store.ui.view === 'run' && store.run) {
     // A committed week waiting to be read sits in front of the next briefing.
     if (store.ui.pending) return RUN_SCREENS.report;
@@ -131,7 +134,7 @@ function applyStep(group, field, step) {
     const next = clamp(r.levels[field] + step, 0, S.MAX_LEVEL);
     const trial = { ...r.levels, [field]: next };
     // Never let the player commit money the district does not have.
-    if (step > 0 && S.weeklySpend(trial, r.pop) > r.funds) return false;
+    if (step > 0 && S.weeklySpend(trial, r.pop, r.builtBeds) > r.funds) return false;
     r.levels[field] = next;
     return true;
   }

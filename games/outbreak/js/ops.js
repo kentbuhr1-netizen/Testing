@@ -12,9 +12,9 @@
  * charges. The same rule that shapes the core game shapes the agency.
  */
 import {
-  REGIONS, getRegion, districtsFor, heldIn, TIERS, mergeMods, GRANT_PER_LIFE,
+  REGIONS, getRegion, heldIn, runConfigFor, GRANT_PER_LIFE,
 } from './campaign.js';
-import { withMods, BASE_POP, REF_POP } from './sim.js';
+import { withMods, baselineDeaths, playPolicy, POLICIES, BASE_POP, REF_POP } from './sim.js';
 
 export const LAB_COST = 150;                 // $M to build a regional laboratory
 export const LAB_BASE_CAPACITY = 400_000;    // doses it can hold
@@ -24,7 +24,21 @@ export const TEAM_HIRE_COST = 25;            // one-off, per district
 export const TEAM_WAGE = 0.9;                // per stationed team per week
 export const LAB_UPKEEP = 0.4;               // per laboratory per week
 
-/** How well a standing team performs against the outbreak it inherits. */
+/**
+ * What a standing team may do: anything in the reference family that does not
+ * close things. Closing things is a political act and not a team's to take,
+ * which is the one hard limit on the agency — and the reason it can never do
+ * what an attentive hand can.
+ *
+ * A team runs the best of these for the district it stands on, rather than one
+ * fixed mix. A single mix would have been another guessed constant, and a
+ * measurably bad one: the obvious choice captured only 79% of what was
+ * available on average and as little as 39% in the import-heavy districts,
+ * penalising them for a doctrine that simply did not suit them.
+ */
+export const TEAM_POLICIES = POLICIES.filter((p) => p.distLevel === 0);
+
+/** How much of that a standing team actually captures. */
 export const TEAM_EFFECT = 0.6;
 /** What a team achieves once the lab behind it runs dry. */
 export const UNSUPPLIED_EFFECT = 0.4;
@@ -70,33 +84,55 @@ export function spaceLeft(lab) {
  * ------------------------------------------------------------------ */
 
 /**
+ * A district's outlook never changes, and working it out means simulating a
+ * whole outbreak, so it is worked out once and kept.
+ */
+const OUTLOOK_CACHE = new Map();
+
+/**
  * Teams work an average week rather than a simulated one: no pathogen to
  * learn, no weather of the mind. They also stop short of what an attentive
  * hand achieves — that gap is what you are paid for when you work a district
  * yourself.
+ *
+ * What they are worth, though, is measured rather than assumed. The district's
+ * own do-nothing run says how many people it loses in an average unmanaged
+ * week, so a team standing over Cascade in an old city is worth a great deal
+ * more than one standing over a mild flu in a young one — and some districts
+ * do not lose enough people for a team to cover its own wages. Deciding where
+ * they are worth stationing is the whole of the agency.
  */
 export function districtOutlook(regionId, districtIndex) {
-  const district = districtsFor(regionId)[districtIndex];
-  const regionMods = getRegion(regionId).challenge.mods;
-  const mods = withMods(mergeMods(TIERS[district.tier].mods, regionMods, district.mods));
+  const key = `${regionId}:${districtIndex}`;
+  const cached = OUTLOOK_CACHE.get(key);
+  if (cached) return cached;
 
+  const config = runConfigFor(regionId, districtIndex);
+  const mods = withMods(config.mods);
   const pop = Math.round(BASE_POP * mods.popScale);
   const scale = pop / REF_POP;
 
-  // Deaths the district would suffer in an unmanaged week.
-  const exposedDeaths = pop * 0.0009 * mods.density * mods.ageing;
-  const saved = exposedDeaths * TEAM_EFFECT;
-  const savedDry = exposedDeaths * UNSUPPLIED_EFFECT;
+  // What a standing response is worth here, per week: the gap between the
+  // district's own do-nothing run and the best a team is allowed to do on it.
+  // Measuring the *achievable* saving rather than the raw death toll is what
+  // keeps a catastrophic district from paying out catastrophically — a team is
+  // worth what it can actually prevent, which saturates.
+  const unmanaged = baselineDeaths(config);
+  const managed = Math.min(...TEAM_POLICIES.map((p) => playPolicy(config, p)));
+  const achievable = Math.max(0, unmanaged - managed) / config.weeks;
+  const saved = achievable * TEAM_EFFECT;
 
-  return {
+  const out = Object.freeze({
     pop,
     doses: Math.round(pop * 0.003),      // doses the team gets through each week
     beds: Math.round(0.6 * scale * 100) / 100,  // local bed spend, $M per week
     wage: TEAM_WAGE,
     saved,
-    savedDry,
+    savedDry: achievable * UNSUPPLIED_EFFECT,
     grant: Math.round(saved * GRANT_PER_LIFE * 100) / 100,
-  };
+  });
+  OUTLOOK_CACHE.set(key, out);
+  return out;
 }
 
 /** What the whole network would do in one week, as a preview. */
@@ -213,7 +249,7 @@ export function runAgencyWeeks(campaign, weeks) {
         if (supplied) {
           lab.doses -= o.doses;
           summary.doses += o.doses;
-        } else if (stationed.length) {
+        } else {
           dry.add(region.id);
         }
         const saved = supplied ? o.saved : o.savedDry;
