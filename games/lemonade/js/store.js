@@ -50,14 +50,22 @@ let renderFn = () => {};
 export const onRender = (fn) => { renderFn = fn; };
 export const render = () => renderFn();
 
+/** Screens a save can come back to. Anything else resumes at the map, or the title without a campaign. */
+const RESUMABLE = new Set(['world', 'city', 'corner', 'ops', 'opsCity', 'bank', 'run']);
+
 export function save() {
-  if (!store.campaign) return;
+  // A Free Play season without a campaign is still a game worth keeping.
+  if (!store.campaign && !store.run) return;
   try {
+    const view = RESUMABLE.has(store.ui.view) ? store.ui.view : (store.campaign ? 'world' : 'title');
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       version: 2,
       campaign: store.campaign,
       run: store.run,
-      view: store.ui.view === 'help' ? 'world' : store.ui.view,
+      // The simulated-but-uncommitted day. Without it a save left on the
+      // report screen resumes into a screen that dereferences null.
+      pending: store.run ? store.ui.pending : null,
+      view,
       cityId: store.ui.cityId,
       cornerIndex: store.ui.cornerIndex,
     }));
@@ -66,12 +74,23 @@ export function save() {
   }
 }
 
+let saveTimer = null;
+/**
+ * Save shortly, coalescing a burst of renders (a held stepper re-renders 12
+ * times a second) into one write. `save()` itself is still synchronous for
+ * the moments that must not be lost; app.js flushes on pagehide.
+ */
+export function saveSoon(delay = 150) {
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => { saveTimer = null; save(); }, delay);
+}
+
 export function loadSave() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    return data?.version === 2 && data.campaign ? data : null;
+    return data?.version === 2 && (data.campaign || data.run) ? data : null;
   } catch {
     return null;
   }
@@ -82,8 +101,12 @@ export function clearSave() {
 }
 
 export function bestScore() {
-  const n = Number(localStorage.getItem(BEST_KEY));
-  return Number.isFinite(n) && n > 0 ? n : 0;
+  try {
+    const n = Number(localStorage.getItem(BEST_KEY));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch {
+    return 0; // storage blocked entirely: the title still has to paint
+  }
 }
 
 export function recordBest(amount) {

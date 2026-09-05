@@ -2,7 +2,7 @@
 import * as C from '../campaign.js';
 import * as S from '../sim.js';
 import { opsUnlocked } from '../campaign.js';
-import { restockCost } from '../ops.js';
+import { restockCost, ensureOpsShape } from '../ops.js';
 import * as E from '../employees.js';
 import { store, save, render, loadSave, clearSave, bestScore, loadUnlockedAchievements, checkAchievements, achievementToast } from '../store.js';
 import { ACHIEVEMENTS } from '../achievements.js';
@@ -22,7 +22,7 @@ const cityPaidFor = (cityId) =>
 
 function titleScreen() {
   const saved = loadSave();
-  const progress = saved ? C.campaignProgress(saved.campaign) : null;
+  const progress = saved?.campaign ? C.campaignProgress(saved.campaign) : null;
   const best = bestScore();
   const achievementCount = Object.keys(loadUnlockedAchievements()).length;
   const achievementTotal = Object.keys(ACHIEVEMENTS).length;
@@ -108,7 +108,7 @@ function worldScreen() {
           <div class="city-flag">🔒</div>
           <div class="city-main">
             <div class="city-name">${city.name}</div>
-            <div class="row-sub">Take ${i - progress.cities} more cit${i - progress.cities === 1 ? 'y' : 'ies'} to unlock</div>
+            <div class="row-sub">Take ${i - 1 - progress.cities} more cit${i - 1 - progress.cities === 1 ? 'y' : 'ies'} to unlock</div>
           </div>
         </div>`;
     }
@@ -311,9 +311,16 @@ export const actions = {
     if (!saved) return;
     store.campaign = saved.campaign;
     store.run = saved.run;
+    if (store.campaign?.ops) ensureOpsShape(store.campaign.ops); // saves that predate trucks/buildings
     store.ui.cityId = saved.cityId;
     store.ui.cornerIndex = saved.cornerIndex;
-    store.ui.view = saved.run ? 'run' : saved.view || 'world';
+    // A day that was simulated but not yet committed. Older saves did not
+    // keep it; the simulation is deterministic, so it can be rebuilt.
+    store.ui.pending = null;
+    if (store.run && (store.run.phase === 'open' || store.run.phase === 'report')) {
+      store.ui.pending = saved.pending || S.simulateDay(store.run);
+    }
+    store.ui.view = saved.run ? 'run' : (saved.view && saved.view !== 'title' ? saved.view : 'world');
   },
   help: () => { store.ui.view = 'help'; },
   'back-from-help': () => { store.ui.view = store.campaign ? 'world' : 'title'; },
