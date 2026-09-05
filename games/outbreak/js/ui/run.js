@@ -76,7 +76,8 @@ function briefing() {
           <p class="muted">Nothing yet. The first week will tell you what you are dealing with.</p>
         </section>`}
     `,
-    actions: `<button class="btn primary" data-act="toMeasures">Set this week’s measures</button>`,
+    actions: `<button class="btn primary" data-act="toMeasures">Set this week’s measures</button>
+             <button class="btn ghost" data-act="open-bonus-shop">🎬 Bonus</button>`,
   };
 }
 
