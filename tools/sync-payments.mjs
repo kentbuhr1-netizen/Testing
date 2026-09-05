@@ -30,6 +30,7 @@ const GAMES = [
   { name: 'lemonade', dir: 'games/lemonade' },
   { name: 'outbreak', dir: 'games/outbreak' },
   { name: 'the-round', dir: 'games/the-round' },
+  { name: 'the-ledger', dir: 'games/the-ledger' },
 ];
 
 const banner = (from) =>

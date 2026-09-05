@@ -13,6 +13,7 @@ export const FREE_TIER = {
   outbreak: { regions: 3 },
   lemonade: { cities: 3 },
   'the-round': { towns: 3 },
+  'the-ledger': { towns: 3 },
 };
 
 /**
@@ -48,6 +49,15 @@ export const PRODUCTS = [
     unlocks: ['the-round'],
   },
   {
+    id: 'the-ledger.full',
+    game: 'the-ledger',
+    name: 'The Ledger — full campaign',
+    blurb: 'All 25 towns, all 625 books, and the branch network.',
+    amount: 499,
+    currency: 'usd',
+    unlocks: ['the-ledger'],
+  },
+  {
     id: 'bundle.all',
     game: null,
     name: 'Every game, forever',
@@ -55,7 +65,7 @@ export const PRODUCTS = [
     // Deliberately below the sum of the singles, and it stays there as games
     // are added — the bundle should always be the obvious buy, never a trap
     // for anyone who does the arithmetic at the point of sale.
-    amount: 799,
+    amount: 899,
     currency: 'usd',
     unlocks: ['*'],
     featured: true,
