@@ -106,27 +106,26 @@ export const WEATHER = {
  * so anything wanting a typical day — the firm's outlook, for one — takes it
  * from the weather table itself instead of keeping a second copy of it.
  */
-export function expectedWorkable(mods) {
+/** The one weather table: what each sky weighs on this round, wet ones scaled by the town. */
+export function weatherWeights(mods) {
   const m = withMods(mods);
-  const weights = [
+  return [
     [WEATHER.clear, 0.30],
     [WEATHER.overcast, 0.26],
     [WEATHER.heat, 0.1],
     [WEATHER.showers, 0.22 * m.wetBias],
     [WEATHER.storm, 0.12 * m.wetBias],
   ];
+}
+
+export function expectedWorkable(mods) {
+  const weights = weatherWeights(mods);
   const total = weights.reduce((n, [, w]) => n + w, 0);
   return WORK_MINUTES * weights.reduce((n, [w, weight]) => n + w.workable * weight, 0) / total;
 }
 
 function pickWeather(rng, mods) {
-  const weights = [
-    [WEATHER.clear, 0.30],
-    [WEATHER.overcast, 0.26],
-    [WEATHER.heat, 0.1],
-    [WEATHER.showers, 0.22 * mods.wetBias],
-    [WEATHER.storm, 0.12 * mods.wetBias],
-  ];
+  const weights = weatherWeights(mods);
   const total = weights.reduce((s, [, w]) => s + w, 0);
   let roll = rng() * total;
   for (const [w, weight] of weights) {

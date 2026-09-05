@@ -67,7 +67,6 @@ export const TIERS = {
 const ASK_FROM = 0.02;
 const ASK_TO = 0.95;
 /** How much of the plain-best-to-par gap an ask of 1.15 reaches into. */
-const BEYOND_PLAIN = 0.3;
 
 export function askFor(roundIndex) {
   const t = roundIndex / (ROUNDS_PER_TOWN - 1);
@@ -281,15 +280,10 @@ export function targetFor(campaign, townId, roundIndex) {
   const spread = plainSpread(config);
   const ask = askFor(roundIndex);
 
-  let bar;
-  if (ask <= 1) {
-    bar = plainPercentile(spread, ask);
-  } else {
-    // Past the best plain attempt, climb towards what the routers manage.
-    const best = spread[spread.length - 1];
-    bar = best + Math.max(0, par - best) * Math.min(1, (ask - 1) / BEYOND_PLAIN);
-  }
-  // Never more than the best of the reference family actually cleared here.
+  // A target is a percentile of ordinary play on this exact round — never past
+  // the best plain attempt (askFor tops out below 1), and never more than the
+  // best of the reference family actually cleared here.
+  const bar = plainPercentile(spread, ask);
   const target = Math.max(10, Math.min(Math.round(bar), Math.round(par)));
   if (campaign) {
     campaign.targets = campaign.targets || {};

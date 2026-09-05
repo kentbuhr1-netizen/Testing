@@ -5,6 +5,8 @@
  * `run` is the season currently being worked, a day at a time.
  * `ui` is throwaway view state — which screen, the order being filled in.
  */
+import { targetFor } from './campaign.js';
+
 const SAVE_KEY = 'the-round-campaign-v1';
 /**
  * Bumped when the day model changes enough that a saved career is describing
@@ -67,6 +69,13 @@ export function loadSave() {
       // cached under the old model is a bar from a game that no longer exists.
       // Rounds already held stay held; the rest are measured again on sight.
       data.campaign.targets = {};
+      // …including the round that was in progress when the save was made.
+      // Its cached target is from the old model; measure it again like the
+      // rest, so one round is not held to a bar its neighbours are not.
+      const n = data.run?.neighbourhood;
+      if (data.run && n && data.run.target != null) {
+        data.run.target = targetFor(data.campaign, n.townId, n.index);
+      }
       data.version = SAVE_VERSION;
     }
     return data;
