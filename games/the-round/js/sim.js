@@ -231,7 +231,6 @@ export const qualityBar = (property) => clamp(0.5 + 0.22 * property.fussiness, 0
 export const isDue = (property) => property.height >= DUE_HEIGHT;
 
 export const daysSinceCut = (property, day) => day - property.lastCut;
-export const isOverdue = (property, day) => daysSinceCut(property, day) > property.expectedGap;
 
 /* ------------------------------------------------------------------ *
  * Starting a run
