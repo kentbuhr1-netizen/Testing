@@ -1,5 +1,7 @@
 # Games
 
+[![Check](https://github.com/kentbuhr1-netizen/Testing/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/kentbuhr1-netizen/Testing/actions/workflows/check.yml)
+
 A series of phone-first browser games. One new game a week, each a
 self-contained project sharing the same spine.
 
