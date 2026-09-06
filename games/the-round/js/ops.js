@@ -13,14 +13,24 @@
  * the core game shapes the firm.
  */
 import { TOWNS, getTown, roundsFor, heldIn, TIERS, mergeMods } from './campaign.js';
-import { withMods, MINUTES_PER_UNIT, MINUTES_PER_SIZE, WORK_MINUTES } from './sim.js';
+import {
+  withMods, IDEAL_HEIGHT, DEPOT, expectedWorkable,
+  mowMinutes, travelMinutes, cutQuality, qualityBar,
+} from './sim.js';
 
 export const YARD_COST = 900;                // to open a yard in a town
 export const YARD_BASE_CAPACITY = 4000;      // units of stock it can hold
 export const CAPACITY_UPGRADE_COST = 700;
 export const CAPACITY_UPGRADE_STEP = 3000;
 export const CREW_HIRE_COST = 250;           // one-off, per round
-export const CREW_WAGE = 95;                 // per crew per day
+/**
+ * Per crew per day. Set against the outlook rather than picked: at this wage
+ * 62% of the 625 rounds pay a crew and 38% do not, so where you station them
+ * is a decision. It also has to clear the bar in the towns you own when the
+ * firm unlocks — the first five average $14 a day a crew, which covers a yard
+ * with a few rounds under it and no more.
+ */
+export const CREW_WAGE = 82;
 export const YARD_UPKEEP = 40;               // per yard per day
 
 /** How well a standing crew works a round compared with you. */
@@ -76,29 +86,74 @@ const round2 = (n) => Math.round(n * 100) / 100;
  * ------------------------------------------------------------------ */
 
 /**
+ * The average lawn and the average day, measured off the simulation rather
+ * than guessed at.
+ *
+ * `buildRound` rolls size over `(2 + rng * 9) * lawnSize`, so the mean lawn is
+ * 6.5 before the round's own modifier; playing 52 rounds under a reference
+ * router gives 6.55. The same run puts the mean hop between consecutive stops
+ * at 17 map units before spread, and the mean grass height when it is finally
+ * cut at 6.8cm — a little past its best, because a lawn is rarely reached the
+ * day it comes due. An earlier version of this file guessed 34 units for the
+ * hop, which modelled every crew as half as productive as the game plays.
+ */
+const MEAN_LAWN = 6.5;
+const MEAN_HOP = 17;
+const MEAN_CUT_HEIGHT = 6.8;
+/** The mean of `(0.6 + rng) * fussiness`. */
+const MEAN_FUSSINESS = 1.1;
+/** A blade kept in reasonable order by the yard, but not freshly ground. */
+const CREW_SHARPNESS = 0.8;
+/**
+ * No route fills the day to the minute: the last job that would not leave time
+ * to get home is left, and what is left over cannot be banked. Playing 779
+ * days under a reference router fills 88% of the workable day.
+ */
+const DAY_PACKING = 0.88;
+
+/**
  * Crews work an average day rather than a simulated one: no weather, no round
  * to plan, no client to read. They also route worse than an attentive owner —
  * that gap is what you are paid for when you work a round yourself.
+ *
+ * What the day *costs*, though, comes from sim.js, so that a crewed round and
+ * a hand-worked one cannot quietly drift apart when the model changes.
  */
 export function roundOutlook(townId, roundIndex) {
   const round = roundsFor(townId)[roundIndex];
   const townMods = getTown(townId).challenge.mods;
   const mods = withMods(mergeMods(TIERS[round.tier].mods, townMods, round.mods));
 
-  const meanSize = 6.5 * mods.lawnSize;
-  const mowMinutes = meanSize * MINUTES_PER_SIZE * mods.slope * 1.15;   // some overgrowth
-  const driveMinutes = 34 * mods.spread * mods.travel * MINUTES_PER_UNIT;
-  const perJob = mowMinutes + driveMinutes;
+  const size = MEAN_LAWN * mods.lawnSize;
+  const lawn = {
+    size,
+    height: MEAN_CUT_HEIGHT,
+    rate: (9 + size * 3.1) * mods.rate,
+    fussiness: MEAN_FUSSINESS * mods.fussiness,
+  };
+  const van = { mods, today: { wet: false }, sharpness: CREW_SHARPNESS };
 
-  const jobs = Math.max(0, (WORK_MINUTES * 0.9 / perJob) * CREW_EFFECT);
-  const jobsDry = Math.max(0, (WORK_MINUTES * 0.9 / perJob) * UNSUPPLIED_EFFECT);
-  const rate = (9 + meanSize * 3.1) * mods.rate;
+  // A crew takes the extra time where the average client on this round needs
+  // it, and not otherwise — the same call the player makes, made once for the
+  // whole round. Keeping standards is why their takings hold up.
+  const careful = cutQuality(lawn, van, false) < qualityBar(lawn);
+
+  const hop = travelMinutes(DEPOT, { x: DEPOT.x + MEAN_HOP * mods.spread, y: DEPOT.y }, mods);
+  const perJob = mowMinutes(lawn, van, careful) + hop;
+
+  // An average day's daylight for this round's climate, as much of it as a
+  // route can actually use. Weather comes from sim.js rather than a guess:
+  // Rainford and Cranmoor lose a third of the year to it.
+  const daylight = expectedWorkable(mods) * DAY_PACKING;
+  const jobs = Math.max(0, (daylight / perJob) * CREW_EFFECT);
+  const jobsDry = Math.max(0, (daylight / perJob) * UNSUPPLIED_EFFECT);
 
   return {
     jobs,
     jobsDry,
-    takings: round2(jobs * rate),
-    takingsDry: round2(jobsDry * rate),
+    careful,
+    takings: round2(jobs * lawn.rate),
+    takingsDry: round2(jobsDry * lawn.rate),
     fuel: Math.max(1, Math.round(jobs * 1.6)),          // litres a day
     blades: Math.max(1, Math.round(jobs * 0.16 * mods.dulling)),
     wage: CREW_WAGE,

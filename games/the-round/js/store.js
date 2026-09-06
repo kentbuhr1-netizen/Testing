@@ -5,7 +5,15 @@
  * `run` is the season currently being worked, a day at a time.
  * `ui` is throwaway view state — which screen, the order being filled in.
  */
+import { targetFor } from './campaign.js';
+
 const SAVE_KEY = 'the-round-campaign-v1';
+/**
+ * Bumped when the day model changes enough that a saved career is describing
+ * a different game. Progress is kept; anything measured against the old model
+ * is thrown away and measured again.
+ */
+const SAVE_VERSION = 2;
 const BEST_KEY = 'the-round-best-v1';
 
 export const store = {
@@ -31,7 +39,7 @@ export function save() {
   if (!store.campaign) return;
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      version: 1,
+      version: SAVE_VERSION,
       campaign: store.campaign,
       run: store.run,
       view: store.ui.view === 'help' || store.ui.view === 'shop' ? 'world' : store.ui.view,
@@ -48,12 +56,27 @@ export function loadSave() {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    if (data?.version !== 1 || !data.campaign) return null;
-    // A season saved before the round had a take-your-time list carries on
-    // without one rather than throwing on the first render.
-    if (data.run) {
-      data.run.care = data.run.care || [];
-      data.run.standing = data.run.standing ?? 1;
+    if (!data?.campaign || !(data.version >= 1)) return null;
+
+    if (data.version < SAVE_VERSION) {
+      // A season saved before the round had a take-your-time list carries on
+      // without one rather than throwing on the first render.
+      if (data.run) {
+        data.run.care = data.run.care || [];
+        data.run.standing = data.run.standing ?? 1;
+      }
+      // Targets are a share of what the reference routers clear, so a target
+      // cached under the old model is a bar from a game that no longer exists.
+      // Rounds already held stay held; the rest are measured again on sight.
+      data.campaign.targets = {};
+      // …including the round that was in progress when the save was made.
+      // Its cached target is from the old model; measure it again like the
+      // rest, so one round is not held to a bar its neighbours are not.
+      const n = data.run?.neighbourhood;
+      if (data.run && n && data.run.target != null) {
+        data.run.target = targetFor(data.campaign, n.townId, n.index);
+      }
+      data.version = SAVE_VERSION;
     }
     return data;
   } catch {
