@@ -76,7 +76,8 @@ function briefing() {
           <p class="muted">Nothing yet. The first week will tell you what you are dealing with.</p>
         </section>`}
     `,
-    actions: `<button class="btn primary" data-act="toMeasures">Set this week’s measures</button>`,
+    actions: `<button class="btn primary" data-act="toMeasures">Set this week’s measures</button>
+             <button class="btn ghost" data-act="open-bonus-shop">🎬 Bonus</button>`,
   };
 }
 
@@ -87,7 +88,10 @@ function briefing() {
 /** What each lever would do, at the level currently dialled in. */
 function leverReadout(id, level) {
   const r = store.run;
-  if (level === 0) return 'Off.';
+  // Wards already open still cost money with the lever at zero, and that is
+  // exactly when the player most needs telling.
+  const standing = id === 'beds' ? S.bedUpkeep(r.builtBeds) : 0;
+  if (level === 0 && standing === 0) return 'Off.';
   if (id === 'trace') {
     const reach = S.traceReach(r, level);
     const cut = S.traceCut(r, level);
@@ -103,13 +107,18 @@ function leverReadout(id, level) {
     const at = r.week + r.pathogen.vaccineLag + r.mods.vaccineDelay;
     return `${lives(doses)} doses. Protection lands in week ${at}.`;
   }
+  const open = standing > 0
+    ? `${lives(r.builtBeds)} open, ${money(standing)} a week to staff.`
+    : '';
+  if (level === 0) return open;
   const added = r.pop * S.BED_PER_LEVEL * level;
-  return `${lives(added)} extra beds, open next week.`;
+  return `${lives(added)} more beds, open next week — ${money(S.bedUpkeep(added))} a week `
+    + `to staff, for good.${open ? ` ${open}` : ''}`;
 }
 
 function measures() {
   const r = store.run;
-  const bill = S.weeklySpend(r.levels, r.pop);
+  const bill = S.weeklySpend(r.levels, r.pop, r.builtBeds);
   const left = round1(r.funds - bill);
 
   const levers = S.LEVERS.map((lever) => {
@@ -140,6 +149,7 @@ function measures() {
         ${fact('Budget', money(r.funds))}
         ${fact('This week', money(bill), bill > r.funds ? 'bad' : '')}
         ${fact('Left over', money(left), left < 0 ? 'bad' : 'good')}
+        ${r.builtBeds > 0 ? fact('Ward staffing', money(S.bedUpkeep(r.builtBeds))) : ''}
       </section>
 
       ${bill > r.funds ? `<div class="warn">This week’s programme costs more than the budget. Scale something back.</div>` : ''}
@@ -264,17 +274,20 @@ export const actions = {
     const r = store.run;
     // Last week's programme may no longer be affordable — closures shrink the
     // budget. Scale it back rather than stranding the player on a dead button.
-    const affordable = S.affordLevels(r.levels, r.funds, r.pop);
-    if (S.weeklySpend(affordable, r.pop) < S.weeklySpend(r.levels, r.pop)) {
+    const before = S.weeklySpend(r.levels, r.pop, r.builtBeds);
+    const closed = S.affordWeek(r);
+    const after = S.weeklySpend(r.levels, r.pop, r.builtBeds);
+    if (closed > 0) {
+      store.ui.notice = `The budget cannot staff every ward. ${lives(closed)} beds have closed to balance the books.`;
+    } else if (after < before) {
       store.ui.notice = 'The budget will not stretch to last week’s programme. Some measures have been scaled back.';
     }
-    r.levels = affordable;
     r.phase = 'measures';
   },
 
   runWeek() {
     const r = store.run;
-    if (S.weeklySpend(r.levels, r.pop) > r.funds) return;
+    if (S.weeklySpend(r.levels, r.pop, r.builtBeds) > r.funds) return;
     const result = S.simulateWeek(r);
     S.commitWeek(r, result);
     store.ui.pending = result;

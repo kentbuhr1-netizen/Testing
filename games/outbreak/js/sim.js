@@ -54,6 +54,26 @@ export const LEVER_COST = {
   beds: 1.05,
 };
 
+/**
+ * Staffing a ward you opened, as a share of what it cost to open it.
+ *
+ * Without this, funding beds is a one-off purchase of a permanent asset: the
+ * stock grows linearly for a flat weekly price, and buying beds from week one
+ * dominates every other lever by a wide margin. Upkeep is what gives the
+ * hospital an opportunity cost, so beds become a question of *when* rather
+ * than a free win.
+ */
+export const BED_UPKEEP_SHARE = 0.28;
+/** What one bed costs to open, in $M — the bed lever's price per bed. */
+export const BED_BUILD_COST_PER_BED = LEVER_COST.beds / (BED_PER_LEVEL * REF_POP);
+/** What one open bed costs to staff each week thereafter, in $M. */
+export const BED_UPKEEP_PER_BED = BED_BUILD_COST_PER_BED * BED_UPKEEP_SHARE;
+
+/** Weekly bill for the wards already standing. Never scaled: a bed is a bed. */
+export function bedUpkeep(builtBeds) {
+  return Math.round(builtBeds * BED_UPKEEP_PER_BED * 100) / 100;
+}
+
 export const LEVERS = [
   { id: 'trace', label: 'Test & trace', icon: '🔬',
     blurb: 'Find cases and chase their contacts. Only as good as the labs can keep up with.' },
@@ -67,13 +87,18 @@ export const LEVERS = [
 
 export const NO_LEVELS = { trace: 0, distance: 0, vaccine: 0, beds: 0 };
 
-/** Weekly bill for a set of levels, scaled to the district's size. */
-export function weeklySpend(levels, pop) {
+/**
+ * Weekly bill for a set of levels, scaled to the district's size, plus the
+ * upkeep on wards already open. Opening a bed is charged once, in the week you
+ * fund it; staffing it is charged every week after.
+ */
+export function weeklySpend(levels, pop, builtBeds = 0) {
   const scale = pop / REF_POP;
   return round2(
     (levels.trace * LEVER_COST.trace +
      levels.vaccine * LEVER_COST.vaccine +
      levels.beds * LEVER_COST.beds) * scale
+    + builtBeds * BED_UPKEEP_PER_BED
   );
 }
 
@@ -85,12 +110,41 @@ export function weeklySpend(levels, pop) {
  * player on a disabled button, the dearest levers are given up first.
  * Distancing costs nothing and is never trimmed.
  */
-export function affordLevels(levels, funds, pop) {
+export function affordLevels(levels, funds, pop, builtBeds = 0) {
   const out = { ...levels };
   for (const key of ['vaccine', 'beds', 'trace']) {   // dearest first
-    while (out[key] > 0 && weeklySpend(out, pop) > funds) out[key] -= 1;
+    while (out[key] > 0 && weeklySpend(out, pop, builtBeds) > funds) out[key] -= 1;
   }
   return out;
+}
+
+/**
+ * Wards the budget can no longer staff. Standing upkeep is the one bill
+ * `affordLevels` cannot trim — a bed is a bed — so when upkeep alone exceeds
+ * the funds, exactly enough wards close to bring it back within reach. Returns
+ * the number of beds to close (0 when the money covers them all).
+ */
+export function wardsToClose(funds, builtBeds) {
+  if (builtBeds <= 0 || bedUpkeep(builtBeds) <= funds) return 0;
+  const shortfall = bedUpkeep(builtBeds) - Math.max(0, funds);
+  return Math.min(builtBeds, Math.ceil(shortfall / BED_UPKEEP_PER_BED * 100) / 100);
+}
+
+/**
+ * Make this week affordable, the one way the game allows: close wards the
+ * budget cannot staff, then trim the levers. This is the same rule for the
+ * player and for the reference bots that set par — a target may only ever be
+ * measured against play the UI would actually permit. Mutates `state`; returns
+ * the beds closed so the briefing can say so.
+ */
+export function affordWeek(state) {
+  const closed = wardsToClose(state.funds, state.builtBeds);
+  if (closed > 0) {
+    state.builtBeds = round2(state.builtBeds - closed);
+    state.bedCapacity = round2(Math.max(0, state.bedCapacity - closed));
+  }
+  state.levels = affordLevels(state.levels, state.funds, state.pop, state.builtBeds);
+  return closed;
 }
 
 /* ------------------------------------------------------------------ *
@@ -242,6 +296,7 @@ function rawRun({ seed, weeks = 12, funds = 11, baseFunds = 7, mods = null, path
     baseFunds: round2(baseFunds * scale),
     labCapacity: pop * BASE_TEST_RATE * m.labs,
     bedCapacity: pop * BASE_BED_RATE * m.bedsBase,
+    builtBeds: 0,          // wards you opened, and therefore have to staff
     bedQueue: 0,
     vaxQueue: [],          // [{ week, doses }] — doses that mature later
     levels: { ...NO_LEVELS },
@@ -368,7 +423,7 @@ export function simulateWeek(state) {
     doses += dosedNow;
   }
 
-  const spend = weeklySpend(L, state.pop);
+  const spend = weeklySpend(L, state.pop, state.builtBeds);
   const income = round2(state.baseFunds * m.funding * economyFactor(state, L.distance));
 
   // Public patience: distancing burns it, quiet weeks restore it, and a bad
@@ -399,12 +454,27 @@ export function commitWeek(state, result) {
   Object.assign(state, result.next);
 
   state.bedCapacity += state.bedQueue;
+  state.builtBeds += state.bedQueue;
   state.bedQueue = state.pop * BED_PER_LEVEL * state.levels.beds;
 
   state.vaxQueue = state.vaxQueue.filter((q) => q.week > state.week);
   if (result.doses > 0) state.vaxQueue.push({ week: result.maturesAt, doses: result.doses });
 
   state.funds = round2(state.funds - result.spend + result.income);
+
+  // A ward you cannot staff is a ward that closes. `affordWeek` should have
+  // kept the books balanced before the week ran; this is the safety net for a
+  // week that still ended in the red. Closures refund exactly the upkeep they
+  // save and not a penny more — a shortfall that outlives every ward stays
+  // owed, for the bots exactly as for the player.
+  result.bedsClosed = 0;
+  if (state.funds < 0 && state.builtBeds > 0) {
+    const closed = Math.min(state.builtBeds, -state.funds / BED_UPKEEP_PER_BED);
+    state.builtBeds = round2(state.builtBeds - closed);
+    state.bedCapacity = round2(Math.max(0, state.bedCapacity - closed));
+    state.funds = round2(state.funds + closed * BED_UPKEEP_PER_BED);
+    result.bedsClosed = closed;
+  }
   state.compliance = clamp(state.compliance + result.complianceDelta, 0.1, 1);
   state.lastDeaths = result.deaths;
 
@@ -444,6 +514,9 @@ export function surveillanceNotes(state, result) {
     notes.push('People are tiring of this.');
   }
 
+  if (result.bedsClosed > 1) {
+    notes.push(`${Math.round(result.bedsClosed).toLocaleString('en-US')} beds closed — there was no money left to staff them.`);
+  }
   if (result.overflow > 0.08) {
     notes.push(`Wards ran ${Math.round(result.overflow * 100)}% over capacity — people died who would have lived with a bed.`);
   }
@@ -500,7 +573,6 @@ export function livesSaved(state) {
 export function finalScore(state) {
   const saved = livesSaved(state);
   const peak = state.history.reduce((a, h) => Math.max(a, h.peakCare), 0);
-  const infected = state.pop - state.s - state.r * 0; // survivors who were never exposed
   const everInfected = state.d + state.r + state.i + state.e;
   return {
     deaths: Math.round(state.d),
@@ -538,15 +610,34 @@ function rankFor(share) {
  * without anyone balancing 625 numbers by hand.
  * ------------------------------------------------------------------ */
 
-/** The knobs the reference bot searches over. */
+/**
+ * The knobs the reference bot searches over.
+ *
+ * The family has to contain the best play available, or par understates what
+ * the district can give and the targets come out too soft. It must therefore
+ * span the levers at full strength, and — because opening beds early and
+ * holding them is a genuinely different policy from opening them once the
+ * wards fill — both sides of that timing question.
+ *
+ * Combinations that would only duplicate another are dropped: a policy that
+ * never closes anything has no threshold to close at, and one that never
+ * builds beds has no timing to choose.
+ */
 export const POLICIES = (() => {
   const out = [];
-  for (const distLevel of [0, 3, 5]) {
-    for (const distFrom of [0.0003, 0.0015]) {
-      for (const vax of [0, 3]) {
-        for (const beds of [0, 3]) {
-          for (const traceFirst of [true, false]) {
-            out.push({ distLevel, distFrom, vax, beds, traceFirst });
+  for (const distLevel of [0, 2, 3, 5]) {
+    // Nothing to threshold if you never close anything.
+    for (const distFrom of distLevel === 0 ? [0] : [0.0003, 0.0015]) {
+      for (const vax of [0, 3, MAX_LEVEL]) {
+        for (const beds of [0, 3, MAX_LEVEL]) {
+          // Nothing to time if you never build a ward.
+          for (const bedsEarly of beds === 0 ? [false] : [true, false]) {
+            for (const traceOn of [true, false]) {
+              // Nothing to prioritise if you never buy a test.
+              for (const traceFirst of traceOn ? [true, false] : [false]) {
+                out.push({ distLevel, distFrom, vax, beds, bedsEarly, traceOn, traceFirst });
+              }
+            }
           }
         }
       }
@@ -562,10 +653,11 @@ export function referenceLevels(state, policy) {
 
   const want = {
     // Tracing is worth buying while it can still reach anybody.
-    trace: traceReach(state, MAX_LEVEL) > 0.25 ? MAX_LEVEL : 0,
+    trace: policy.traceOn && traceReach(state, MAX_LEVEL) > 0.25 ? MAX_LEVEL : 0,
     distance: activeShare >= policy.distFrom && state.compliance > 0.3 ? policy.distLevel : 0,
     vaccine: susceptibleShare > 0.2 ? policy.vax : 0,
-    beds: state.i * state.pathogen.hosp > state.bedCapacity * 0.7 ? policy.beds : 0,
+    beds: policy.bedsEarly || state.i * state.pathogen.hosp > state.bedCapacity * 0.7
+      ? policy.beds : 0,
   };
 
   // Trim to what the money covers, in priority order.
@@ -574,7 +666,7 @@ export function referenceLevels(state, policy) {
   for (const key of order) {
     for (let n = want[key]; n > 0; n--) {
       const trial = { ...levels, [key]: n };
-      if (weeklySpend(trial, state.pop) <= state.funds) { levels[key] = n; break; }
+      if (weeklySpend(trial, state.pop, state.builtBeds) <= state.funds) { levels[key] = n; break; }
     }
   }
   return levels;
@@ -585,6 +677,7 @@ export function playPolicy(config, policy) {
   const state = rawRun(config);
   state.baselineDeaths = 0;
   while (state.phase !== 'gameover') {
+    affordWeek(state);                       // the bots close wards exactly as the player must
     state.levels = referenceLevels(state, policy);
     commitWeek(state, simulateWeek(state));
   }
