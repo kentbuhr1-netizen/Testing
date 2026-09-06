@@ -312,6 +312,13 @@ export const actions = {
     store.ui.regionId = data.regionId ?? null;
     store.ui.districtIndex = data.districtIndex ?? null;
     store.ui.view = data.run ? 'run' : (data.view ?? 'world');
+    // Targets are measured, so a change to the model makes the cached ones
+    // wrong. Say so rather than letting a bar quietly differ from last time.
+    if (data.migrated?.cleared > 0) {
+      store.ui.notice = `The model has changed since you last played. `
+        + `${data.migrated.cleared} district ${data.migrated.cleared === 1 ? 'target has' : 'targets have'} `
+        + `been measured again. A district you are part-way through keeps the target it started on.`;
+    }
   },
 
   freePlay() {

@@ -132,3 +132,86 @@ test('no district asks for more than it can give', { timeout: 120_000 }, () => {
   }
   assert.equal(checked, 625);
 });
+
+/**
+ * Clearing stale bars.
+ *
+ * A target is a share of what `parSaved` finds, so a change to the model makes
+ * every cached bar an honest number for a game that no longer exists. The
+ * migration drops them; everything that is not a claim about difficulty stays.
+ */
+test('a campaign measured against an older model has its bars re-measured', () => {
+  const campaign = C.newCampaign();
+  campaign.held = { wellington: [0, 1, 2] };
+  campaign.treasury = 42.5;
+  campaign.stats = { runsPlayed: 9, runsWon: 3, livesSaved: 1234 };
+  campaign.ops = { week: 7, labs: { wellington: { capacity: 1, doses: 2 } }, teams: {} };
+  campaign.targets = { 'wellington:0': 111, 'wellington:1': 222, 'seoul:4': 333 };
+  campaign.targetModel = 1;                       // measured against the old model
+
+  const result = C.migrateCampaign(campaign);
+
+  assert.equal(result.from, 1);
+  assert.equal(result.cleared, 3, 'every stale bar should have been dropped');
+  assert.deepEqual(campaign.targets, {}, 'no stale bar should survive');
+  assert.equal(campaign.targetModel, C.TARGET_MODEL_VERSION);
+
+  // Nothing that is not a claim about difficulty may be touched.
+  assert.deepEqual(campaign.held, { wellington: [0, 1, 2] });
+  assert.equal(campaign.treasury, 42.5);
+  assert.deepEqual(campaign.stats, { runsPlayed: 9, runsWon: 3, livesSaved: 1234 });
+  assert.equal(campaign.ops.week, 7);
+  assert.equal(campaign.ops.labs.wellington.doses, 2);
+});
+
+test('a save with no model stamp at all is treated as the oldest one', () => {
+  const campaign = C.newCampaign();
+  delete campaign.targetModel;                    // exactly how the first saves look
+  campaign.targets = { 'wellington:0': 999 };
+  const result = C.migrateCampaign(campaign);
+  assert.equal(result.from, 1);
+  assert.equal(result.cleared, 1);
+  assert.deepEqual(campaign.targets, {});
+});
+
+test('a campaign already on the current model is left alone', () => {
+  const campaign = C.newCampaign();
+  const bar = C.targetFor(campaign, 'wellington', 0);
+  const result = C.migrateCampaign(campaign);
+  assert.equal(result.cleared, 0, 'a current campaign has nothing to clear');
+  assert.equal(campaign.targets['wellington:0'], bar, 'its bars must survive');
+
+  // And migrating twice never clears anything the second time.
+  campaign.targetModel = 1;
+  assert.equal(C.migrateCampaign(campaign).cleared, 1);
+  assert.equal(C.migrateCampaign(campaign).cleared, 0);
+});
+
+test('a bar dropped by the migration comes back measured against the model in force', () => {
+  const stale = C.newCampaign();
+  stale.targetModel = 1;
+  stale.targets = { 'wellington:0': 99_999 };     // a bar no model would ever set
+  C.migrateCampaign(stale);
+
+  const fresh = C.newCampaign();
+  assert.equal(C.targetFor(stale, 'wellington', 0), C.targetFor(fresh, 'wellington', 0),
+    're-measured bar should match what a new campaign is given');
+});
+
+/**
+ * The promise the migration must not break: a bar may be re-measured between
+ * districts, but never while one is being played. The run takes its own copy
+ * of the target when it starts, so clearing the campaign's cache cannot move
+ * the bar out from under an outbreak in progress.
+ */
+test('clearing the cache never moves the bar under a district in progress', () => {
+  const campaign = C.newCampaign();
+  const target = C.targetFor(campaign, 'wellington', 0);
+  const run = S.newRun({ ...C.runConfigFor('wellington', 0), target });
+
+  campaign.targetModel = 1;
+  C.migrateCampaign(campaign);
+
+  assert.equal(run.target, target, 'the run in progress kept the bar it started with');
+  assert.equal(S.finalScore(run).target, target);
+});
