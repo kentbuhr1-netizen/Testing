@@ -1,0 +1,18 @@
+{
+  "appId": "com.kentbuhr.theledger",
+  "appName": "The Ledger",
+  "webDir": "www",
+  "backgroundColor": "#f4f2ec",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#f4f2ec"
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "backgroundColor": "#f4f2ec",
+    "scheme": "TheLedger"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

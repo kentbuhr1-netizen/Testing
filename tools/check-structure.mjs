@@ -303,6 +303,26 @@ for (const name of games) {
   if (!readme.includes(`games/${name}`)) listed.push('not listed in the root README.md');
   if (listed.length) bad(name, 'is linked from the root index and README', listed);
   else ok('is linked from the root index and README');
+
+  // Every game is its own store app. The shell is generated — this checks it
+  // exists and still describes this game, not that anyone remembered to run it.
+  const app = join(dir, 'app');
+  const shell = ['capacitor.config.json', 'package.json', 'build.mjs', 'native-storage.js'].filter((f) => !existsSync(join(app, f)));
+  if (shell.length) {
+    bad(name, 'has a store app shell', shell.map((f) => `missing app/${f} — run: node tools/make-app.mjs ${name}`));
+  } else {
+    const cfg = JSON.parse(readFileSync(join(app, 'capacitor.config.json'), 'utf8'));
+    const manifest = JSON.parse(readFileSync(join(dir, 'manifest.webmanifest'), 'utf8'));
+    const wrong = [];
+    if (cfg.appName !== manifest.name) wrong.push(`app name "${cfg.appName}" is not the manifest's "${manifest.name}"`);
+    if (!/^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)+$/.test(cfg.appId || '')) wrong.push(`app id "${cfg.appId}" is not reverse-DNS`);
+    if (cfg.webDir !== 'www') wrong.push(`webDir is "${cfg.webDir}", the build writes www`);
+    if (wrong.length) bad(name, 'has a store app shell', wrong);
+    else ok('has a store app shell');
+    const assets = ['icon-1024.png', 'splash-2732.png'].filter((f) => !existsSync(join(app, 'assets', f)));
+    if (assets.length) warn(name, 'has its store artwork', assets.map((f) => `missing app/assets/${f} — run: node tools/make-store-assets.mjs ${name}`));
+    else ok('has its store artwork');
+  }
 }
 
 /* ── summary ───────────────────────────────────────────────────────────── */

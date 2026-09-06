@@ -1,0 +1,18 @@
+{
+  "appId": "com.kentbuhr.theround",
+  "appName": "The Round",
+  "webDir": "www",
+  "backgroundColor": "#f2f7ee",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#f2f7ee"
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "backgroundColor": "#f2f7ee",
+    "scheme": "TheRound"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

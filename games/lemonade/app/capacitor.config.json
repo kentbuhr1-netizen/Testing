@@ -1,0 +1,18 @@
+{
+  "appId": "com.kentbuhr.lemonade",
+  "appName": "Lemonade Stand",
+  "webDir": "www",
+  "backgroundColor": "#fff8e6",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#fff8e6"
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "backgroundColor": "#fff8e6",
+    "scheme": "LemonadeStand"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

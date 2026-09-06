@@ -60,6 +60,31 @@ Payments are **off** unless configured: with a game's `js/payments.config.js`
 left blank, that game is the complete game. See
 [`shared/payments/README.md`](shared/payments/README.md) to switch the shop on.
 
+## Store apps
+
+Every game ships to the App Store and Google Play as **its own app** — one game,
+one listing, one binary — in a [Capacitor](https://capacitorjs.com) shell that
+wraps the web game unchanged. The shell lives in `games/<slug>/app/` and is
+generated, not hand-written, so a new game gets one in a single command:
+
+```bash
+node tools/make-app.mjs <slug>            # the shell: config, build step, storage shim, store copy
+node tools/make-store-assets.mjs <slug>   # 1024×1024 icon and a splash, from the game's own icon.svg
+cd games/<slug>/app && npm install && npm run add:android && npm run add:ios
+npm run sync                              # every time the game changes
+```
+
+The shell adds exactly one behaviour the browser build lacks: **native save
+mirroring**. iOS may evict WebView storage; every localStorage write is mirrored
+into Capacitor Preferences and restored on launch, so nobody loses a campaign
+or a paid licence to the OS. The game's code is not touched.
+
+What no script can do is in each app's `README.md` and `store/`: the app id (fixed
+forever at first listing), swapping the Stripe paywall for in-app purchase or
+shipping the complete game free (the default), wiring a real rewarded ad behind
+the bonus shop or hiding it, a public privacy-policy URL, and screenshots from
+real devices.
+
 ## Working on them
 
 ```bash
