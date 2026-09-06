@@ -13,6 +13,9 @@
  * balancing 625 numbers by hand.
  */
 import { parProfit, mulberry32 } from './sim.js';
+import { NUDGES } from './seeds.js';
+
+export { NUDGES };
 
 export const BOOKS_PER_TOWN = 25;
 /**
@@ -187,27 +190,49 @@ const QUIRKS = [
   { id: 'nobooks', label: 'Nobody keeps books', mods: { noise: 1.3, mispricing: 1.15 } },
 ];
 
-const bookSeed = (townIdx, i) => (townIdx + 1) * 1_000_003 + (i + 1) * 7919;
+/**
+ * The seed a book would have with no re-roll. Kept separate from the seed a
+ * book actually gets: see `NUDGES`, and `tools/reroll-seeds.mjs` for why some
+ * books are dealt a different hand than this.
+ */
+const baseSeed = (townIdx, i) => (townIdx + 1) * 1_000_003 + (i + 1) * 7919;
+
+/** How far a nudged book is moved along. Prime, so it does not fold back. */
+const NUDGE_STEP = 104_729;
+
+/** The seed a book is actually played with. */
+export const bookSeed = (townIdx, i) =>
+  baseSeed(townIdx, i) + (NUDGES[townIdx * BOOKS_PER_TOWN + i] || 0) * NUDGE_STEP;
+
+/**
+ * One book, dealt from an explicit seed. Everything the seed decides — the
+ * quirk, the corner of town, the name, the size of the queue — is decided
+ * here, so the re-roll tool can try a candidate hand without going through
+ * the table of hands already chosen.
+ */
+export function bookAtSeed(townIdx, i, seed, siblings = []) {
+  const t = TOWNS[townIdx];
+  const rng = mulberry32(seed);
+  const quirk = QUIRKS[Math.floor(rng() * QUIRKS.length)];
+  const area = t.areas[Math.floor(rng() * t.areas.length)];
+  const kind = rng() < 0.5 ? 'Book' : ['Ledger', 'Account', 'Paper', 'Bills'][Math.floor(rng() * 4)];
+  return {
+    index: i,
+    townId: t.id,
+    name: dedupeName(siblings, `The ${area} ${kind}`, i),
+    tier: TIER_LAYOUT[i],
+    quirk: quirk.label,
+    seed,
+    mods: mergeMods(quirk.mods, { applicants: 0.9 + rng() * 0.3 }),
+  };
+}
 
 /** The 25 books of a town, always generated the same way. */
 export function booksFor(townId) {
   const townIdx = TOWN_INDEX[townId];
-  const t = TOWNS[townIdx];
   const out = [];
   for (let i = 0; i < BOOKS_PER_TOWN; i++) {
-    const rng = mulberry32(bookSeed(townIdx, i));
-    const quirk = QUIRKS[Math.floor(rng() * QUIRKS.length)];
-    const area = t.areas[Math.floor(rng() * t.areas.length)];
-    const kind = rng() < 0.5 ? 'Book' : ['Ledger', 'Account', 'Paper', 'Bills'][Math.floor(rng() * 4)];
-    out.push({
-      index: i,
-      townId,
-      name: dedupeName(out, `The ${area} ${kind}`, i),
-      tier: TIER_LAYOUT[i],
-      quirk: quirk.label,
-      seed: bookSeed(townIdx, i),
-      mods: mergeMods(quirk.mods, { applicants: 0.9 + rng() * 0.3 }),
-    });
+    out.push(bookAtSeed(townIdx, i, bookSeed(townIdx, i), out));
   }
   return out;
 }
@@ -229,18 +254,22 @@ export function mergeMods(...list) {
   return out;
 }
 
-/** Everything sim.js needs to play one book. */
-export function runConfigFor(townId, bookIndex) {
+/** Everything sim.js needs to play a book you already hold. */
+export function configForBook(townId, book) {
   const t = getTown(townId);
-  const book = booksFor(townId)[bookIndex];
   const tier = TIERS[book.tier];
   return {
     seed: book.seed,
     weeks: tier.weeks,
     stake: tier.stake,
     mods: mergeMods(tier.mods, t.challenge.mods, book.mods),
-    book: { townId, index: bookIndex, name: book.name, tier: book.tier },
+    book: { townId, index: book.index, name: book.name, tier: book.tier },
   };
+}
+
+/** Everything sim.js needs to play one book. */
+export function runConfigFor(townId, bookIndex) {
+  return configForBook(townId, booksFor(townId)[bookIndex]);
 }
 
 /**

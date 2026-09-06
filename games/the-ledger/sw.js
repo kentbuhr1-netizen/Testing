@@ -1,5 +1,5 @@
 /* Offline shell: the game is static, so cache it and serve from cache first. */
-const CACHE = 'the-ledger-v2';
+const CACHE = 'the-ledger-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,7 @@ const ASSETS = [
   './js/app.js',
   './js/sim.js',
   './js/campaign.js',
+  './js/seeds.js',
   './js/ops.js',
   './js/store.js',
   './js/ui/kit.js',

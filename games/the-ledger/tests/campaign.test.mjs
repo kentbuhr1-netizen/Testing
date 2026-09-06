@@ -190,3 +190,37 @@ test('no book asks for more than it can give', { timeout: 300_000 }, () => {
   }
   assert.equal(checked, 625);
 });
+
+// The other load-bearing invariant, and the reason `js/seeds.js` exists. A
+// book whose bar a coarse rule clears is a book that never asked the player
+// anything, so no book is allowed to be one. Walks all 625.
+test('no blunt rule clears any book', { timeout: 300_000 }, () => {
+  const blunt = S.POLICIES.filter((p) => ['all', 'none', 'safest', 'rate'].includes(p.kind));
+  assert.ok(blunt.length >= 8, 'the blunt rules went missing from the family');
+  const campaign = C.newCampaign();
+  let checked = 0;
+  for (const town of C.TOWNS) {
+    for (let i = 0; i < C.BOOKS_PER_TOWN; i++) {
+      const config = C.runConfigFor(town.id, i);
+      const target = C.targetFor(campaign, town.id, i);
+      const best = Math.max(...blunt.map((p) => S.playPolicy(config, p)));
+      assert.ok(best < target,
+        `${town.id}:${i} is won by a blunt rule — it clears ${Math.round(best)} against ${target}`);
+      checked += 1;
+    }
+  }
+  assert.equal(checked, 625);
+});
+
+// The nudge table is content, not a cache: a stale one silently un-does the
+// re-roll, so its shape is checked rather than trusted.
+test('every book has been dealt a hand that was actually chosen', () => {
+  assert.equal(C.NUDGES.length, C.TOWNS.length * C.BOOKS_PER_TOWN);
+  for (const n of C.NUDGES) {
+    assert.ok(Number.isInteger(n) && n >= 0, `bad nudge ${n}`);
+  }
+  for (const town of C.TOWNS) {
+    const seeds = C.booksFor(town.id).map((b) => b.seed);
+    assert.equal(new Set(seeds).size, seeds.length, `${town.id} deals a seed twice`);
+  }
+});

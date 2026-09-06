@@ -167,9 +167,10 @@ js/ops.js               branches, vaults, managers, the daily tick
 js/store.js             shared state and the save file
 js/app.js               router, HUD, input
 js/ui/                  screens: map.js, run.js, opsui.js, bonusshop.js, kit.js
-tests/                  94 tests across the model, the campaign, the network
+tests/                  96 tests across the model, the campaign, the network
                         and the bonus shop
 tools/make-icons.mjs    regenerates icons/*.png from icons/icon.svg
+tools/reroll-seeds.mjs  re-deals the books a blunt rule would win
 ```
 
 `sim.js`, `campaign.js` and `ops.js` are pure and DOM-free, so the whole game
@@ -177,7 +178,7 @@ can be played and balanced from node. The same seed always replays the same
 book.
 
 ```bash
-npm test           # 94 tests
+npm test           # 96 tests
 npm run icons      # rebuild PNG icons from the SVG (needs headless Chromium)
 ```
 
@@ -192,7 +193,7 @@ open-ended twenty-week book with no target — is also on the menu.
 The numbers here were measured, not guessed, and the measuring changed the
 design four times.
 
-**Par across all 625 books** — min $19, median $503, 95th percentile $1,107.
+**Par across all 625 books** — min $21, median $530, 95th percentile $1,116.
 No book has a par at or below zero, which is what makes the target invariant
 hold everywhere.
 
@@ -202,29 +203,59 @@ is how far short they fall. Averaged over all 625 books, as a share of par:
 
 | Strategy | Share of par |
 |---|---|
-| Approve everything | **−40%** |
-| Decline everything | **−49%** |
-| Approve only the safest-looking | **−0% to +6%** |
-| Threshold on the rate | **−52% to −57%** |
+| Approve everything | **−57%** |
+| Decline everything | **−47%** |
+| Approve only the safest-looking | **−19% to −11%** |
+| Threshold on the rate | **−64% to −70%** |
 
-All four lose money or barely break even, against an Easy target of 40% of
-par. Put in cash, averaged over the same 625 books: reading the file clears
-**$555**, taking only the safest-looking names clears **$110** at its best
-bar and nothing at all at its worst, chasing the highest rates loses **$101
-to $117**, approving everybody loses **$68**, and approving nobody loses
-**$191**.
+All four lose money, against an Easy target of 40% of par. Put in cash,
+averaged over the same 625 books: reading the file clears **$577**, taking
+only the safest-looking names clears **$38** at its best bar and loses money
+at its worst, chasing the highest rates loses **$185 to $206**, approving
+everybody loses **$162**, and approving nobody loses **$191**.
 
 That last one matters as much as the first. Depositors are paid interest and
-the branch costs money to keep open, so **doing nothing is the second-worst
-strategy in the game**. There is no safe option; there is only judgement.
+the branch costs money to keep open, so **shutting the desk still loses $191 a
+book**. There is no safe option; there is only judgement.
 
-That table is a mean, and it is worth saying what a mean hides. Book by book,
-the *best* of the four blunt rules does clear the target on **279 of the 625**
-— 85 Easy, 82 Medium, 74 Hard, 38 Impossible. Those are not books where
-thinking fails; they are books where a blunt rule happens to land near the
-right answer, and the target is a share of par rather than a share of what a
-careless player would manage. Averaged out, judgement wins by a distance. On
-any one book, sometimes the coarse bar is close enough.
+### No book is won by a blunt rule
+
+A mean can hide a great deal, and this one used to. Averaged out the coarse
+rules were hopeless, but book by book the best of them cleared the target on
+**279 of the 625** — and a book a blunt rule wins never asked the player
+anything. So the books that behaved that way were dealt again.
+
+A book's seed fixes its applicants and their outcomes before a single decision
+is made, so it also fixes how well a coarse bar happens to do there. Nothing
+about the model changed: `tools/reroll-seeds.mjs` walks all 625 books, plays
+the whole reference family on each, and where a blunt rule clears the bar it
+deals that book a fresh hand and tries again. It keeps the first hand that
+satisfies both halves of what a book is for:
+
+- **no blunt rule comes near the target** — the best of them must fall at
+  least a tenth short, so a hand that merely scrapes under does not count;
+- **judgement still gets through** — enough of the reading policies must clear
+  the target, with the floor set at each tier's own 25th percentile on the
+  content as first dealt. A book nothing can win would be as bad as one
+  anything can win, and the first pass at this produced exactly that before
+  the second condition was added.
+
+**342 of the 625 books** needed a second hand; the median book was re-dealt
+once, and the most stubborn took 52 deals before it stopped rewarding a coarse
+bar. The result, and there is a test walking all 625 that holds it:
+
+| | Before | After |
+|---|---|---|
+| Books a blunt rule wins | 279 / 625 | **0 / 625** |
+| Books a blunt rule tops the whole family on | 17% | **0%** |
+| Books one good fixed policy wins | 188 / 625 | **208 / 625** |
+
+That last row is the one that mattered. Re-dealing until the coarse rules fail
+could easily have produced books where *nothing* readable works — hands where
+the signal on the card is simply noise. It did the opposite: a single good
+policy, chosen once and applied blind to all 625, now wins more books than
+before, while the blunt rules win none. The re-deal took difficulty away from
+the dice and gave it back to the reading.
 
 The optimum is an interior one, which is how you know the family brackets it
 rather than running out at its own edge. Sweeping the acceptance bar with the
@@ -232,12 +263,12 @@ other three knobs held fixed, averaged over all 625 books:
 
 | Acceptance bar | Approves | Loans a book | Profit |
 |---|---|---|---|
-| 0 (everything positive) | 30% | 41 | $223 |
-| 0.02 | 27% | 39 | $262 |
-| 0.035 | 25% | 36 | $274 |
-| 0.05 | **22%** | **32** | **$275** |
-| 0.08 | 16% | 24 | $246 |
-| 0.12 | 9% | 15 | $145 |
+| 0 (everything positive) | 30% | 42 | $245 |
+| 0.02 | 28% | 40 | $305 |
+| 0.035 | 25% | 36 | $329 |
+| 0.05 | **22%** | **33** | **$339** |
+| 0.08 | 16% | 24 | $293 |
+| 0.12 | 9% | 15 | $186 |
 
 It climbs, tops out around 0.035–0.05, and falls away again. Being choosier
 than that costs more in loans not written than it saves in defaults avoided.
@@ -268,8 +299,9 @@ file was worth nothing on half of them. The cause was that a default cost the
 whole principal regardless of term while the interest scaled with it, so short
 loans were strictly bad and the bots hoarded. Making default a **weekly hazard**
 — so a longer loan has proportionally longer to go wrong — made term
-EV-neutral, pushed acceptance from 8% to 22%, and put 32 loans in a book
-instead of 6. Naive-tops-the-family fell to 17%.
+EV-neutral, pushed acceptance from 8% to 22%, and put 33 loans in a book
+instead of 6. Naive-tops-the-family fell from 52% to 17%, and the re-deal
+above later took it the rest of the way to nothing.
 
 **One knob was secretly two.** `noise` scaled both how unreadable the files
 were *and* how badly the town priced its rates — and those pull in opposite
@@ -304,9 +336,17 @@ they are.
 A full fourteen-week book driven end to end in headless Chromium, and won —
 using a strategy computed **only from what is printed on the file card**,
 which is the check that the screen actually shows you enough to play well. It
-cleared $236.36 against a target of $127. The same harness playing on
-keywords alone — "clean books, good word" — cleared $86.54 and lost. Banked
-the book, reloaded the page, and the career resumed with it held.
+cleared $185.17 against a target of $157, writing 19 of the 67 files that
+reached the desk and losing none of them. Banked the book, reloaded the page,
+and the career resumed with it held.
+
+The same harness playing on keywords alone — "clean books, good word" —
+cleared $174.54 and also got through, writing 32 files and losing one. Worth
+being straight about that: on this opening Easy book a coarse reading is
+enough, and it is only the *blunt* rules, the ones that never look at the card
+at all, that the re-deal above guarantees will fail. Reading the file properly
+wrote thirteen fewer loans for eleven more dollars, which is the shape of the
+edge rather than a wall.
 
 Reloading **part-way through a week's queue** — the thing a phone actually
 does to you — comes back to the same applicant, with the same terms, the same
