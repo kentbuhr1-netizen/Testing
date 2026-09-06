@@ -249,14 +249,13 @@ function buildApplication(rng, mods, week, id) {
 }
 
 /**
- * What the applicant will hand back in total if they see it through.
+ * What the applicant hands over each week.
  *
  * Loans here are bullet loans: interest every week, the principal back in one
  * piece at the end. That is what makes "you cannot call a loan in" mean
  * something — the money is gone for the whole term, and a depositor who wants
  * theirs on Friday does not care that it comes back in six weeks.
  */
-export const totalDue = (app) => round2(app.amount * (1 + app.rate));
 export const interestOf = (app) => round2(app.amount * app.rate / app.term);
 
 /* ------------------------------------------------------------------ *

@@ -37,10 +37,6 @@ export function bulkDiscount(qty) {
   return BULK_BREAKS.find((b) => qty >= b.min).discount;
 }
 
-export function wholesaleCost(unit, qty) {
-  return Math.round(WHOLESALE[unit] * qty * bulkDiscount(qty) * 100) / 100;
-}
-
 // Employee discounts read as multipliers off the base constants above, so
 // "no employee hired" always reduces to the numbers this file already had.
 export const effectiveWage = (campaign) => Math.round(STAFF_WAGE * Employees.wageMult(campaign) * 100) / 100;
