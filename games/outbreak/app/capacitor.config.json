@@ -1,0 +1,18 @@
+{
+  "appId": "com.kentbuhr.outbreak",
+  "appName": "Outbreak",
+  "webDir": "www",
+  "backgroundColor": "#0f1720",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#0f1720"
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "backgroundColor": "#0f1720",
+    "scheme": "Outbreak"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

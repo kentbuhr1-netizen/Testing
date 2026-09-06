@@ -77,11 +77,16 @@ function opsTown() {
     const round = rounds[i];
     const staffed = O.isStaffed(opsState, townId, i);
     const o = O.roundOutlook(townId, i);
+    // Wages are the same everywhere and takings are not, so plenty of rounds
+    // are not worth a crew. That subtraction is the decision, so make it.
+    const net = Math.round((o.takings - o.wage) * 100) / 100;
     return `
       <div class="row">
         <div class="row-main">
-          <div class="row-name">${round.name}</div>
-          <div class="row-sub">${money(o.takings)}/day · ${money(o.wage)} wages · ${o.fuel}L, ${o.blades} blades</div>
+          <div class="row-name">${round.name}
+            <em class="crew-net ${net >= 0 ? 'good' : 'bad'}">${net >= 0 ? '+' : ''}${money(net)}/day</em>
+          </div>
+          <div class="row-sub">${money(o.takings)} of work · ${money(o.wage)} wages · ${o.fuel}L, ${o.blades} blades${o.careful ? ' · they take their time here' : ''}</div>
         </div>
         ${staffed
           ? `<button class="chip danger" data-act="layOff" data-index="${i}">Lay off</button>`

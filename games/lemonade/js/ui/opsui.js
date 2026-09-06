@@ -77,7 +77,7 @@ function truckRouteLabel(truck) {
 /** The whole fleet: domestic trucks plus overseas ships and planes, bought by tier. */
 function fleetCard() {
   const campaign = store.campaign;
-  const vehicles = ops().trucks;
+  const vehicles = O.ensureOpsShape(ops()).trucks;
   const rows = vehicles.map((v) => {
     const def = O.VEHICLES[v.tier] || O.VEHICLES.semi;
     return `<div class="row">

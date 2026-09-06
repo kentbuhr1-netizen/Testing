@@ -48,7 +48,11 @@ export function loadSave() {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    return data?.version === 1 && data.campaign ? data : null;
+    if (!(data?.version === 1 && data.campaign)) return null;
+    // A run saved before wards carried a staffing bill has no bed stock to
+    // staff. Without this the first committed week adds to `undefined`.
+    if (data.run && typeof data.run.builtBeds !== 'number') data.run.builtBeds = 0;
+    return data;
   } catch {
     return null;
   }

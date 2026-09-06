@@ -1,0 +1,40 @@
+# The gate. Every push and every pull request runs the same command a
+# contributor runs locally — `npm run check` — so there is exactly one
+# definition of "green" and no way to discover a break only after merging.
+#
+# Nothing is installed: the games have no dependencies by design, so this is
+# a checkout, a node, and the tests.
+name: Check
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A newer push to the same branch makes the older run irrelevant.
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Structure and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Structure first: it is instant, and it explains a break far better
+      # than a test failure downstream of it would.
+      - name: Structure
+        run: npm run check:structure
+
+      - name: Tests
+        run: npm run test:all

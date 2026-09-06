@@ -77,10 +77,7 @@ function buyScreen() {
   const r = run();
   const p = r.today.prices;
   const o = store.ui.order;
-  const baseCost = S.buyCost(p, o);
-  const enhCost = S.enhancerOrderCost(o.enhancers);
-  const sizedCupCost = S.sizedCupOrderCost(p, o);
-  const cost = Math.round((baseCost + sizedCupCost + enhCost) * 100) / 100;
+  const cost = S.totalOrderCost(p, o);
   const left = r.money - cost;
   const after = {
     lemons: r.inventory.lemons + o.lemons,
@@ -308,6 +305,7 @@ function playDay(result) {
   const started = performance.now();
   let shown = -1;
   let frameId = null;
+  let timeoutId = null;
 
   const finish = () => {
     // #screen is never replaced across renders (draw() only swaps its
@@ -319,6 +317,8 @@ function playDay(result) {
     // which path gets there first.
     screenEl.removeEventListener('click', finish);
     if (frameId) cancelAnimationFrame(frameId);
+    if (timeoutId) clearTimeout(timeoutId);       // a click must not leave the timer armed
+    timeoutId = null;
     countEl.innerHTML = `${total}<small>cups sold</small>`;
     tillEl.textContent = money(result.revenue);
     barEl.style.width = '100%';
@@ -339,7 +339,7 @@ function playDay(result) {
     }
     barEl.style.width = `${t * 100}%`;
     if (t < 1) frameId = requestAnimationFrame(frame);
-    else setTimeout(finish, 400);
+    else timeoutId = setTimeout(finish, 400);
   };
 
   frameId = requestAnimationFrame(frame);
@@ -540,7 +540,9 @@ function orderFor(cups) {
 function presetOrder(cups) {
   const r = run();
   const prices = r.today.prices;
-  if (S.buyCost(prices, orderFor(cups)) <= r.money) {
+  // Priced on the whole basket — the small/large cups and enhancers already
+  // in it count too, or a preset can land on an order the Buy button refuses.
+  if (S.totalOrderCost(prices, orderFor(cups)) <= r.money) {
     store.ui.order = orderFor(cups);
     return;
   }
@@ -548,7 +550,7 @@ function presetOrder(cups) {
   let hi = cups;
   while (lo < hi) {
     const mid = Math.ceil((lo + hi) / 2);
-    if (S.buyCost(prices, orderFor(mid)) <= r.money) lo = mid;
+    if (S.totalOrderCost(prices, orderFor(mid)) <= r.money) lo = mid;
     else hi = mid - 1;
   }
   store.ui.order = orderFor(lo);
@@ -599,7 +601,10 @@ function settleRun() {
 
   store.ui.interestEarned = 0;
   store.ui.wagesPaid = 0;
-  if (store.campaign) {
+  // One clock: the office and the bank move only when the network does, and
+  // the network only trades for a corner. A Free Play season is outside all
+  // of that — no wages owed for staff who managed nothing.
+  if (store.campaign && r.corner) {
     const earned = B.accrueInterest(store.campaign, r.history.length, Emp.interestBonus(store.campaign));
     if (earned > 0) {
       recordInterest(earned);
@@ -661,11 +666,7 @@ export const actions = {
   'confirm-buy': () => {
     const r = run();
     const order = store.ui.order;
-    const cost = Math.round((
-      S.buyCost(r.today.prices, order) +
-      S.sizedCupOrderCost(r.today.prices, order) +
-      S.enhancerOrderCost(order.enhancers)
-    ) * 100) / 100;
+    const cost = S.totalOrderCost(r.today.prices, order);
     if (cost > r.money) return;
     r.money = Math.round((r.money - cost) * 100) / 100;
     S.receiveOrder(r, order);

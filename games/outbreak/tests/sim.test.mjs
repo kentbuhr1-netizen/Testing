@@ -115,6 +115,40 @@ test('beds open the week after they are funded, and overflow kills', () => {
   assert.ok(a.overflow > 0 && b.overflow === 0);
 });
 
+test('a ward costs money to staff for as long as it stands', () => {
+  const state = S.newRun(CFG);
+  const first = S.weeklySpend({ ...S.NO_LEVELS, beds: 3 }, state.pop, state.builtBeds);
+  play(state, { beds: 3 });
+  assert.equal(state.builtBeds, 0, 'nothing is open to staff in the week you fund it');
+
+  play(state, { beds: 3 });
+  assert.ok(state.builtBeds > 0, 'the first tranche never opened');
+  const later = S.weeklySpend({ ...S.NO_LEVELS, beds: 3 }, state.pop, state.builtBeds);
+  assert.ok(later > first, 'the same programme should cost more once wards are standing');
+
+  // Stopping the programme still leaves a bill for what is already open.
+  const standing = S.weeklySpend(S.NO_LEVELS, state.pop, state.builtBeds);
+  assert.ok(standing > 0, 'open wards should cost something even with the lever at zero');
+  assert.equal(standing, S.bedUpkeep(state.builtBeds));
+});
+
+test('wards you cannot staff close instead of running up a debt', () => {
+  const state = S.newRun(CFG);
+  for (let i = 0; i < 3; i++) play(state, { beds: 5 });
+  assert.ok(state.builtBeds > 0, 'test needs some wards standing');
+
+  // Strip the budget to nothing and stop funding: upkeep alone is now unpayable.
+  const open = state.builtBeds;
+  state.funds = 0;
+  state.baseFunds = 0;
+  const result = play(state, { beds: 0 });
+
+  assert.ok(state.funds >= 0, 'the player should never be left in debt');
+  assert.ok(result.bedsClosed > 0, 'beds should have closed');
+  assert.ok(state.builtBeds < open, 'the standing stock should have shrunk');
+  assert.ok(result.notes.some((n) => /beds closed/.test(n)), 'the closure went unexplained');
+});
+
 test('patience drains under closure and recovers when things reopen', () => {
   const state = S.newRun(CFG);
   const start = state.compliance;
@@ -210,4 +244,119 @@ test('a programme that outgrows a shrinking budget is scaled back, not stranded'
   // With nothing in the bank, everything that costs money goes.
   const broke = S.affordLevels(greedy, 0, state.pop);
   assert.deepEqual(broke, { trace: 0, distance: 5, vaccine: 0, beds: 0 });
+});
+
+/**
+ * The guard on par itself.
+ *
+ * `parSaved` is only a fair bar if the reference family actually contains the
+ * best simple play available. When it does not, par comes out low, every
+ * target derived from it comes out soft, and the most obvious strategy in the
+ * game clears the hardest tier. This test is what catches that: it plays a
+ * handful of policies a real player would reach for on their first afternoon,
+ * and asserts none of them does better than the family that sets the bar.
+ */
+const HEURISTICS = {
+  'everything at maximum': () => ({ trace: 5, distance: 5, vaccine: 5, beds: 5 }),
+  'vaccinate and nothing else': () => ({ trace: 0, distance: 0, vaccine: 5, beds: 0 }),
+  'beds and nothing else': () => ({ trace: 0, distance: 0, vaccine: 0, beds: 5 }),
+  'vaccines and beds, forever': () => ({ trace: 0, distance: 0, vaccine: 5, beds: 5 }),
+  'close everything, forever': () => ({ trace: 0, distance: 5, vaccine: 0, beds: 0 }),
+  'a light permanent closure': () => ({ trace: 0, distance: 2, vaccine: 5, beds: 3 }),
+  'hammer it early, coast later': (s) => s.week <= 4
+    ? { trace: 5, distance: 5, vaccine: 5, beds: 0 }
+    : { trace: 0, distance: 0, vaccine: 5, beds: 5 },
+};
+
+function playHeuristic(config, pick) {
+  const state = S.newRun(config);
+  state.baselineDeaths = 0;
+  while (state.phase !== 'gameover') {
+    state.levels = S.affordLevels(pick(state), state.funds, state.pop, state.builtBeds);
+    S.commitWeek(state, S.simulateWeek(state));
+  }
+  return state.d;
+}
+
+test('no simple heuristic beats the reference family that sets par', () => {
+  for (const pathogenId of ['marrow', 'quietcarrier', 'greylung', 'ashfall', 'vector', 'cascade']) {
+    const cfg = { ...CFG, pathogenId };
+    const baseline = S.baselineDeaths(cfg);
+    const par = S.parSaved(cfg);
+    for (const [name, pick] of Object.entries(HEURISTICS)) {
+      const saved = Math.max(0, baseline - playHeuristic(cfg, pick));
+      assert.ok(saved <= par + 1,
+        `${pathogenId}: "${name}" saved ${Math.round(saved)} against a par of ${Math.round(par)}`);
+    }
+  }
+});
+
+test('naive play does not come close to par', () => {
+  // The three a player reaches for before they have understood anything.
+  const naive = ['everything at maximum', 'close everything, forever', 'vaccinate and nothing else'];
+  for (const pathogenId of ['marrow', 'greylung', 'cascade']) {
+    const cfg = { ...CFG, pathogenId };
+    const baseline = S.baselineDeaths(cfg);
+    const par = S.parSaved(cfg);
+    for (const name of naive) {
+      const saved = Math.max(0, baseline - playHeuristic(cfg, HEURISTICS[name]));
+      assert.ok(saved < par * 0.9,
+        `${pathogenId}: naive "${name}" saved ${Math.round(saved)} of a par of ${Math.round(par)}`);
+    }
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * The week must always be runnable — for the player and the bots alike
+ * ------------------------------------------------------------------ */
+
+test('a district that funds beds to the maximum every week can always run the week', () => {
+  const state = S.newRun({ ...CFG, funds: 11, baseFunds: 7 });
+  for (let w = 0; w < state.weeks; w++) {
+    state.levels = { ...S.NO_LEVELS, beds: S.MAX_LEVEL };
+    S.affordWeek(state);
+    const bill = S.weeklySpend(state.levels, state.pop, state.builtBeds);
+    assert.ok(bill <= state.funds, `week ${state.week}: bill ${bill} exceeds funds ${state.funds}`);
+    S.commitWeek(state, S.simulateWeek(state));
+    assert.ok(state.funds >= 0, `week ${state.week}: ended in debt (${state.funds})`);
+  }
+});
+
+test('wards close only as far as the shortfall needs, never further', () => {
+  const upkeep = S.bedUpkeep(100);
+  assert.equal(S.wardsToClose(upkeep, 100), 0, 'exactly affordable closes nothing');
+  assert.equal(S.wardsToClose(upkeep * 2, 100), 0);
+  const closed = S.wardsToClose(upkeep / 2, 100);
+  assert.ok(closed > 0 && closed <= 100);
+  assert.ok(S.bedUpkeep(100 - closed) <= upkeep / 2, 'what is left is affordable');
+  assert.ok(closed < 100, 'it does not close the lot when half the money is there');
+  assert.ok(Math.abs(S.bedUpkeep(100 - closed) - upkeep / 2) < S.BED_UPKEEP_PER_BED + 0.02, 'and it closes no more than the shortfall needs');
+  assert.equal(S.wardsToClose(-5, 100), 100, 'no money at all closes every ward');
+});
+
+test('closing wards never forgives a debt it did not cover', () => {
+  const state = S.newRun(CFG);
+  state.builtBeds = 10; state.bedCapacity = 10;
+  state.funds = -1000;                                   // far more than ten beds' upkeep
+  const before = state.funds;
+  S.commitWeek(state, { ...S.simulateWeek(state), spend: 0, income: 0 });
+  assert.equal(state.builtBeds, 0, 'every ward closed');
+  assert.ok(state.funds < 0, 'the remainder is still owed');
+  assert.ok(state.funds > before, 'but the closures did refund their upkeep');
+  assert.equal(Math.round((before + S.bedUpkeep(10) - state.funds) * 100) / 100, 0, 'to the penny');
+});
+
+test('the reference bots never run a week the player could not', () => {
+  const orig = S.commitWeek;
+  for (const policy of S.POLICIES.slice(0, 40)) {
+    const state = S.newRun(CFG);
+    while (state.phase !== 'gameover') {
+      S.affordWeek(state);
+      state.levels = S.referenceLevels(state, policy);
+      const bill = S.weeklySpend(state.levels, state.pop, state.builtBeds);
+      assert.ok(bill <= state.funds + 1e-9, `policy ${JSON.stringify(policy)} week ${state.week} overspent`);
+      S.commitWeek(state, S.simulateWeek(state));
+    }
+  }
+  assert.equal(S.commitWeek, orig);
 });

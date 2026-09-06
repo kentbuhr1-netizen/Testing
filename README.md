@@ -8,6 +8,7 @@ self-contained project sharing the same spine.
 | 🍋 | [`games/lemonade`](games/lemonade) | **Lemonade Stand** — read the weather, mix the pitcher, set your price |
 | 🦠 | [`games/outbreak`](games/outbreak) | **Outbreak** — contain an epidemic with four levers that fight each other |
 | 🌱 | [`games/the-round`](games/the-round) | **The Round** — plan a grass-cutting round against the daylight |
+| 📒 | [`games/the-ledger`](games/the-ledger) | **The Ledger** — say yes or no to one borrower at a time, and find out months later |
 
 Each game is completely independent: its own `package.json`, tests, icons,
 service worker and PWA scope. Nothing in one game imports anything from
@@ -19,7 +20,8 @@ another, so any of them can be lifted out and hosted on its own.
 npm start        # serves everything on http://localhost:8080
 ```
 
-Then open `/games/lemonade/`, `/games/outbreak/` or `/games/the-round/` — or
+Then open `/games/lemonade/`, `/games/outbreak/`, `/games/the-round/` or
+`/games/the-ledger/` — or
 just `/` for the index. On a phone, **Add to Home Screen** installs the one you
 are looking at; each has its own icon and runs offline.
 
@@ -39,7 +41,7 @@ what make them good:
   40% on Easy up to 93% on Impossible. Every game has a test that walks all 625
   and asserts no level asks for more than it can give.
 - **Something meaningful is hidden** and inferred from qualitative feedback
-  rather than read off a number: the recipe, the pathogen, the client.
+  rather than read off a number: the recipe, the pathogen, the client, the borrower.
 - **An operations layer** unlocks partway through and ticks in step with the
   turns you play by hand — and in each game there is one thing that cannot be
   stockpiled, which is what stops the empire replacing the game.
@@ -50,18 +52,51 @@ what make them good:
 |---|---|
 | [`shared/payments`](shared/payments) | The shop: Stripe checkout, signed licences, one server for every game |
 | `tools/sync-payments.mjs` | Copies the payments client into each game — a service worker only caches its own scope, so each game owns a copy |
+| `tools/check-structure.mjs` | Checks what no test can see: that every game caches everything it loads, ships everything its manifest promises, and imports nothing from outside itself |
+| `.github/workflows/check.yml` | Runs `npm run check` on every push and pull request |
 | `.github/workflows/open-game-pr.yml` | Opens a pull request automatically for each `claude/game-*` branch |
 
 Payments are **off** unless configured: with a game's `js/payments.config.js`
 left blank, that game is the complete game. See
 [`shared/payments/README.md`](shared/payments/README.md) to switch the shop on.
 
+## Store apps
+
+Every game ships to the App Store and Google Play as **its own app** — one game,
+one listing, one binary — in a [Capacitor](https://capacitorjs.com) shell that
+wraps the web game unchanged. The shell lives in `games/<slug>/app/` and is
+generated, not hand-written, so a new game gets one in a single command:
+
+```bash
+node tools/make-app.mjs <slug>            # the shell: config, build step, storage shim, store copy
+node tools/make-store-assets.mjs <slug>   # 1024×1024 icon and a splash, from the game's own icon.svg
+cd games/<slug>/app && npm install && npm run add:android && npm run add:ios
+npm run sync                              # every time the game changes
+```
+
+The shell adds exactly one behaviour the browser build lacks: **native save
+mirroring**. iOS may evict WebView storage; every localStorage write is mirrored
+into Capacitor Preferences and restored on launch, so nobody loses a campaign
+or a paid licence to the OS. The game's code is not touched.
+
+What no script can do is in each app's `README.md` and `store/`: the app id (fixed
+forever at first listing), swapping the Stripe paywall for in-app purchase or
+shipping the complete game free (the default), wiring a real rewarded ad behind
+the bonus shop or hiding it, a public privacy-policy URL, and screenshots from
+real devices.
+
 ## Working on them
 
 ```bash
+npm run check        # the gate: structural checks, then every test. What CI runs.
 npm run test:all     # every game's tests, plus the payments tests
 npm run sync         # re-copy the shared payments client into each game
 ```
+
+`npm run check` needs nothing installed — the games have no dependencies, so it
+runs on a fresh clone. [`CLAUDE.md`](CLAUDE.md) has the house rules in full,
+including the two that bite: never edit a synced copy, and always bump a
+service worker's `CACHE` when you change its `ASSETS`.
 
 Inside any game directory:
 
