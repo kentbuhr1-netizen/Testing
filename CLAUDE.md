@@ -8,7 +8,7 @@ can be lifted out and hosted on its own.
 ## Commands
 
 ```bash
-npm run check            # the gate — structure + all 284 tests. Run before pushing.
+npm run check            # the gate — structure + all 487 tests. Run before pushing.
 npm run check:structure  # just the structural invariants (instant)
 npm run test:all         # just the tests
 npm run sync             # re-copy shared client code into each game
@@ -36,7 +36,7 @@ These are deliberate. Do not relax one to make something easier.
   level and the target is a share of what the best of them managed. Every game
   has a test walking all 625 levels asserting none asks for more than it can
   give. If a balance change turns that red, the change is wrong — not the test.
-- **One thing can never be stockpiled** in each game (ice, beds, daylight).
+- **One thing can never be stockpiled** in each game (ice, beds, daylight, heat).
   That is what stops the operations layer replacing the game.
 
 ## Invariants `check:structure` enforces

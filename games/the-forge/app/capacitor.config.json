@@ -1,0 +1,18 @@
+{
+  "appId": "com.kentbuhr.theforge",
+  "appName": "The Forge",
+  "webDir": "www",
+  "backgroundColor": "#1a1210",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#1a1210"
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "backgroundColor": "#1a1210",
+    "scheme": "TheForge"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

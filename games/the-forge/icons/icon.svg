@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="The Forge">
+  <defs>
+    <linearGradient id="night" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b1c14"/>
+      <stop offset="1" stop-color="#120c09"/>
+    </linearGradient>
+    <radialGradient id="fire" cx="50%" cy="72%" r="55%">
+      <stop offset="0" stop-color="#fff0c2"/>
+      <stop offset="0.35" stop-color="#ffb020"/>
+      <stop offset="0.7" stop-color="#e0490a"/>
+      <stop offset="1" stop-color="#e0490a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e7e2da"/>
+      <stop offset="0.5" stop-color="#a7a09a"/>
+      <stop offset="1" stop-color="#6d6762"/>
+    </linearGradient>
+    <linearGradient id="hot" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fff2b0"/>
+      <stop offset="1" stop-color="#ff8a08"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#night)"/>
+  <ellipse cx="256" cy="360" rx="210" ry="150" fill="url(#fire)"/>
+
+  <!-- the anvil -->
+  <path d="M118 356h276v34H118z" fill="#4a423c"/>
+  <path d="M150 322h212v34H150z" fill="#5d544d"/>
+  <path d="M96 268h300l-34 44H130z" fill="url(#steel)"/>
+  <path d="M96 268h300v16H96z" fill="#cfc8c0"/>
+
+  <!-- the bar on the face, at working heat -->
+  <rect x="150" y="240" width="190" height="22" rx="10" fill="url(#hot)"/>
+
+  <!-- the hammer, mid-swing -->
+  <g transform="rotate(-32 330 150)">
+    <rect x="316" y="128" width="26" height="188" rx="12" fill="#7a4a22"/>
+    <rect x="256" y="88" width="150" height="62" rx="14" fill="url(#steel)"/>
+    <rect x="256" y="88" width="150" height="16" rx="8" fill="#e7e2da"/>
+  </g>
+
+  <!-- sparks -->
+  <g fill="#ffd98a">
+    <circle cx="196" cy="214" r="9"/>
+    <circle cx="240" cy="186" r="6"/>
+    <circle cx="158" cy="192" r="5"/>
+    <circle cx="286" cy="204" r="5"/>
+  </g>
+</svg>
