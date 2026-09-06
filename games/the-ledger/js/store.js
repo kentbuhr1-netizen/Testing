@@ -6,6 +6,13 @@
  * `ui` is throwaway view state — which screen, the shipment being filled in.
  */
 const SAVE_KEY = 'the-ledger-campaign-v1';
+/**
+ * 2 — the books were re-dealt (see `tools/reroll-seeds.mjs`), so a target
+ * cached against the old hand no longer describes the book it is filed under.
+ * A version-1 save keeps every town it has taken and simply has its cached
+ * targets dropped, to be measured again from the books as they now are.
+ */
+const SAVE_VERSION = 2;
 const BEST_KEY = 'the-ledger-best-v1';
 
 export const store = {
@@ -34,7 +41,7 @@ export function save() {
   if (!store.campaign) return;
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      version: 1,
+      version: SAVE_VERSION,
       campaign: store.campaign,
       run: store.run,
       view: store.ui.view === 'help' || store.ui.view === 'shop' ? 'world' : store.ui.view,
@@ -51,7 +58,12 @@ export function loadSave() {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    return data?.version === 1 && data.campaign ? data : null;
+    if (!data?.campaign) return null;
+    if (data.version === 1) {
+      delete data.campaign.targets;
+      data.version = SAVE_VERSION;
+    }
+    return data.version === SAVE_VERSION ? data : null;
   } catch {
     return null;
   }
