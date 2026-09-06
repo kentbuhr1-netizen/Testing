@@ -53,6 +53,7 @@ what make them good:
 | [`shared/payments`](shared/payments) | The shop: Stripe checkout, signed licences, one server for every game |
 | `tools/sync-payments.mjs` | Copies the payments client into each game — a service worker only caches its own scope, so each game owns a copy |
 | `tools/check-structure.mjs` | Checks what no test can see: that every game caches everything it loads, ships everything its manifest promises, and imports nothing from outside itself |
+| `tools/delegate.mjs` | Hands a bounded task — a second-opinion review, test ideas, store copy — to ChatGPT and prints the answer. Advice only; needs `OPENAI_API_KEY` |
 | `.github/workflows/check.yml` | Runs `npm run check` on every push and pull request |
 | `.github/workflows/open-game-pr.yml` | Opens a pull request automatically for each `claude/game-*` branch |
 
