@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="The Ledger">
+  <rect width="512" height="512" rx="112" fill="#12332f"/>
+  <rect x="104" y="96" width="304" height="320" rx="18" fill="#f2ece0"/>
+  <rect x="104" y="96" width="46" height="320" rx="18" fill="#8a5a3b"/>
+  <g stroke="#c8bda8" stroke-width="10" stroke-linecap="round">
+    <path d="M186 168h176M186 216h176M186 264h176M186 312h110"/>
+  </g>
+  <circle cx="352" cy="332" r="62" fill="#1d4f4a"/>
+  <path d="M352 300v64M334 316h30a12 12 0 0 1 0 24h-24a12 12 0 0 0 0 24h32"
+        stroke="#f5d547" stroke-width="12" fill="none" stroke-linecap="round"/>
+</svg>
