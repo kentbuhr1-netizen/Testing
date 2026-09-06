@@ -310,15 +310,54 @@ export function targetFor(campaign, regionId, districtIndex) {
  * Progress
  * ------------------------------------------------------------------ */
 
+/**
+ * Which version of the model the cached targets were measured against.
+ *
+ * A target is a share of what `parSaved` finds on a district, so a change to
+ * `sim.js` that moves par makes every cached bar wrong — measured honestly,
+ * but against a game that no longer exists. Bump this whenever that happens
+ * and `migrateCampaign` drops the stale bars, so each district is re-measured
+ * the next time it is offered.
+ *
+ * 1 → the original model. 2 → wards carry a staffing bill, the reference
+ * family spans full-strength levers, and the bots obey the player's budget.
+ */
+export const TARGET_MODEL_VERSION = 2;
+
 export function newCampaign() {
   return {
     version: 1,
+    targetModel: TARGET_MODEL_VERSION,
     treasury: 0,        // agency budget, $M
     held: {},           // regionId → array of held district indexes
     targets: {},        // "regionId:index" → the bar, cached once shown
     ops: null,          // built by ops.js once five regions are done
     stats: { runsPlayed: 0, runsWon: 0, livesSaved: 0 },
   };
+}
+
+/**
+ * Bring a loaded campaign up to the current model.
+ *
+ * Only the cached targets are dropped — districts held, treasury, statistics
+ * and the agency all survive, because none of them is a claim about what a
+ * district asks for. A district already taken keeps nothing that matters: its
+ * bar has been cleared. One not yet attempted gets an honest bar the next time
+ * it is offered. And a district being played right now is untouched, because
+ * the run carries its own copy of the target from the moment it starts, which
+ * is what keeps the bar from moving under the player mid-outbreak.
+ *
+ * Returns how many bars were dropped, so the caller can say so.
+ */
+export function migrateCampaign(campaign) {
+  if (!campaign) return { cleared: 0, from: null };
+  const from = campaign.targetModel ?? 1;
+  if (from === TARGET_MODEL_VERSION) return { cleared: 0, from };
+
+  const cleared = Object.keys(campaign.targets || {}).length;
+  campaign.targets = {};
+  campaign.targetModel = TARGET_MODEL_VERSION;
+  return { cleared, from };
 }
 
 export const heldIn = (campaign, regionId) => campaign.held[regionId] || [];

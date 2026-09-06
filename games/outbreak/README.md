@@ -134,7 +134,7 @@ js/ops.js               laboratories, procurement, teams, the weekly tick
 js/store.js             shared state and the save file
 js/app.js               router, HUD, input
 js/ui/                  screens: map.js, run.js, opsui.js, kit.js
-tests/                  49 tests across the model, the campaign and the agency
+tests/                  58 tests across the model, the campaign and the agency
 tools/make-icons.mjs    regenerates icons/*.png from icons/icon.svg
 ```
 
@@ -143,7 +143,7 @@ can be played and balanced from node. The same seed always replays the same
 outbreak.
 
 ```bash
-npm test           # 49 tests
+npm test           # 58 tests
 npm run icons      # rebuild PNG icons from the SVG (needs headless Chromium)
 ```
 
@@ -151,7 +151,12 @@ Two constants set how long the campaign runs, in `js/campaign.js`:
 `DISTRICTS_TO_TAKE_REGION` (how much of a region you must hold) and
 `REGIONS_FOR_OPS` (how many regions unlock the agency).
 
-Progress saves to `localStorage` after every action. **Free response** — a
+Progress saves to `localStorage` after every action. Targets are cached in the
+save so a bar never moves under you mid-campaign — but they are *measured*, so
+when a change to the model moves what `parSaved` finds, the stale bars are
+dropped on load and each district is measured again the next time it is
+offered. Districts held, treasury and statistics are untouched, and a district
+you are part-way through keeps the target it started on. **Free response** — a
 single open-ended 14-week outbreak with no target — is also on the menu.
 
 ## A note on the model

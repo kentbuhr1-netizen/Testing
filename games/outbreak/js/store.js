@@ -5,6 +5,8 @@
  * `run` is the outbreak currently being worked, a week at a time.
  * `ui` is throwaway view state — which screen, the order being filled in.
  */
+import { migrateCampaign } from './campaign.js';
+
 const SAVE_KEY = 'outbreak-campaign-v1';
 const BEST_KEY = 'outbreak-best-v1';
 
@@ -52,6 +54,9 @@ export function loadSave() {
     // A run saved before wards carried a staffing bill has no bed stock to
     // staff. Without this the first committed week adds to `undefined`.
     if (data.run && typeof data.run.builtBeds !== 'number') data.run.builtBeds = 0;
+    // Targets cached against an older model are honest numbers for a game that
+    // no longer exists. Drop them; each district is re-measured when offered.
+    data.migrated = migrateCampaign(data.campaign);
     return data;
   } catch {
     return null;
