@@ -204,7 +204,9 @@ test('building upkeep is charged whether or not anything gets made', () => {
   const before = campaign.treasury;
   const summary = O.tickOps(campaign, 3);
   assert.equal(summary.produced.cups, 0, 'no room to press into');
-  assert.equal(campaign.treasury, Math.round((before - 3 * O.BUILDINGS.cupFactory.upkeep) * 100) / 100);
+  // The depot itself is owed too, staffed or not — a depot is paid for whether it sells or not.
+  const depotUpkeep = 3 * O.effectiveWarehouseUpkeep(campaign);
+  assert.equal(campaign.treasury, Math.round((before - 3 * O.BUILDINGS.cupFactory.upkeep - depotUpkeep) * 100) / 100);
 });
 
 test('an ice maker covers ice for free up to its daily press', () => {
@@ -363,7 +365,9 @@ test('unassigning a truck parks it for free', () => {
   assert.equal(O.unassignTruck(campaign, id).ok, true);
   const before = campaign.treasury;
   O.tickOps(campaign, 3);
-  assert.equal(campaign.treasury, before, 'a parked truck should not be charged upkeep');
+  // Two depots still owe their own upkeep; the parked truck must add nothing on top.
+  const depots = 2 * 3 * O.effectiveWarehouseUpkeep(campaign);
+  assert.equal(campaign.treasury, Math.round((before - depots) * 100) / 100, 'a parked truck should not be charged upkeep');
 });
 
 /* -------------------------------------------------------------- *
@@ -446,4 +450,15 @@ test('a farm can feed a truck that feeds a staffed corner in a different city', 
   const summary = O.tickOps(campaign, 4);
   assert.ok(summary.trucked > 0, 'the farm\'s lemons should have moved');
   assert.ok(summary.cups > 0, 'Austin should have sold cups using trucked-in lemons');
+});
+
+test('a depot is paid for whether or not anyone is staffed to sell from it', () => {
+  const campaign = C.newCampaign();
+  campaign.ops = O.newOps();
+  campaign.treasury = 1000;
+  O.buyWarehouse(campaign, 'nyc');
+  const afterBuild = campaign.treasury;
+  const summary = O.tickOps(campaign, 3);
+  assert.ok(campaign.treasury < afterBuild, 'upkeep was charged with nobody staffed');
+  assert.ok(summary.costs > 0);
 });

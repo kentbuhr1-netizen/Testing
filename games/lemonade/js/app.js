@@ -5,7 +5,7 @@
  * returning { body, actions, mounted }) and `actions` (button name → handler).
  * This file owns the DOM, the HUD, input, and saving after every action.
  */
-import { store, onRender, render, save, hasTutorialBeenSeen } from './store.js';
+import { store, onRender, render, save, saveSoon, hasTutorialBeenSeen } from './store.js';
 import * as C from './campaign.js';
 import * as S from './sim.js';
 import * as mapUi from './ui/map.js';
@@ -77,8 +77,10 @@ function draw() {
     window.scrollTo(0, 0);
   }
   screen.mounted?.();
-  save();
+  saveSoon();
 }
+// Whatever the coalescing timer has not written yet, write before the page goes.
+window.addEventListener('pagehide', save);
 
 function drawHud() {
   const inRun = store.ui.view === 'run' && store.run;
@@ -150,14 +152,7 @@ const LIMITS = {
   enhancerOrder: Object.fromEntries(Object.keys(S.ENHANCERS).map((id) => [id, [0, 999]])),
 };
 
-/** Every category a shopping basket can cost money in, added together. */
-function totalOrderCost(prices, order) {
-  return Math.round((
-    S.buyCost(prices, order) +
-    S.sizedCupOrderCost(prices, order) +
-    S.enhancerOrderCost(order.enhancers)
-  ) * 100) / 100;
-}
+const totalOrderCost = S.totalOrderCost;
 
 /** Apply one tap of a stepper. Returns false when it could not move. */
 function applyStep(group, field, step) {
