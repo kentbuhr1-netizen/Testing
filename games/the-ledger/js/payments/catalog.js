@@ -15,6 +15,7 @@ export const FREE_TIER = {
   lemonade: { cities: 3 },
   'the-round': { towns: 3 },
   'the-ledger': { towns: 3 },
+  'gadget-factory': { tiers: 2 },
 };
 
 /**
@@ -57,6 +58,15 @@ export const PRODUCTS = [
     amount: 499,
     currency: 'usd',
     unlocks: ['the-ledger'],
+  },
+  {
+    id: 'gadget-factory.full',
+    game: 'gadget-factory',
+    name: 'Gadget Factory — full product ladder',
+    blurb: 'All five product lines, bicycles to spacecraft, and the regional offices.',
+    amount: 499,
+    currency: 'usd',
+    unlocks: ['gadget-factory'],
   },
   {
     id: 'bundle.all',

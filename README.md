@@ -9,6 +9,7 @@ self-contained project sharing the same spine.
 | 🦠 | [`games/outbreak`](games/outbreak) | **Outbreak** — contain an epidemic with four levers that fight each other |
 | 🌱 | [`games/the-round`](games/the-round) | **The Round** — plan a grass-cutting round against the daylight |
 | 📒 | [`games/the-ledger`](games/the-ledger) | **The Ledger** — say yes or no to one borrower at a time, and find out months later |
+| 🏭 | [`games/gadget-factory`](games/gadget-factory) | **Gadget Factory** — tap, sell, buy machines, and prestige from bicycles to spacecraft |
 
 Each game is completely independent: its own `package.json`, tests, icons,
 service worker and PWA scope. Nothing in one game imports anything from

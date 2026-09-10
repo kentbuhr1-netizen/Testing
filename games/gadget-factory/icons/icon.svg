@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Gadget Factory">
+  <rect width="512" height="512" rx="112" fill="#171310"/>
+  <path d="M120 340 L120 220 L200 270 L200 220 L280 270 L280 220 L360 270 L360 340 Z" fill="#e8871e"/>
+  <rect x="120" y="340" width="272" height="56" rx="8" fill="#b8630e"/>
+  <rect x="150" y="360" width="36" height="24" rx="4" fill="#171310"/>
+  <rect x="238" y="360" width="36" height="24" rx="4" fill="#171310"/>
+  <rect x="326" y="360" width="36" height="24" rx="4" fill="#171310"/>
+  <circle cx="200" cy="180" r="14" fill="#f4a13b"/>
+  <circle cx="280" cy="165" r="16" fill="#f4a13b"/>
+</svg>

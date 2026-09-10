@@ -1,0 +1,13 @@
+{
+  "name": "gadget-factory",
+  "version": "1.0.0",
+  "description": "A manufacturing tycoon clicker, built to play on a phone.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8084 --directory ../..",
+    "test": "node --test tests/*.test.mjs",
+    "icons": "node tools/make-icons.mjs"
+  },
+  "license": "MIT"
+}

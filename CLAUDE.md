@@ -8,7 +8,7 @@ can be lifted out and hosted on its own.
 ## Commands
 
 ```bash
-npm run check            # the gate — structure + all 284 tests. Run before pushing.
+npm run check            # the gate — structure + all 447 tests. Run before pushing.
 npm run check:structure  # just the structural invariants (instant)
 npm run test:all         # just the tests
 npm run sync             # re-copy shared client code into each game

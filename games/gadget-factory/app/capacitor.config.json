@@ -1,0 +1,18 @@
+{
+  "appId": "com.kentbuhr.gadgetfactory",
+  "appName": "Gadget Factory",
+  "webDir": "www",
+  "backgroundColor": "#171310",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#171310"
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "backgroundColor": "#171310",
+    "scheme": "GadgetFactory"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}
