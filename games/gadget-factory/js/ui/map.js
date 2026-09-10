@@ -188,6 +188,7 @@ export const actions = {
   newCampaign() {
     clearSave();
     store.campaign = C.newCampaign();
+    store.ui.tierId = null;   // a tier left open from a previous campaign must not keep ticking into this one
     store.ui.view = 'tiers';
   },
 
@@ -238,6 +239,7 @@ export const actions = {
   wipeSave() {
     clearSave();
     store.campaign = null;
+    store.ui.tierId = null;
     store.ui.view = 'title';
   },
 };

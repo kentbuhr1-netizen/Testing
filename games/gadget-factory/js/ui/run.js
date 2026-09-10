@@ -4,7 +4,7 @@
 import { store, render, recordBest } from '../store.js';
 import * as S from '../sim.js';
 import * as C from '../campaign.js';
-import { money, pct, fact, bar, offlineFlash } from './kit.js';
+import { money, fact, bar, offlineFlash } from './kit.js';
 
 const UPGRADES = [
   { id: 'tap', label: 'Tap Power', icon: '👆', blurb: 'Every tap assembles more at once.' },

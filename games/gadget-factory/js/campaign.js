@@ -106,7 +106,6 @@ export const TREASURY_SHARE_OF_PRESTIGE = 0.03;
 export function newCampaign() {
   return {
     version: 1,
-    tier: 0,               // which product line the player is actively working
     lifetimeCash: 0,        // carries a tier's prestige multiplier forward
     prestigesByTier: TIERS.map(() => 0),
     unlockedTiers: 1,        // how many tiers are open to switch into
@@ -138,7 +137,10 @@ export function recordPrestige(campaign, tierIndex, earnedThisRun) {
 
   return {
     tierJustUnlocked: justUnlocked,
-    opsJustUnlocked: campaign.unlockedTiers - 1 === TIERS_FOR_OPS,
+    // Only the prestige that actually crosses the threshold should announce
+    // it — not every later prestige that happens to leave unlockedTiers at
+    // the same count.
+    opsJustUnlocked: justUnlocked && campaign.unlockedTiers - 1 === TIERS_FOR_OPS,
   };
 }
 

@@ -193,7 +193,7 @@ function candidates(tier, state, lifetimeCash) {
   for (const machine of tier.machines) {
     const owned = state.machines[machine.id] || 0;
     out.push({ kind: 'machine', id: machine.id, cost: machineCost(tier, machine.id, owned),
-      gain: machine.baseRate * (1 + state.upgrades.speed * SPEED_LEVEL_GAIN) * sellPrice(tier, state, lifetimeCash) });
+      gain: estimateMachineGain(tier, state, machine.id, lifetimeCash) });
   }
   for (const kind of ['speed', 'price']) {
     out.push({ kind: 'upgrade', id: kind, cost: upgradeCost(tier, kind, state.upgrades[kind]),
@@ -202,6 +202,19 @@ function candidates(tier, state, lifetimeCash) {
   out.push({ kind: 'upgrade', id: 'grid', cost: upgradeCost(tier, 'grid', state.upgrades.grid),
     gain: estimateUpgradeGain(tier, state, 'grid', lifetimeCash) });
   return out.filter((c) => c.gain > 0);
+}
+
+/**
+ * How much extra income/sec one more unit of a machine would add right now.
+ * Never the machine's raw rate on its own — a machine bought past what the
+ * grid can carry adds nothing at all, and a bot that priced it as if it did
+ * would waste money the true-optimal player would spend on the grid instead.
+ */
+function estimateMachineGain(tier, state, machineId, lifetimeCash) {
+  const before = incomePerSecond(tier, state, lifetimeCash);
+  const owned = state.machines[machineId] || 0;
+  const trial = { ...state, machines: { ...state.machines, [machineId]: owned + 1 } };
+  return incomePerSecond(tier, trial, lifetimeCash) - before;
 }
 
 /** How much extra income/sec one more level of an upgrade would add right now. */

@@ -85,17 +85,30 @@ onRender(draw);
 /* ------------------------------------------------------------------ *
  * The idle tick
  *
- * One real second at a time, so a floor left open keeps producing exactly
- * the way it would if you glanced away and came back — no special-cased
- * "offline" math for the case where you never actually left.
+ * The tier you last opened keeps producing whether you are looking at its
+ * floor, browsing the tier ladder, or checking on regional offices — the
+ * same tier the offline catch-up in ui/map.js credits on reload. Only
+ * leaving the app (or picking a different tier) stops it, never switching
+ * screens inside it.
+ *
+ * Real elapsed time is measured between ticks rather than assumed to be
+ * exactly one second: a backgrounded tab throttles `setInterval` (often
+ * hard, sometimes to once a minute), and crediting a throttled tick as if a
+ * full second had passed would quietly undercount everything it missed.
  * ------------------------------------------------------------------ */
 
+let lastTick = Date.now();
 setInterval(() => {
-  if (!store.campaign || store.ui.view !== 'floor' || !store.ui.tierId) return;
+  const now = Date.now();
+  const elapsed = (now - lastTick) / 1000;
+  lastTick = now;
+
+  if (!store.campaign || !store.ui.tierId) return;
+  if (!C.isTierUnlocked(store.campaign, C.TIER_INDEX[store.ui.tierId])) return;
   const tier = C.getTier(store.ui.tierId);
   const floor = C.getFloor(store.campaign, store.ui.tierId);
-  S.advance(tier, floor, 1, store.campaign.lifetimeCash);
-  render();
+  const { earned } = S.advance(tier, floor, elapsed, store.campaign.lifetimeCash);
+  if (earned > 0 && store.ui.view === 'floor') render();
 }, 1000);
 
 /* ------------------------------------------------------------------ *

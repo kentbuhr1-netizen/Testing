@@ -79,14 +79,19 @@ test('a prestige banks a share of its earnings into the treasury', () => {
   assert.equal(campaign.treasury, Math.round(10_000 * C.TREASURY_SHARE_OF_PRESTIGE * 100) / 100);
 });
 
-test('regional offices unlock once TIERS_FOR_OPS tiers have a first prestige', () => {
+test('regional offices unlock once TIERS_FOR_OPS tiers have a first prestige, and the announcement fires exactly once', () => {
   const campaign = C.newCampaign();
   assert.equal(C.opsUnlocked(campaign), false);
   for (let i = 0; i < C.TIERS_FOR_OPS; i++) {
     const change = C.recordPrestige(campaign, i, 1000);
     if (i === C.TIERS_FOR_OPS - 1) assert.equal(change.opsJustUnlocked, true);
+    else assert.equal(change.opsJustUnlocked, false);
   }
   assert.equal(C.opsUnlocked(campaign), true);
+
+  // A later, unrelated prestige must not re-announce something that already happened.
+  const later = C.recordPrestige(campaign, 0, 1000);
+  assert.equal(later.opsJustUnlocked, false);
 });
 
 test('the final tier prestiging does not try to unlock a sixth one', () => {

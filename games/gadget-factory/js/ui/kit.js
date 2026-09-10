@@ -16,9 +16,6 @@ export function money(n) {
   return `${sign}$${abs.toFixed(0)}`;
 }
 
-export const count = (n) => money(n).replace('$', '');
-export const pct = (n) => `${Math.round(n * 100)}%`;
-
 export function fact(label, value, cls = '') {
   return `<div class="fact"><div class="fact-label">${label}</div><div class="fact-value ${cls}">${value}</div></div>`;
 }
@@ -26,17 +23,6 @@ export function fact(label, value, cls = '') {
 export function bar(fraction, cls = '') {
   const width = Math.max(0, Math.min(1, fraction)) * 100;
   return `<span class="bar ${cls}"><i style="width:${width.toFixed(1)}%"></i></span>`;
-}
-
-export function row(name, sub, control) {
-  return `
-    <div class="row">
-      <div class="row-main">
-        <div class="row-name">${name}</div>
-        ${sub ? `<div class="row-sub">${sub}</div>` : ''}
-      </div>
-      ${control || ''}
-    </div>`;
 }
 
 export function backBar(label, act, extra = '') {
