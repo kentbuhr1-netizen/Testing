@@ -11,6 +11,7 @@ can be lifted out and hosted on its own.
 npm run check            # the gate — structure + all 284 tests. Run before pushing.
 npm run check:structure  # just the structural invariants (instant)
 npm run test:all         # just the tests
+npm run regression       # play every game through its core loop in a browser
 npm run sync             # re-copy shared client code into each game
 npm start                # serve on http://localhost:8080
 ```
@@ -18,6 +19,12 @@ npm start                # serve on http://localhost:8080
 `npm run check` is exactly what CI runs (`.github/workflows/check.yml`). There
 is no build step, no framework and no dependency install — `npm run check`
 works on a fresh clone.
+
+`npm run regression` is the one command that needs a browser, which is why it
+sits outside the gate. It catches what the tests structurally cannot see: a
+screen that renders but whose button is dead, an action name in the markup
+with no handler behind it, a `NaN` reaching the page. Add a flow for a new
+game in `tools/regression.mjs` — `node tools/regression.mjs <slug>` runs one.
 
 Inside a game directory: `npm test`, `npm run icons`.
 
